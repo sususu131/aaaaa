@@ -16,8 +16,38 @@ export default function DungeonRuntime({ onClose, getSessionToken, onPickOption 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [rewardSummary, setRewardSummary] = useState(null); // 服务器最终结算结果
+  const [timedEvent, setTimedEvent] = useState(null); // 限时抉择（QTE）
+  const [timedResult, setTimedResult] = useState(null);
+  const [timedLeft, setTimedLeft] = useState(1); // 剩余比例 0..1
+  const [agentEvents, setAgentEvents] = useState([]); // Agent 轨迹（默认折叠）
 
   const token = () => (getSessionToken ? getSessionToken() : null);
+
+  // QTE 倒计时（进度条）
+  useEffect(() => {
+    if (!timedEvent) return undefined;
+    const tick = () => {
+      const left = Math.max(0, timedEvent.expiresAt - Date.now());
+      setTimedLeft(Math.max(0, Math.min(1, left / timedEvent.deadlineMs)));
+      if (left <= 0) setTimedEvent(null); // 服务器会广播 timedExpired
+    };
+    tick();
+    const id = setInterval(tick, 100);
+    return () => clearInterval(id);
+  }, [timedEvent]);
+
+  const chooseTimed = async (index) => {
+    if (!timedEvent || !instanceUid) return;
+    const id = timedEvent.id;
+    setTimedEvent(null);
+    try {
+      const r = await api.timedChoice(instanceUid, index, token());
+      if (!r.ok) setError(`选择被拒：${r.reason}`);
+    } catch (e) {
+      setError(e.message);
+    }
+    void id;
+  };
 
   useEffect(() => {
     api.listDungeons().then((d) => setDungeons(d.dungeons || [])).catch(() => {});
@@ -34,15 +64,31 @@ export default function DungeonRuntime({ onClose, getSessionToken, onPickOption 
       setRewardSummary(data && data.grants ? data.grants : []);
       refresh();
     };
+    // 阶段7：限时抉择（QTE）+ Agent 轨迹
+    const onTimedEvent = (data) => setTimedEvent({ ...data, receivedAt: Date.now() });
+    const onTimedExpired = (data) => {
+      setTimedResult(data);
+      setTimedEvent(null);
+      refresh();
+    };
+    const onAgentEvent = (evt) => {
+      setAgentEvents((prev) => [...prev.slice(-40), evt]);
+    };
     socket.on('instance:update', onUpdate);
     socket.on('instance:scene', onScene);
     socket.on('instance:combat', onCombat);
     socket.on('instance:completed', onCompleted);
+    socket.on('instance:timedEvent', onTimedEvent);
+    socket.on('instance:timedExpired', onTimedExpired);
+    socket.on('agent:event', onAgentEvent);
     return () => {
       socket.off('instance:update', onUpdate);
       socket.off('instance:scene', onScene);
       socket.off('instance:combat', onCombat);
       socket.off('instance:completed', onCompleted);
+      socket.off('instance:timedEvent', onTimedEvent);
+      socket.off('instance:timedExpired', onTimedExpired);
+      socket.off('agent:event', onAgentEvent);
     };
     // eslint-disable-next-line
   }, [instanceUid]);
@@ -176,6 +222,30 @@ export default function DungeonRuntime({ onClose, getSessionToken, onPickOption 
               </div>
             )}
 
+            {timedEvent && (
+              <div className="timed-event">
+                <h4>⚠ {timedEvent.prompt}</h4>
+                <div className="timed-bar">
+                  <div className={`timed-fill ${timedLeft < 0.3 ? 'danger' : ''}`} style={{ width: `${timedLeft * 100}%` }} />
+                </div>
+                <div className="action-options">
+                  {timedEvent.options.map((o, i) => (
+                    <button key={i} className="option-btn timed" onClick={() => chooseTimed(i)}>
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="muted small">倒计时结束前未选择将承受后果！</p>
+              </div>
+            )}
+            {timedResult && (
+              <div className="gm-status">
+                {timedResult.outcome === 'RESOLVED'
+                  ? `✅ ${timedResult.by} 选择了「${timedResult.choice}」`
+                  : `💀 来不及了！${(timedResult.victims || []).map((v) => `${v.name} -${v.damage}HP${v.downed ? '（倒下）' : ''}`).join('，') || '无人受伤'}`}
+              </div>
+            )}
+
             {snapshot.instance.status === 'RUNNING' && (
               <div className="chat-input-row">
                 <input
@@ -186,6 +256,28 @@ export default function DungeonRuntime({ onClose, getSessionToken, onPickOption 
                 />
                 <button className="btn primary" disabled={busy || !actionText.trim()} onClick={sendAction}>行动</button>
               </div>
+            )}
+
+            {agentEvents.length > 0 && (
+              <details className="source-refs">
+                <summary>AI Agent 轨迹（{agentEvents.length} 事件）</summary>
+                <pre className="context-content" style={{ maxHeight: 180 }}>
+                  {agentEvents
+                    .map((e) => {
+                      if (e.type === 'AI_TOOL_START') return `🔧 工具调用：${e.tool}`;
+                      if (e.type === 'AI_TOOL_RESULT') return `${e.ok ? '✅' : '❌'} 工具结果：${e.tool}${e.durationMs != null ? `（${e.durationMs}ms）` : ''}`;
+                      if (e.type === 'AI_SEARCH_START') return `🔎 搜索：${e.query}`;
+                      if (e.type === 'AI_TEXT_DELTA') return null;
+                      if (e.type === 'AI_THINKING') return `🤔 第${e.round}轮推演…`;
+                      if (e.type === 'AI_ERROR') return `⚠ AI错误[${e.code}] ${e.message}`;
+                      if (e.type === 'AI_COMPLETE') return `🏁 完成（${e.rounds}轮，${e.toolCalls ?? 0}次工具）`;
+                      return `${e.type}`;
+                    })
+                    .filter(Boolean)
+                    .slice(-30)
+                    .join('\n')}
+                </pre>
+              </details>
             )}
             {snapshot.instance.status === 'WAITING' && (
               <div className="chat-input-row">

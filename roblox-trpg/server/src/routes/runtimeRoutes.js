@@ -153,6 +153,58 @@ router.get('/api/dungeon-instances/:id', (req, res) => {
   }
 });
 
+/** POST /api/dungeon-instances/:id/timed-choice —— 限时抉择（QTE）：倒计时内选择，幂等。 */
+router.post('/api/dungeon-instances/:id/timed-choice', (req, res) => {
+  try {
+    const sess = authPlayer(req, res);
+    if (!sess) return;
+    const instance = im.getInstance(req.params.id);
+    const player = getDb().prepare('SELECT * FROM players WHERE id = ?').get(sess.playerRowId);
+    if (!player || !im.partyOf(instance).includes(player.id)) {
+      return res.status(403).json({ error: '你不是该实例的队伍成员', code: 'NOT_IN_PARTY' });
+    }
+    if (instance.status !== 'RUNNING') {
+      return res.status(409).json({ error: `实例状态 ${instance.status}，不能行动`, code: 'NOT_RUNNING' });
+    }
+    const { io } = require('../index.js');
+    const result = runtimeEngine.resolveTimedChoice(io, instance, player, (req.body || {}).choiceIndex);
+    if (!result.ok) return res.status(409).json({ error: `选择被拒：${result.reason}`, code: result.reason });
+    res.json(result);
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+/** GET /api/agent-runs?roomId= —— Agent Trace（开发/调试）。 */
+router.get('/api/agent-runs', (req, res) => {
+  try {
+    const db = getDb();
+    const runs = req.query.roomId
+      ? db.prepare('SELECT * FROM agent_runs WHERE room_id = ? ORDER BY id DESC LIMIT 50').all(String(req.query.roomId))
+      : db.prepare('SELECT * FROM agent_runs ORDER BY id DESC LIMIT 50').all();
+    res.json({ runs });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+/** GET /api/agent-runs/:id —— 单次 Agent Run 的逐轮工具轨迹（Replay 视角）。 */
+router.get('/api/agent-runs/:id', (req, res) => {
+  try {
+    const db = getDb();
+    const run = db.prepare('SELECT * FROM agent_runs WHERE id = ? OR uid = ?').get(Number(req.params.id) || -1, String(req.params.id));
+    if (!run) return res.status(404).json({ error: 'Agent Run 不存在', code: 'RUN_NOT_FOUND' });
+    const calls = db.prepare('SELECT * FROM agent_tool_calls WHERE agent_run_id = ? ORDER BY round, id').all(run.id);
+    const rounds = {};
+    for (const c of calls) {
+      (rounds[c.round] = rounds[c.round] || []).push(c);
+    }
+    res.json({ run, rounds });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 /** GET /api/dungeon-instances/:id/events —— 事件日志（Replay 数据）。 */
 router.get('/api/dungeon-instances/:id/events', (req, res) => {
   try {

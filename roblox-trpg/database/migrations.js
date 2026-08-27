@@ -9,6 +9,42 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '004_stage7_agent_runtime',
+    up(db) {
+      // Agent Run 追踪（阶段7 第四十一节）
+      db.exec(`CREATE TABLE IF NOT EXISTS agent_runs (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        uid          TEXT UNIQUE,
+        room_id      TEXT,
+        instance_id  INTEGER,
+        player_id    INTEGER,
+        scope        TEXT,                    -- room / dungeon
+        status       TEXT NOT NULL DEFAULT 'RUNNING' CHECK (status IN ('RUNNING','COMPLETED','FAILED','STOPPED')),
+        rounds       INTEGER NOT NULL DEFAULT 0,
+        tool_calls   INTEGER NOT NULL DEFAULT 0,
+        searches     INTEGER NOT NULL DEFAULT 0,
+        budget       TEXT,
+        error        TEXT,
+        started_at   TEXT NOT NULL DEFAULT (datetime('now')),
+        completed_at TEXT
+      )`);
+      // Tool Call 追踪（阶段7 第四十二节）
+      db.exec(`CREATE TABLE IF NOT EXISTS agent_tool_calls (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_run_id  INTEGER NOT NULL REFERENCES agent_runs(id),
+        round         INTEGER NOT NULL,
+        tool_call_id  TEXT,
+        tool_name     TEXT NOT NULL,
+        arguments     TEXT,
+        result        TEXT,
+        duration_ms   INTEGER,
+        status        TEXT NOT NULL DEFAULT 'OK' CHECK (status IN ('OK','ERROR','INVALID_ARGS','UNKNOWN_TOOL','PERMISSION_DENIED','RATE_LIMITED','DEDUP')),
+        created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_agent_tc_run ON agent_tool_calls(agent_run_id, round)');
+    },
+  },
+  {
     name: '003_stage6_character_progression',
     up(db) {
       const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);

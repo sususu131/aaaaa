@@ -74,4 +74,9 @@ export const api = {
     request('/api/character/equipment/equip', { method: 'POST', body: JSON.stringify({ itemId, sessionToken }) }),
   unequipSlot: (slot, sessionToken) =>
     request('/api/character/equipment/unequip', { method: 'POST', body: JSON.stringify({ slot, sessionToken }) }),
+  // ── 阶段7：Agent Runtime 2.0 ──
+  timedChoice: (instanceId, choiceIndex, sessionToken) =>
+    request(`/api/dungeon-instances/${instanceId}/timed-choice`, { method: 'POST', body: JSON.stringify({ choiceIndex, sessionToken }) }),
+  getAgentRuns: (roomId) => request(`/api/agent-runs${roomId ? `?roomId=${encodeURIComponent(roomId)}` : ''}`),
+  getAgentRun: (id) => request(`/api/agent-runs/${id}`),
 };

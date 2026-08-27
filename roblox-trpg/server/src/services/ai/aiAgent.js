@@ -18,6 +18,11 @@ function maxToolRounds() {
   return Number(process.env.AI_MAX_TOOL_ROUNDS || 6);
 }
 
+/** 房间级 Agent 也遵守阶段7 预算。 */
+function roomMaxRounds() {
+  return Number(process.env.AGENT_MAX_TOOL_ROUNDS || maxToolRounds());
+}
+
 /** 玩家可见的中文工具状态（不暴露内部参数/推理）。 */
 function toolStatusLabel(name) {
   switch (name) {
@@ -77,8 +82,9 @@ async function runAgentTurn(ctx, playerText) {
 
   const toolDefs = tools.toolDefinitions();
   ctx.pendingOptions = [];
+  io.to(room.id).emit('agent:event', { type: 'AI_START', scope: 'room' });
 
-  for (let round = 0; round < maxToolRounds(); round += 1) {
+  for (let round = 0; round < roomMaxRounds(); round += 1) {
     broadcastStatus(io, room, round === 0 ? 'GM 思考中…' : 'GM 继续推演…');
     const res = await provider.chat(session, toolDefs);
 
@@ -89,14 +95,19 @@ async function runAgentTurn(ctx, playerText) {
       if (ctx.pendingOptions.length) {
         parsed.options = [...parsed.options, ...ctx.pendingOptions].slice(0, 6);
       }
+      io.to(room.id).emit('agent:event', { type: 'AI_COMPLETE', scope: 'room', rounds: round + 1 });
       return parsed;
     }
 
-    // 逐个执行工具：服务器校验 → 执行 → 结果回给 AI
+    // 同一轮多个工具全部执行（不只读 tool_calls[0]）：服务器校验 → 执行 → 结果回给 AI
     const results = [];
     for (const call of res.toolCalls) {
       broadcastStatus(io, room, toolStatusLabel(call.name));
       io.to(room.id).emit('gm:toolCall', { tool: call.name, at: new Date().toISOString() });
+      io.to(room.id).emit('agent:event', { type: 'AI_TOOL_START', round: round + 1, tool: call.name, toolCallId: call.id });
+      if (call.name === 'web_search' || call.name === 'roblox_search') {
+        io.to(room.id).emit('agent:event', { type: 'AI_SEARCH_START', tool: call.name, query: (call.args && (call.args.query || call.args.queries)) || '' });
+      }
 
       let outcome;
       try {
@@ -105,6 +116,7 @@ async function runAgentTurn(ctx, playerText) {
         outcome = { ok: false, error: err.message, kind: err.kind || 'tool_error' };
       }
       io.to(room.id).emit('gm:toolResult', { tool: call.name, ok: Boolean(outcome.ok), at: new Date().toISOString() });
+      io.to(room.id).emit('agent:event', { type: 'AI_TOOL_RESULT', round: round + 1, tool: call.name, ok: Boolean(outcome.ok) });
       results.push({ id: call.id, content: toolResultText(outcome) });
     }
     provider.appendToolResults(session, results);

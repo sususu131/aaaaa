@@ -57,4 +57,17 @@ module.exports = {
   // ── 阶段3b：Vision（与文字 AI 配置完全独立，绝不复用 AI_*）──
   // VISION_API_KEY / VISION_BASE_URL / VISION_MODEL 在调用时读取环境变量
   VISION_DEFAULT_MODEL: 'deepseek-v4-flash-vision-exp',
+
+  // ── 阶段7：Agent Runtime 2.0 预算（防无限循环/成本控制）──
+  AGENT_MAX_TOOL_ROUNDS: Number(process.env.AGENT_MAX_TOOL_ROUNDS || 8),
+  AGENT_MAX_TOOLS: Number(process.env.AGENT_MAX_TOOLS || 16),
+  AGENT_MAX_SEARCHES: Number(process.env.AGENT_MAX_SEARCHES || 4),
+  AGENT_SEARCH_QUERY_MAX: 500,
+  AGENT_MAX_QUERIES_PER_SEARCH: 4,
+  AGENT_MAX_DURATION_MS: Number(process.env.AGENT_MAX_DURATION_MS || 60000),
+  AGENT_MAX_OUTPUT_TOKENS: Number(process.env.AGENT_MAX_OUTPUT_TOKENS || 1500),
+  AI_STREAM: process.env.AI_STREAM !== 'off',
+  // 限时抉择（QTE）：超时未选择即承受失败后果
+  TIMED_EVENT_MIN_MS: 3000,
+  TIMED_EVENT_MAX_MS: 60000,
 };

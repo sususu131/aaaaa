@@ -478,3 +478,66 @@ frontend/src/components/         CharacterPanel.jsx
 npm test              # 245 项全套件（16+30+41+42+51+65）
 npm run test:stage6   # 仅阶段6
 ```
+
+---
+
+# 阶段7：AI GM Runtime 2.0（多轮 Tool Calling + Web Search + Streaming + 限时抉择）
+
+AI GM 从"单次请求→单次回答"升级为真正的 **Agent Runtime**：
+`User → AI → Tool → Server → Tool Result → AI → … → Final Answer`（0~8 轮，预算硬限制）。
+
+## 核心能力
+
+- **Agent Loop**（`agentRuntime.js`）：MAX_TOOL_ROUNDS=8 / MAX_TOOLS=16 / MAX_SEARCHES=4 / MAX_DURATION；
+  同一轮多个 Tool Call 全部执行；`tool_call_id` 幂等；最终回答按 `finish_reason` 判定（不依赖 content）
+- **Tool Registry 升级**：22 个工具；权限模型（READ_ONLY/GAME_ACTION/REWARD/WEB/ROBLOX/ADMIN/AI_INTERNAL）；
+  Context-aware 可见性（lobby/room/dungeon 范围过滤）；新增 `get_character / get_scene / damage_player / heal_player / use_skill / roblox_search`
+- **Web Search**：AI 只发请求，服务器执行 SearchProvider（Serper/可扩展）；查询 ≤500 字符、单次 ≤4 query、
+  单请求 ≤4 次搜索；结果以 `<external_search_result>` UNTRUSTED 围栏注入，`[来源N]` 编号，URL 仅来自 Provider
+- **Roblox Search**：与 web_search 分离，优先 Roblox API（CANONICAL_FACT）
+- **Provider**：OpenAI 兼容（含 DeepSeek：`reasoning_content` 透传不丢弃）/ Anthropic / **Responses API Adapter**
+  （message/function_call/function_call_output，与 Chat Completions 严格分离）；统一 AgentResponse 归一化
+- **Streaming**：SSE 解析 + 事件协议 `AI_START / AI_TEXT_DELTA / AI_TOOL_START / AI_TOOL_ARGUMENTS /
+  AI_TOOL_RESULT / AI_SEARCH_START / AI_SEARCH_RESULT / AI_COMPLETE / AI_ERROR`（经 Socket.IO `agent:event` 广播）；
+  非流式端点自动回退
+- **Tool Trace**：`agent_runs` / `agent_tool_calls`（round/tool_call_id/args/result/duration/status）；
+  `GET /api/agent-runs(:id)` 逐轮查看（Replay 视角）
+- **限时抉择（QTE）**：GM 输出 `timed_event`（如 DOORS 躲 Rush）→ 前端进度条倒计时 →
+  `POST /api/dungeon-instances/:id/timed-choice`（幂等，首个选择生效）→ 超时未选择：服务器执行失败后果
+  （伤害/可致死/全队倒下→副本失败）；deadline 钳制 3s~60s
+- **Agent Queue / Lock**：复用阶段5 实例串行队列（同实例单 pipeline）；断线不中断进行中的 Agent
+- **错误恢复**：429/401/402/403/超时/非法 JSON/未知工具/畸形参数（允许重试）/5xx 全分类处理
+- **安全**：AI 输出全部 UNTRUSTED；搜索注入围栏；工具参数防作弊（damage 1~50、目标存在性）；
+  Trace 不泄露 API Key；Room Isolation（工具只能访问当前房间/实例）
+
+## 新增文件
+
+```
+server/src/services/ai/agentRuntime.js          Agent Loop + 预算 + Trace
+server/src/services/ai/providers/responsesAdapter.js   Responses API Adapter
+server/src/services/ai/tools/getCharacter.js / getScene.js / damageHeal.js / useSkill.js / robloxSearch.js
+server/test/stage7-agent.test.js                82 项测试
+```
+
+## Migration（004_stage7_agent_runtime）
+
+`agent_runs`（uid/room/instance/player/scope/status/rounds/tool_calls/searches/budget/error）、
+`agent_tool_calls`（agent_run_id/round/tool_call_id/tool_name/arguments/result/duration_ms/status）
+
+## 配置
+
+```bash
+# DeepSeek（OpenAI 兼容；Thinking Mode 的 reasoning_content 自动透传）
+export AI_API_KEY=sk-xxx AI_BASE_URL=https://api.deepseek.com AI_MODEL=deepseek-v4-flash
+export AI_API_FORMAT=openai        # openai | anthropic | responses
+export AI_STREAM=on                # off 关闭流式
+# Web Search（可选，未配置时返回 SEARCH_UNAVAILABLE）
+export SEARCH_PROVIDER=serper SERPER_API_KEY=xxx
+# Agent 预算
+export AGENT_MAX_TOOL_ROUNDS=8 AGENT_MAX_TOOLS=16 AGENT_MAX_SEARCHES=4 AGENT_MAX_DURATION_MS=60000
+```
+
+```
+npm test              # 327 项全套件（16+30+41+42+51+65+82）
+npm run test:stage7   # 仅阶段7
+```

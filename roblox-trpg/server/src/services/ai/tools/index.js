@@ -129,7 +129,65 @@ function resolveRoomPlayer(ctx, playerIdRef) {
   return { name: p.name, uid: row.uid, playerRowId: row.id };
 }
 
-module.exports = { register, runTool, getRegistry, toolDefinitions, resolveRoomPlayer, ToolError };
+// ── 阶段7：权限模型 + Context-aware 工具可见性 ──
+const PERMISSION_LEVELS = ['READ_ONLY', 'GAME_ACTION', 'REWARD', 'ADMIN', 'WEB', 'ROBLOX', 'AI_INTERNAL'];
+
+/** 每个工具的权限与可用范围（Lobby/房间/副本/结算）。 */
+const TOOL_META = {
+  get_world_state: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  get_player_state: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  get_dungeon_state: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  get_character: { permission: 'READ_ONLY', scopes: ['lobby', 'room', 'dungeon'] },
+  get_scene: { permission: 'READ_ONLY', scopes: ['dungeon'] },
+  roll_dice: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  skill_check: { permission: 'GAME_ACTION', scopes: ['dungeon'] },
+  use_skill: { permission: 'GAME_ACTION', scopes: ['dungeon'] },
+  damage_player: { permission: 'GAME_ACTION', scopes: ['dungeon'] },
+  heal_player: { permission: 'GAME_ACTION', scopes: ['dungeon'] },
+  modify_world_state: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  modify_player_state: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  grant_item: { permission: 'REWARD', scopes: ['dungeon'] },
+  grant_skill: { permission: 'REWARD', scopes: ['dungeon'] },
+  complete_dungeon: { permission: 'GAME_ACTION', scopes: ['dungeon'] },
+  create_option: { permission: 'AI_INTERNAL', scopes: ['room', 'dungeon'] },
+  web_search: { permission: 'WEB', scopes: ['lobby', 'room', 'dungeon'] },
+  roblox_search: { permission: 'ROBLOX', scopes: ['lobby', 'room', 'dungeon'] },
+  search_roblox_experiences: { permission: 'ROBLOX', scopes: ['lobby', 'room', 'dungeon'] },
+  get_roblox_experience: { permission: 'ROBLOX', scopes: ['lobby', 'room', 'dungeon'] },
+  get_roblox_user: { permission: 'ROBLOX', scopes: ['lobby', 'room', 'dungeon'] },
+  get_roblox_avatar: { permission: 'ROBLOX', scopes: ['lobby', 'room', 'dungeon'] },
+};
+
+function toolMeta(name) {
+  return TOOL_META[name] || { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] };
+}
+
+/** Context-aware：按当前范围过滤可见工具（第九节）。 */
+function toolsForScope(scope) {
+  return getRegistry().filter((t) => (toolMeta(t.name).scopes || []).includes(scope));
+}
+
+function toolDefinitionsForScope(scope) {
+  return toolsForScope(scope).map((t) => ({
+    name: t.name,
+    description: t.description,
+    inputSchema: t.inputSchema || { type: 'object', properties: {} },
+    permission: toolMeta(t.name).permission,
+  }));
+}
+
+module.exports = {
+  register,
+  runTool,
+  getRegistry,
+  toolDefinitions,
+  resolveRoomPlayer,
+  ToolError,
+  PERMISSION_LEVELS,
+  toolMeta,
+  toolsForScope,
+  toolDefinitionsForScope,
+};
 
 // 注册全部工具
 require('./getWorldState');
@@ -145,3 +203,9 @@ require('./completeDungeon');
 require('./createOption');
 require('./robloxTools');
 require('./webSearch');
+// 阶段7 新增
+require('./getCharacter');
+require('./getScene');
+require('./damageHeal');
+require('./useSkill');
+require('./robloxSearch');
