@@ -164,6 +164,13 @@ const TOOL_META = {
   abandon_quest: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
   advance_quest: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
   submit_quest_choice: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  // 阶段9：NPC 工具
+  get_npc_status: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  talk_to_npc: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  inspect_npc_memory: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  npc_relationship_event: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  update_npc_plan: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  kill_npc: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
 };
 
 function toolMeta(name) {
@@ -219,3 +226,5 @@ require('./useSkill');
 require('./robloxSearch');
 // 阶段8 新增
 require('./questTools');
+// 阶段9 新增
+require('./npcTools');

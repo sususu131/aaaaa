@@ -14,6 +14,7 @@ const dungeonRoutes = require('./routes/dungeonRoutes');
 const runtimeRoutes = require('./routes/runtimeRoutes');
 const characterRoutes = require('./routes/characterRoutes');
 const questRoutes = require('./routes/questRoutes');
+const npcRoutes = require('./routes/npcRoutes');
 
 // 启动即建表（幂等）
 initDb();
@@ -32,8 +33,12 @@ app.use(dungeonRoutes); // 阶段4：Dungeon Design Pipeline
 app.use(runtimeRoutes); // 阶段5：Dungeon Runtime
 app.use(characterRoutes); // 阶段6：Persistent Character
 app.use(questRoutes); // 阶段8：Quest System
+app.use(npcRoutes); // 阶段9：NPC & Living World
 
 registerSocketHandlers(io);
+
+// 阶段9：NPC Listener（Game Event Bus → NPC 反应，服务器规则决定）
+require('./services/npcs/npcListener').registerNpcListener();
 
 // 作为入口运行时才监听端口（测试可直接 require 后自管端口）
 if (require.main === module) {

@@ -127,6 +127,32 @@ function buildRuntimeContext(instance, definition, playerRows) {
     ? `Boss：${definition.boss.name}（HP ${definition.boss.stats?.hp}）— 只能引用该定义，禁止临时增强。`
     : '（无 Boss）';
 
+  // 阶段9：NPC_CONTEXT 分区（附近NPC/关系/最近记忆/当前目标）
+  let npcBlock = '（房间内无 NPC）';
+  try {
+    const npcEngine = require('../npcs/npcEngine');
+    const insts = npcEngine.npcInstancesInRoom(instance.room_id);
+    if (insts.length) {
+      npcBlock = insts
+        .map((ni) => {
+          const npc = npcEngine.getNpc(ni.npc_id);
+          const rels = playerRows
+            .map((p) => {
+              const rel = npcEngine.getRelationship('npc', ni.npc_id, 'player', p.id);
+              return `${p.name}:${rel.value}(${rel.relationshipType})`;
+            })
+            .join('，');
+          const mems = npcEngine
+            .getMemories(ni.npc_id, { limit: 3 })
+            .map((m) => `[${m.memory_type}/${m.importance}] ${m.content}`)
+            .join('；');
+          const plan = JSON.parse(ni.current_plan_json || '{}').plan || '无';
+          return `NPC「${npc.name}」（${ni.alive ? '存活' : '已死亡'}，情绪:${ni.mood}）目标:${JSON.stringify(npc.goals)} 关系:${rels} 计划:${plan} 近期记忆:${mems || '无'}`;
+        })
+        .join('\n');
+    }
+  } catch { /* NPC 系统异常不影响主流程 */ }
+
   return [
     `## 副本（Published Definition，只读）`,
     `名称：${definition.dungeon?.display_name || definition.dungeon?.name}`,
@@ -141,6 +167,8 @@ function buildRuntimeContext(instance, definition, playerRows) {
     combatBlock,
     `## 任务（ACTIVE_QUESTS / QUEST_OBJECTIVES）`,
     questBlock,
+    `## NPC_CONTEXT（阶段9：附近NPC/关系/记忆/目标）`,
+    npcBlock,
     `## 世界状态（version=${world.version}，白名单标志）`,
     JSON.stringify(world.state),
     `## 最近行动日志`,

@@ -151,3 +151,37 @@ INSERT OR IGNORE INTO quest_objectives (quest_version_id, objective_key, name, d
 SELECT qv.id, 'reach_hall', '深入走廊', '不要回头，一直走到走廊深处', 'REACH_LOCATION', 1, 1, 0, '{"event_type":"PLAYER_ENTERED_SCENE","match":{"scene":"scene_hall"}}'
 FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id
 WHERE q.uid = 'quest_doors_hidden' AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'reach_hall');
+
+-- ============================================================
+-- 阶段9：DOORS 示例阵营与 NPC（幸存者/实体/旅馆管理员）+ 关系门控隐藏任务
+-- ============================================================
+INSERT OR IGNORE INTO factions (uid, name, description, dungeon_id)
+SELECT 'faction_doors_survivors', '幸存者', '在旅馆中挣扎求生的普通人。', id FROM dungeons WHERE roblox_experience_name = 'Doors';
+INSERT OR IGNORE INTO factions (uid, name, description, dungeon_id)
+SELECT 'faction_doors_entities', '实体', '徘徊在旅馆中的危险存在。', id FROM dungeons WHERE roblox_experience_name = 'Doors';
+INSERT OR IGNORE INTO factions (uid, name, description, dungeon_id)
+SELECT 'faction_doors_keeper', '旅馆管理员', '旅馆的神秘管理者，知道许多秘密。', id FROM dungeons WHERE roblox_experience_name = 'Doors';
+
+INSERT OR IGNORE INTO npcs (uid, name, description, avatar, personality_json, goals_json, knowledge_json, faction_id, location_id)
+SELECT 'npc_doors_keeper', '旅馆管理员', '一位提着油灯的老人，似乎知道旅馆的所有秘密。', '🏮',
+  '{"traits":["谨慎","念旧"],"speech":"缓慢、低声"}',
+  '["守护旅馆的秘密","寻找可信的幸存者"]',
+  '["知道100号门后的真相"]',
+  f.id, 'scene_lobby'
+FROM factions f WHERE f.uid = 'faction_doors_keeper';
+
+-- 关系门控隐藏任务：与旅馆管理员关系 ≥50 才会出现
+INSERT OR IGNORE INTO quests (uid, name, description, type, status, source_type, dungeon_id, difficulty, max_players)
+SELECT 'quest_doors_keeper_secret', '旅馆管理员的秘密', '旅馆管理员似乎想告诉你一些关于100号门的事。', 'HIDDEN', 'ACTIVE', 'DESIGNER', d.id, 4, 3
+FROM dungeons d WHERE d.roblox_experience_name = 'Doors';
+
+INSERT OR IGNORE INTO quest_versions (quest_id, version, definition_json, status, published_at)
+SELECT q.id, 1, '{"scope":"PARTY","hidden":true,"npc_gate":{"npc":"npc_doors_keeper","min_relationship":50},"rewards":[{"type":"XP","amount":300}],"objectives":[{"key":"listen_keeper","name":"聆听秘密","description":"听旅馆管理员讲完100号门的真相","type":"TALK_TO_NPC","required_count":1,"order_index":1}]}', 'PUBLISHED', datetime('now')
+FROM quests q WHERE q.uid = 'quest_doors_keeper_secret'
+  AND NOT EXISTS (SELECT 1 FROM quest_versions qv WHERE qv.quest_id = q.id AND qv.version = 1);
+
+INSERT OR IGNORE INTO quest_objectives (quest_version_id, objective_key, name, description, type, required_count, order_index, is_optional, definition_json)
+SELECT qv.id, 'listen_keeper', '聆听秘密', '听旅馆管理员讲完100号门的真相', 'TALK_TO_NPC', 1, 1, 0, '{"event_type":"NPC_TALKED","match":{"npc":"npc_doors_keeper"}}'
+FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id
+WHERE q.uid = 'quest_doors_keeper_secret'
+  AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'listen_keeper');

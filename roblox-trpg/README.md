@@ -593,3 +593,50 @@ npm run test:stage8   # 仅阶段8（70 项）
 隐藏任务、时间限制、失败条件、奖励（含幂等/非法奖励/不存在技能物品）、事件幂等、乐观锁并发、
 AI 工具全 7 个、AI 作弊拒绝、跨房间隔离、版本化、Context/压缩、3 人 DOORS 完整集成
 （进入→找钥匙→开门→隐藏任务→通关→奖励一次结算→断线恢复）。
+
+---
+
+# 阶段9：NPC Relationship & Living World System
+
+NPC 不只是 AI 输出文字——拥有**身份/人格/目标/知识/记忆/情绪/关系/阵营/当前计划**的持久化实体。
+行为规则由服务器决定（Event Bus → NPC Listener），AI 只负责描述。
+
+## 核心机制
+
+- **NPC 数据模型**：`npcs`（uid/人格/目标/知识/阵营/位置）+ `npc_instances`（房间/副本实例内，
+  state/alive/mood/current_plan，同房间幂等）
+- **记忆系统**：`npc_memories`，6 种类型（PLAYER_ACTION/CONVERSATION/EVENT/BETRAYAL/HELP/QUEST），
+  importance 0~100；容量上限 100（删最旧低重要度）；**BETRAYAL 与 importance≥60 为隐藏记忆，
+  玩家/API 永不可见**（服务器过滤）
+- **关系系统**：`npc_relationships`（NPC↔玩家 / NPC↔NPC，-100~100 钳制，SQL 原子累加）；
+  类型阈值：敌视 ≤-50 / 陌生 / 认识 / 友好 / 信任 / 盟友 ≥80；
+  **固定增量表（服务器拥有）**：help +10 / conversation +2 / deceive -20 / attack -50 / betray -60 / quest_complete +15
+  —— AI 只能选动作类型，不能指定数值
+- **阵营**：`factions` + `faction_reputation`（±100 钳制，按玩家隔离）；种子：DOORS 幸存者/实体/旅馆管理员
+- **NPC Listener**（Game Event Bus）：QUEST_COMPLETED → 房间内 NPC 感恩 +15；NPC_DEAD → 长期世界事件；
+  情绪由服务器规则联动（帮助→友好/感激，攻击→恐惧/敌视）
+- **NPC 死亡**：`kill_npc`（服务器验证）→ alive=0 + NPC_DEAD（game_events + world_events），死亡 NPC 不可再交互
+- **任务门控**（第九节）：quest 定义 `npc_gate {npc, min_relationship}` —— 关系 <50 不给任务，
+  ≥50 自动发现激活（幂等）；种子：「旅馆管理员的秘密」
+- **NPC_CONTEXT**：GM 上下文新增分区（附近NPC/关系/最近记忆/当前目标/计划）
+- **UI**：NPC 面板（头像/关系值与类型/情绪/目标/计划/公开记忆/阵营声望）+ 关系变化 Toast
+- **REST**：`GET /api/npcs`（公开视图，断线恢复安全）· `GET /api/npcs/:id`（跨房间 403）· `GET /api/factions`
+
+## 新增 AI Tools（6 个）
+
+`get_npc_status`（READ_ONLY，公开视图）· `talk_to_npc`（+2 固定）· `inspect_npc_memory`（仅公开记忆）·
+`npc_relationship_event`（help/deceive/attack/betray/quest_complete，固定增量）·
+`update_npc_plan`（仅计划+情绪枚举，**绝不能改关系/记忆/声望**）· `kill_npc`
+
+**安全**：不存在任何直接改关系/声望/记忆的工具；AI 附加的数值参数被忽略；跨房间访问拒绝。
+
+## 测试
+
+```
+npm test              # 459 项全套件（16+30+41+42+51+65+82+70+62）
+npm run test:stage9   # 仅阶段9（62 项）
+```
+
+覆盖：NPC 模型/记忆（类型/隐藏过滤/长度/容量）/关系（固定增量/钳制/类型阈值/并发原子累加）/
+阵营声望/Listener 联动/6 工具（含作弊拒绝）/任务门控（<50 隐藏、≥50 激活、幂等）/
+NPC_CONTEXT/REST 权限/隐藏记忆防泄漏/无直接修改工具存在性验证。

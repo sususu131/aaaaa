@@ -8,6 +8,7 @@ import DungeonRuntime from './DungeonRuntime.jsx';
 import CharacterPanel from './CharacterPanel.jsx';
 import RobloxBindPanel from './RobloxBindPanel.jsx';
 import QuestPanel from './QuestPanel.jsx';
+import NpcPanel from './NpcPanel.jsx';
 import { socket } from '../lib/socket.js';
 
 /**
@@ -47,7 +48,30 @@ export default function RoomScreen({
       setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
     };
     socket.on('quest:event', onQuestEvent);
-    return () => socket.off('quest:event', onQuestEvent);
+
+    // 阶段9：NPC 关系变化提示
+    const npcLabel = {
+      NPC_SPAWNED: '🧍 NPC 出现',
+      NPC_DEAD: '💀 NPC 死亡',
+      NPC_HELP: '💚 关系变化：帮助',
+      NPC_CONVERSATION: '💬 关系变化：交谈',
+      NPC_DECEIVE: '💔 关系变化：欺骗',
+      NPC_ATTACK: '⚔ 关系变化：攻击',
+      NPC_BETRAY: '🗡 关系变化：背叛',
+      NPC_QUEST_COMPLETE: '🤝 关系变化：任务完成',
+    };
+    const onNpcEvent = (e) => {
+      const base = npcLabel[e.type] || e.type;
+      const extra = e.relationship !== undefined ? `（关系 ${e.relationship}）` : e.name ? `：${e.name}` : '';
+      const id = `${Date.now()}_${Math.random()}`;
+      setToasts((t) => [...t.slice(-4), { id, text: `${base}${extra}` }]);
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
+    };
+    socket.on('npc:event', onNpcEvent);
+    return () => {
+      socket.off('quest:event', onQuestEvent);
+      socket.off('npc:event', onNpcEvent);
+    };
   }, []);
 
   const copyRoomId = async () => {
@@ -93,6 +117,9 @@ export default function RoomScreen({
         </button>
         <button className="btn small" onClick={() => onOpenModal(modal === 'quest' ? null : 'quest')}>
           任务
+        </button>
+        <button className="btn small" onClick={() => onOpenModal(modal === 'npc' ? null : 'npc')}>
+          NPC
         </button>
         <button className="btn danger" onClick={onLeave}>
           离开
@@ -171,6 +198,7 @@ export default function RoomScreen({
         />
       )}
       {modal === 'quest' && <QuestPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
+      {modal === 'npc' && <NpcPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
     </main>
   );
 }

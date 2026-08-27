@@ -9,6 +9,79 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '006_stage9_npc_world',
+    up(db) {
+      // 阵营
+      db.exec(`CREATE TABLE IF NOT EXISTS factions (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        uid         TEXT UNIQUE,
+        name        TEXT NOT NULL,
+        description TEXT,
+        dungeon_id  INTEGER REFERENCES dungeons(id),   -- 关联副本（DOORS:幸存者/实体…）
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (name, dungeon_id)
+      )`);
+      // 玩家阵营声望（-100~100，影响 NPC 态度/任务出现）
+      db.exec(`CREATE TABLE IF NOT EXISTS faction_reputation (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        faction_id INTEGER NOT NULL REFERENCES factions(id),
+        player_id  INTEGER NOT NULL REFERENCES players(id),
+        value      INTEGER NOT NULL DEFAULT 0 CHECK (value >= -100 AND value <= 100),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (faction_id, player_id)
+      )`);
+      // NPC 定义（持久化身份：人格/目标/知识/阵营）
+      db.exec(`CREATE TABLE IF NOT EXISTS npcs (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        uid             TEXT UNIQUE,
+        name            TEXT NOT NULL,
+        description     TEXT,
+        avatar          TEXT,                          -- 头像 URL 或 emoji
+        personality_json TEXT NOT NULL DEFAULT '{}',
+        goals_json      TEXT NOT NULL DEFAULT '[]',
+        knowledge_json  TEXT NOT NULL DEFAULT '[]',
+        faction_id      INTEGER REFERENCES factions(id),
+        location_id     TEXT,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      // NPC 实例（副本/房间内；状态/存活/情绪/当前计划）
+      db.exec(`CREATE TABLE IF NOT EXISTS npc_instances (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        npc_id              INTEGER NOT NULL REFERENCES npcs(id),
+        room_id             TEXT NOT NULL,
+        dungeon_instance_id INTEGER REFERENCES dungeon_instances(id),
+        state_json          TEXT NOT NULL DEFAULT '{}',
+        alive               INTEGER NOT NULL DEFAULT 1,
+        mood                TEXT NOT NULL DEFAULT 'neutral',   -- neutral/friendly/afraid/hostile/grateful
+        current_plan_json   TEXT NOT NULL DEFAULT '{}',
+        created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (npc_id, room_id, dungeon_instance_id)
+      )`);
+      // NPC 长期记忆
+      db.exec(`CREATE TABLE IF NOT EXISTS npc_memories (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        npc_id      INTEGER NOT NULL REFERENCES npcs(id),
+        player_id   INTEGER REFERENCES players(id),
+        memory_type TEXT NOT NULL CHECK (memory_type IN ('PLAYER_ACTION','CONVERSATION','EVENT','BETRAYAL','HELP','QUEST')),
+        importance  INTEGER NOT NULL DEFAULT 50 CHECK (importance >= 0 AND importance <= 100),
+        content     TEXT NOT NULL,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_npc_memories_npc ON npc_memories(npc_id, importance)');
+      // NPC 关系（NPC↔玩家 / NPC↔NPC；value -100~100）
+      db.exec(`CREATE TABLE IF NOT EXISTS npc_relationships (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        source_type       TEXT NOT NULL CHECK (source_type IN ('npc','player')),
+        source_id         INTEGER NOT NULL,
+        target_type       TEXT NOT NULL CHECK (target_type IN ('npc','player')),
+        target_id         INTEGER NOT NULL,
+        value             INTEGER NOT NULL DEFAULT 0 CHECK (value >= -100 AND value <= 100),
+        updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (source_type, source_id, target_type, target_id)
+      )`);
+    },
+  },
+  {
     name: '005_stage8_quest_system',
     up(db) {
       // 任务定义（版本化的父记录）
