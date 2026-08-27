@@ -88,4 +88,22 @@ router.get('/api/dod/civilian', (req, res) => {
   }
 });
 
+// ── 阶段19：Civilian Ability Lore Integration（只读 Lore 数据，非游戏技能系统）──
+
+/** GET /api/dod/abilities/lore —— Ability Lore 数据库（为什么拥有这些 Ability；无任何数值字段）。 */
+router.get('/api/dod/abilities/lore', (req, res) => {
+  const sess = authPlayer(req, res);
+  if (!sess) return;
+  try {
+    const dodAbilityLore = require('../services/presets/dodAbilityLore');
+    res.json({
+      rule: dodAbilityLore.ABILITY_EXPLANATION_RULE,
+      note: 'Lore 数据库：解释 Civilian 为什么拥有 Ability（过去的人生经历，不是魔法）；无战斗数值、无技能UI。',
+      abilities: dodAbilityLore.listAbilityLore(),
+    });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'DOD_ERROR' });
+  }
+});
+
 module.exports = router;

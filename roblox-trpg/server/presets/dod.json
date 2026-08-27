@@ -285,6 +285,30 @@
     ],
     "trait_note": "Trait 代表个人特点，决定 Ability 出现可能性。",
     "ability_note": "Ability 不是魔法/超能力/技能树，代表 Civilian 利用自身经历生存。",
+    "ability_lore": {
+      "table": "dod_abilities_lore",
+      "source": "DIE_OF_DEATH",
+      "explanation_rule": "Ability 不是魔法，代表 Civilian 过去的人生经历：解释为什么拥有该能力（如医疗知识/枪械训练/工程经验/身体训练），而不是描述技能效果或数值。",
+      "lore_fields": ["id", "name", "source", "category", "core_trait", "possible_background", "lore_description", "personality_connection", "synergy_candidates"],
+      "background_weights": {
+        "Engineer": ["BonusPad", "Block"],
+        "Medic": ["Caretaker"],
+        "Athlete": ["Punch", "Dash"],
+        "Security": ["Revolver", "Block"],
+        "Cook": ["Hotdog", "Pie"]
+      },
+      "background_weight_note": "只是概率提高（权重 3，其余 1），不是固定绑定；任何 Civilian 都可能获得任何 Ability（无职业锁定）。",
+      "trait_examples": {
+        "Caretaker": ["Medical Knowledge", "Empathy", "First Aid Experience"],
+        "Revolver": ["Weapon Familiarity", "Marksmanship"]
+      },
+      "trait_note": "Ability 的出现由 Trait 解释（该 Civilian 拥有的人生特点）。",
+      "possible_synergy": {
+        "BonusPad": [{ "with": "Caretaker", "result": "CarePad" }],
+        "Revolver": [{ "with": "Caretaker", "result": "Loveshot" }]
+      },
+      "synergy_note": "只保存 possible_synergy 候选（预留），不实现 Synergy 逻辑。"
+    },
     "synergy_note": "Synergy 代表能力组合达到大师级水平（不是升级/职业进化）。示例：Caretaker + BonusPad → CarePad。",
     "npc_rule": "NPC 也使用 Civilian 规则；不创建固定英雄，除非 Lore 明确存在。"
   },

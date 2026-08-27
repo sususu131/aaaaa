@@ -280,26 +280,45 @@ function inventoryContextContent(room) {
 /**
  * 阶段18：CIVILIAN_CONTEXT（Die of Death Lore Simulation）。
  * 玩家作为普通 Civilian 的身份/经历/能力（含跨世界解释）；供 GM 模拟居民与事件。
+ * 阶段19：DOD_CIVILIAN_CONTEXT —— 每个 Ability 附带 Lore Explanation
+ * （为什么拥有这个能力 = 过去的人生经历；禁止解释为技能/魔法/数值）。
  */
 function civilianContextContent(room) {
   try {
     const db = getDb();
     const dodLore = require('../presets/dodLore');
+    const abilityLore = require('../presets/dodAbilityLore');
     const expName = room.currentDungeon ? room.currentDungeon.name : null;
-    const lines = [];
+    const blocks = [];
     for (const p of room.players) {
       const row = db.prepare('SELECT id FROM players WHERE socket_id = ?').get(p.socketId);
       if (!row) continue;
       const view = dodLore.loreView(row.id, expName);
       if (!view) continue;
-      const abilities = view.abilities.map((a) => `${a.key}(${a.interpretation}×${a.effectiveMultiplier})`).join('、');
-      lines.push(
-        `- ${p.name}：${view.background}背景｜人生经历：${view.lifeExperience || '（未知）'}｜特点：${view.personalityTraits.join('、')}｜能力：${abilities}${view.synergyState && view.synergyState !== 'NONE' ? `｜Synergy：${view.synergyState}` : ''}`
-      );
+      const lines = [
+        `- ${p.name} Civilian:`,
+        `  Background: ${view.background}`,
+        `  Traits: ${view.personalityTraits.join('、') || '（未知）'}`,
+        `  Abilities: ${view.abilities.map((a) => `${a.key}（当前解释：${a.interpretation}×${a.effectiveMultiplier}）`).join('、') || '无'}`,
+      ];
+      for (const a of view.abilities) {
+        lines.push(`  Lore Explanation: ${a.key} —— ${a.loreExplanation || '（该能力的经历来源未知）'}`);
+      }
+      if (view.synergyState && view.synergyState !== 'NONE') {
+        lines.push(`  Synergy: ${view.synergyState}（能力组合的大师级水平）`);
+      }
+      lines.push(`  Life Experience: ${view.lifeExperience || '（未知）'}`);
+      blocks.push(lines.join('\n'));
     }
-    if (!lines.length) return '（房间内没有 Civilian 身份）';
+    if (!blocks.length) return '（房间内没有 Civilian 身份）';
     const w = dodLore.WORLD_SETTING;
-    return `世界：${w.world}（${w.era}）——玩家是${w.player_role}。\n${lines.join('\n')}\n（GM 纪律：普通居民/幸存者/拥有特殊经验的人；禁止超级英雄/救世主/传奇战士；NPC 同样遵循 Civilian 规则。）`;
+    return (
+      `世界：${w.world}（${w.era}）——玩家是${w.player_role}。\n` +
+      `Ability 解释规则：${abilityLore.ABILITY_EXPLANATION_RULE}\n` +
+      `${blocks.join('\n')}\n` +
+      `（GM 纪律：普通居民/幸存者/拥有特殊经验的人；禁止超级英雄/救世主/传奇战士；` +
+      `Background 只提高概率，不锁定 Ability；NPC 同样遵循 Civilian 规则。）`
+    );
   } catch (err) {
     return `（Civilian 上下文不可用：${err.message}）`;
   }
@@ -355,7 +374,7 @@ function buildContext(room) {
     { key: 'party', label: 'PARTY_CONTEXT', content: partyContextContent(room) },
     { key: 'decisions', label: 'DECISION_CONTEXT', content: decisionContextContent(room.id) },
     { key: 'inventory', label: 'INVENTORY_CONTEXT', content: inventoryContextContent(room) },
-    { key: 'civilian', label: 'CIVILIAN_CONTEXT (Die of Death Lore Simulation)', content: civilianContextContent(room) },
+    { key: 'civilian', label: 'DOD_CIVILIAN_CONTEXT (Die of Death Lore Simulation)', content: civilianContextContent(room) },
     { key: 'avatar', label: 'Avatar / Initial State', content: avatarContext(room) },
     { key: 'roblox', label: 'Roblox Source Data', content: robloxBlock },
   ];

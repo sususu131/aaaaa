@@ -740,3 +740,54 @@ npm run test:stage11   # 仅阶段11（56 项）
 
 覆盖：遭遇判定/幂等/奖励池随机与验证/Builderman商店/永久物品/跨副本削弱/
 剑数据库验证/剑斗完成度奖励档位与幂等/Context显示/AI作弊拒绝（无发放/改价/改规则/造剑工具）。
+
+---
+
+# 阶段19：Civilian Ability Lore Integration（Die of Death）
+
+让 AI GM 理解 DOD 世界中 Civilian【为什么】拥有这些 Ability。这是 Lore 解释层，
+**不是游戏技能系统**：不实现 Cooldown/Damage/HP/SP/战斗数值/技能UI。
+
+## 核心规则
+
+- **Ability 不是魔法**：Ability 代表 Civilian 过去的人生经历 —— 解释"为什么拥有"，绝不解释为
+  "获得技能/魔法/超能力/凭空召唤"。例：Punch=优秀身体素质（格斗训练/体育经历/长期锻炼）；
+  Caretaker=医疗知识+照顾他人的经验；Revolver=枪械训练/射击经验/安全职业背景；
+  BonusPad=工程能力/建筑经验/创造辅助工具
+- **Background → Ability 权重**：Engineer→BonusPad/Block、Medic→Caretaker、Athlete→Punch/Dash、
+  Security→Revolver/Block、Cook→Hotdog/Pie。只是概率提高（关联 3 / 其余 1），**不是固定绑定**：
+  任何 Civilian 都可能获得任何 Ability（无职业锁定）
+- **Trait 解释**：每个 Ability 由 Trait 解释出现原因 —— Caretaker ← Medical Knowledge/Empathy/
+  First Aid Experience；Revolver ← Weapon Familiarity/Marksmanship
+- **Synergy 预留**：只保存候选（BonusPad: Caretaker→CarePad；Revolver: Caretaker→Loveshot），
+  不实现任何 Synergy 逻辑（Loveshot 不入技能库、不触发检测）
+
+## 数据库变化（016_stage19）
+
+新表 `dod_abilities_lore`：`id/name/source(DIE_OF_DEATH)/category/core_trait/explaining_traits/
+possible_background/lore_description/personality_connection/synergy_candidates/synergy_result_of`
+（全设定解释字段，无任何战斗数值列；幂等播种，10 条 = 8 基础 Ability + 2 Synergy 结果登记）
+
+## AI Context
+
+`DOD_CIVILIAN_CONTEXT` 分区升级：每个玩家输出
+`Background: / Traits: / Abilities: / Lore Explanation: / Life Experience:`，
+其中 Lore Explanation 为因果解释（如"该居民过去拥有建筑经验，因此能够制作临时辅助设施。"），
+非关联 Ability 附"无固定绑定：任何背景的居民都可能拥有这种经历"说明；
+SYSTEM_RULES 新增纪律（Ability=人生经历、禁魔法描述、无职业绑定）。
+
+## REST（只读）
+
+`GET /api/dod/abilities/lore`（会话校验）—— Ability Lore 数据库（解释规则 + 全部条目）
+
+## 测试
+
+```
+npm test               # 1211 项全套件（…+62）
+npm run test:stage19   # 仅阶段19（62 项）
+```
+
+覆盖：Lore 读取（幂等/字段/未知返回空）/ 解释规则（四例官方解释 + 全库无魔法描述）/
+Background 关联（权重 3/1、同种子对比、统计 120 种子、Cook 也能获得 BonusPad）/
+Trait 解释（与阶段18 亲和一致）/ AI Context（格式四段 + 因果解释 + 无魔法 + 无锁定）/
+Synergy 预留（候选保存、逻辑未新增、Loveshot 不触发）/ 边界（无数值字段、无技能UI、REST 401）。

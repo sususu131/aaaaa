@@ -9,6 +9,28 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '016_stage19_dod_ability_lore',
+    up(db) {
+      // ── Die of Death 阶段19：Civilian Ability Lore Integration ──
+      // Lore 数据库：解释 Civilian 为什么拥有这些 Ability（人生经历，不是魔法/技能系统）。
+      // 红线：不存 Cooldown/Damage/HP/SP 等战斗数值；仅设定解释字段。
+      db.exec(`CREATE TABLE IF NOT EXISTS dod_abilities_lore (
+        id                    TEXT PRIMARY KEY,             -- 语义 id（punch/caretaker/...）
+        name                  TEXT NOT NULL UNIQUE,         -- Ability 名（Punch/Caretaker/...）
+        source                TEXT NOT NULL DEFAULT 'DIE_OF_DEATH',
+        category              TEXT NOT NULL,                -- physical/medical/firearms/culinary/engineering/mobility/defensive/synergy
+        core_trait            TEXT NOT NULL,                -- 核心 Trait（能力来源的主特点）
+        explaining_traits     TEXT NOT NULL DEFAULT '[]',   -- JSON：解释该 Ability 的 Trait 列表
+        possible_background   TEXT NOT NULL DEFAULT '[]',   -- JSON：关联 Background（只提高概率，不锁定）
+        lore_description      TEXT NOT NULL,                -- 过去的人生经历解释（禁止魔法描述）
+        personality_connection TEXT NOT NULL,               -- 性格关联（该经历如何塑造性格）
+        synergy_candidates    TEXT NOT NULL DEFAULT '[]',   -- JSON：[{with, result}]（预留，不实现逻辑）
+        synergy_result_of     TEXT NOT NULL DEFAULT '[]',   -- JSON：作为 Synergy 结果的来源组合（仅登记）
+        created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+    },
+  },
+  {
     name: '015_stage18_dod_lore',
     up(db) {
       const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);

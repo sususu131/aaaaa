@@ -63,13 +63,18 @@ const BACKGROUND_AFFINITY = {
 };
 
 // Ability 跨世界解释（官方示例：Caretaker 在 DOD=专业生存能力，普通世界=医疗经验）
+// 阶段19 补充 Lore 目录扩展项（Block/Dash/Pie/Loveshot：Lore 解释数据，非发放技能）
 const ABILITY_INTERPRETATIONS = {
   Punch: { dod: '专业生存能力', default: '强大的身体训练' },
   Caretaker: { dod: '专业生存能力', default: '医疗经验' },
   Revolver: { dod: '专业生存能力', default: '枪械使用经验' },
   Hotdog: { dod: '专业生存能力', default: '特殊习惯或个人能力' },
   BonusPad: { dod: '专业生存能力', default: '支援设施能力' },
+  Dash: { dod: '专业生存能力', default: '敏捷与移动经验' },
+  Block: { dod: '专业生存能力', default: '防护与工事经验' },
+  Pie: { dod: '专业生存能力', default: '烘焙与烹饪经验' },
   CarePad: { dod: '大师级能力组合', default: '医疗知识 + 工程能力的组合' },
+  Loveshot: { dod: '大师级能力组合', default: '射击经验 + 关怀之心的组合（预留）' },
 };
 
 // 未来扩展接口（预留，不实现）
@@ -94,8 +99,12 @@ function abilityWeight(abilityKey, traits) {
   return w;
 }
 
-/** 按 Trait 权重抽取 Ability（服务器随机；可注入种子）。 */
-function rollAbilitiesByTraits(traits, count = 2, rng = null) {
+/**
+ * 按 Trait 权重抽取 Ability（服务器随机；可注入种子）。
+ * 阶段19：可选 background 参数 —— 关联背景提高该 Ability 概率（权重 +2），
+ * 其余 Ability 保持基础权重：只是概率提高，不是固定绑定（任何背景都可能抽到任何 Ability）。
+ */
+function rollAbilitiesByTraits(traits, count = 2, rng = null, background = null) {
   let seed = rng === null ? null : Number(rng) % 1;
   const nextRoll = () => {
     if (seed === null) return crypto.randomInt(0, 100000) / 100000;
@@ -107,7 +116,12 @@ function rollAbilitiesByTraits(traits, count = 2, rng = null) {
   while (picks.length < count && guard < 200) {
     guard += 1;
     const catalog = dodCivilian.ABILITY_CATALOG;
-    const weights = catalog.map((a) => abilityWeight(a.key, traits));
+    const abilityLore = require('./dodAbilityLore');
+    const weights = catalog.map((a) => {
+      let w = abilityWeight(a.key, traits);
+      if (background) w += Math.max(0, abilityLore.backgroundAbilityWeight(a.key, background) - 1);
+      return w;
+    });
     const total = weights.reduce((s, w) => s + w, 0);
     let roll = nextRoll() * total;
     for (let i = 0; i < catalog.length; i += 1) {
@@ -168,7 +182,8 @@ function generateCivilianLore(io, playerId, { rng = null, background = null } = 
   const bg = background || pick(dodCivilian.BACKGROUNDS, nextRoll());
   if (!dodCivilian.BACKGROUNDS.includes(bg)) throw new DodLoreError('BAD_BACKGROUND', `背景必须是：${dodCivilian.BACKGROUNDS.join('/')}`, 400);
   const personalityTraits = rollPersonalityTraits(bg, nextRoll());
-  const abilities = rollAbilitiesByTraits(personalityTraits, 2, nextRoll());
+  // 阶段19：背景关联只提高概率（+权重），不锁定 —— 任何背景仍可能获得任何 Ability
+  const abilities = rollAbilitiesByTraits(personalityTraits, 2, nextRoll(), bg);
   const lifeExperience = generateLifeExperience(bg);
 
   db.prepare(
@@ -218,7 +233,7 @@ function rollCivilianNpcTemplate(rng = null) {
   };
   const background = pick(dodCivilian.BACKGROUNDS, nextRoll());
   const traits = rollPersonalityTraits(background, nextRoll());
-  const abilities = rollAbilitiesByTraits(traits, 2, nextRoll());
+  const abilities = rollAbilitiesByTraits(traits, 2, nextRoll(), background);
   return {
     background,
     traits,
@@ -235,9 +250,10 @@ function interpretAbility(abilityKey, experienceName = null) {
   return isDod ? table.dod : table.default;
 }
 
-/** Lore 视图（GM Context / UI 共用；含跨世界解释）。 */
+/** Lore 视图（GM Context / UI 共用；含跨世界解释 + 阶段19 Ability Lore 解释）。 */
 function loreView(playerId, experienceName = null) {
   const db = require('@roblox-trpg/database').getDb();
+  const abilityLore = require('./dodAbilityLore');
   const civ = dodCivilian.getCivilian(playerId);
   if (!civ) return null;
   const parse = (s, fb) => {
@@ -252,14 +268,25 @@ function loreView(playerId, experienceName = null) {
     background: civ.background,
     lifeExperience: civ.life_experience,
     personalityTraits: parse(civ.personality_traits && civ.personality_traits !== '[]' ? civ.personality_traits : civ.traits, []),
-    abilities: parse(civ.abilities, []).map((key) => ({
-      key,
-      interpretation: interpretAbility(key, experienceName),
-      effectiveMultiplier: dodCivilian.dodAbilityMultiplier(experienceName),
-    })),
+    abilities: parse(civ.abilities, []).map((key) => {
+      const lore = abilityLore.getAbilityLore(key);
+      return {
+        key,
+        interpretation: interpretAbility(key, experienceName),
+        effectiveMultiplier: dodCivilian.dodAbilityMultiplier(experienceName),
+        // 阶段19：为什么拥有这个 Ability（人生经历解释，非魔法/技能描述）
+        category: lore ? lore.category : null,
+        coreTrait: lore ? lore.core_trait : null,
+        explainingTraits: lore ? lore.explaining_traits : [],
+        linkedBackgrounds: lore ? lore.possible_background : [],
+        backgroundLinked: lore ? lore.possible_background.includes(civ.background) : false,
+        loreExplanation: abilityLore.abilityLoreExplanation(key, civ.background),
+      };
+    }),
     synergyState: civ.synergy_state,
     source: civ.source,
     world: WORLD_SETTING,
+    abilityExplanationRule: abilityLore.ABILITY_EXPLANATION_RULE,
     note: '普通居民/幸存者/拥有特殊经验的人（禁止描述为超级英雄/救世主/传奇战士）。',
   };
 }

@@ -46,6 +46,9 @@ const SYSTEM_RULES = `你是《Roblox灾变：现实崩坏》的 AI GM（游戏�
   你的扩展内容必须明确是 TRPG_EXTENSION/TRPG_ORIGINAL。
 - Die of Death 的 Civilian：必须描述为普通人/幸存者/拥有特殊技能的人；
   禁止描述为超级英雄、职业战士或救世主；Civilian 是模板（一类普通居民），不是固定的英雄角色。
+- Die of Death 的 Civilian Ability 必须解释为过去的人生经历（医疗知识/枪械训练/工程经验/身体训练/烹饪习惯等），
+  叙述“为什么拥有这种能力”，禁止描述为魔法、超能力、凭空获得或数值化的游戏技能；
+  Background 只提高出现概率，不锁定任何 Ability（无职业绑定，任何居民都可能拥有任何 Ability）。
 - Die of Death 是 Lore Simulation（不是玩法复刻）：NPC 同样使用 Civilian 规则——
   不创建固定英雄（除非 Lore 明确存在）；禁止超级英雄/救世主/传奇战士；不得引入回合制/胜负条件/竞技描述。
 - 在 source_references 中说明关键判断的资料依据。
