@@ -9,30 +9,55 @@ PRAGMA foreign_keys = ON;
 
 -- ── 房间表（阶段1使用）──────────────────────────────
 CREATE TABLE IF NOT EXISTS rooms (
-  id                TEXT PRIMARY KEY,               -- 6位房间码
-  status            TEXT NOT NULL DEFAULT 'waiting',-- waiting / in_game / finished
-  max_players       INTEGER NOT NULL DEFAULT 3,
-  creator_socket_id TEXT,                           -- 创建者（按会话）
-  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
-  closed_at         TEXT                            -- 未来：副本结算后关闭
+  id                 TEXT PRIMARY KEY,               -- 6位房间码
+  status             TEXT NOT NULL DEFAULT 'waiting',-- waiting / in_game / finished
+  max_players        INTEGER NOT NULL DEFAULT 3,
+  creator_socket_id  TEXT,                           -- 创建者（按会话）
+  current_experience TEXT,                           -- JSON：当前绑定的 Roblox 体验公开资料（阶段2）
+  created_at         TEXT NOT NULL DEFAULT (datetime('now')),
+  closed_at          TEXT                            -- 未来：副本结算后关闭
 );
 
 -- ── 玩家表（阶段1使用）──────────────────────────────
 CREATE TABLE IF NOT EXISTS players (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  socket_id   TEXT NOT NULL UNIQUE,                 -- 当前会话身份
-  name        TEXT NOT NULL,                        -- 玩家名字
-  room_id     TEXT REFERENCES rooms(id),            -- 当前所在房间
-  joined_at   TEXT NOT NULL DEFAULT (datetime('now')),
-  left_at     TEXT,
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  uid              TEXT UNIQUE,                      -- 对外稳定身份 player_xxxx（阶段2）
+  socket_id        TEXT NOT NULL UNIQUE,             -- 当前会话身份
+  name             TEXT NOT NULL,                    -- 玩家名字
+  room_id          TEXT REFERENCES rooms(id),        -- 当前所在房间
+  roblox_profile_id INTEGER REFERENCES roblox_profiles(id), -- 可选绑定的公开 Roblox 资料
+  joined_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  left_at          TEXT,
   -- ── 未来成长系统预留字段 ──
-  avatar_type TEXT NOT NULL DEFAULT 'bacon',        -- roblox / bacon（培根头）
-  roblox_user TEXT,                                 -- 未来：绑定的Roblox账号
+  avatar_type TEXT NOT NULL DEFAULT 'bacon',         -- roblox / bacon（培根头）
   level       INTEGER NOT NULL DEFAULT 1,
   exp         INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_players_room ON players(room_id);
+
+-- ── 会话表（阶段2）：临时身份，无账号登录 ──────────────
+-- token 仅存 SHA-256 哈希；客户端不得指定 playerId。
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash  TEXT PRIMARY KEY,
+  player_id   INTEGER NOT NULL REFERENCES players(id),
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  last_seen_at TEXT,
+  expires_at  TEXT
+);
+
+-- ── Roblox 公开资料表（阶段2）：只存公开信息，主键用 Roblox User ID ──
+CREATE TABLE IF NOT EXISTS roblox_profiles (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  roblox_user_id  TEXT NOT NULL UNIQUE,      -- 稳定唯一标识（username 可变，不做主键）
+  username        TEXT,
+  display_name    TEXT,
+  description     TEXT,
+  headshot_url    TEXT,
+  fullbody_url    TEXT,
+  data_source     TEXT NOT NULL DEFAULT 'roblox_api',
+  fetched_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 -- ── 消息表（阶段1使用：聊天 + 系统消息，未来做跑团日志）──
 CREATE TABLE IF NOT EXISTS messages (
@@ -45,6 +70,40 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_messages_room ON messages(room_id);
+
+-- ── AI 重要记忆（阶段2）：Context 的 IMPORTANT_MEMORIES 持久层 ──
+CREATE TABLE IF NOT EXISTS room_memories (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  room_id    TEXT NOT NULL REFERENCES rooms(id),
+  kind       TEXT NOT NULL DEFAULT 'important_event', -- important_event / npc / quest / location
+  content    TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_memories_room ON room_memories(room_id);
+
+-- ── Context 压缩摘要（阶段2）──────────────────────────
+CREATE TABLE IF NOT EXISTS context_summaries (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  room_id          TEXT NOT NULL REFERENCES rooms(id),
+  summary          TEXT NOT NULL,
+  token_estimate   INTEGER,
+  message_id_from  INTEGER,
+  message_id_to    INTEGER,
+  created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ── AI 规则请求（阶段2）：AI 只能提请求，由规则引擎审批 ──
+-- 治理：AI 不得直接修改 HP/金币/技能/装备/副本进度等任何状态表。
+CREATE TABLE IF NOT EXISTS ai_rule_requests (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  room_id      TEXT NOT NULL REFERENCES rooms(id),
+  request_type TEXT NOT NULL,               -- reward_request / state_change / ...
+  payload      TEXT,                        -- JSON
+  status       TEXT NOT NULL DEFAULT 'pending'
+               CHECK (status IN ('pending', 'approved', 'rejected')),
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
 
 -- ============================================================
 -- 以下为未来阶段预留：副本 → 技能成长线（本阶段仅建表，不实现逻辑）

@@ -1,12 +1,28 @@
 /**
  * websocket 通信：全部游戏事件的绑定与广播。
- * 事件协议见 docs/01-requirements-analysis.md。
+ * 阶段1：房间生命周期 + 聊天。
+ * 阶段2：临时会话身份 / @AI → GM 流水线 / Roblox 绑定与副本选择 / Context Viewer。
+ *
+ * 架构红线：PLAYER → SERVER → AI → RULE ENGINE → DATABASE → ALL PLAYERS。
+ * AI 输出不直达任何状态表；玩家输入全部按 UNTRUSTED INPUT 处理。
  */
-const { MESSAGE_MAX } = require('../config');
+const { MESSAGE_MAX, CONTEXT_VIEWER_SCOPE } = require('../config');
+const { getDb } = require('@roblox-trpg/database');
 const roomManager = require('../rooms/roomManager');
-const { validateName, makePlayer } = require('../players/playerManager');
+const { validateName } = require('../players/playerManager');
+const { createSession, resolveSession } = require('../sessions/sessionManager');
+const aiGm = require('../services/ai/aiGm');
+const rateLimiter = require('../services/ai/rateLimiter');
+const { maybeCompress } = require('../services/ai/contextCompressor');
+const { buildContext } = require('../services/ai/contextBuilder');
+const robloxUsers = require('../services/roblox/robloxUsers');
+const robloxThumbnails = require('../services/roblox/robloxThumbnails');
+const robloxExperiences = require('../services/roblox/robloxExperiences');
+const robloxSearch = require('../services/roblox/robloxSearch');
 
-/** 广播一条系统消息到房间（并持久化）。 */
+// ── 通用工具 ──────────────────────────────────────────────
+
+/** 广播系统消息（并持久化）。 */
 function broadcastSystem(io, room, text) {
   const id = roomManager.saveMessage(room.id, null, 'system', text);
   io.to(room.id).emit('chat:message', {
@@ -16,6 +32,11 @@ function broadcastSystem(io, room, text) {
     text,
     at: new Date().toISOString(),
   });
+}
+
+/** 广播玩家列表刷新。 */
+function broadcastPlayers(io, room) {
+  io.to(room.id).emit('players:update', { players: roomManager.publicPlayers(room) });
 }
 
 /** 离开当前房间并通知其余玩家。 */
@@ -33,26 +54,104 @@ function leaveCurrentRoom(io, socket, silent = false) {
   }
 }
 
+/** 会话接入：握手带有效 token → 复用身份；否则创建新的临时身份。 */
+function attachSession(socket, playerRowId) {
+  const handToken = socket.handshake.auth && socket.handshake.auth.sessionToken;
+  const resolved = handToken ? resolveSession(handToken) : null;
+  if (resolved && resolved.playerRowId === playerRowId) {
+    socket.playerUid = resolved.playerId;
+    return { playerId: resolved.playerId, sessionToken: null }; // token 客户端已持有
+  }
+  const { playerId, token } = createSession(playerRowId);
+  socket.playerUid = playerId;
+  return { playerId, sessionToken: token };
+}
+
+/** 组装 create/join 的成功载荷。 */
+function roomPayload(room, session) {
+  return {
+    room: { id: room.id, maxPlayers: room.maxPlayers, experience: room.currentExperience || null },
+    players: roomManager.publicPlayers(room),
+    playerId: session.playerId,
+    ...(session.sessionToken ? { sessionToken: session.sessionToken } : {}),
+  };
+}
+
+// ── @AI → GM 流水线（Step 8-11 + 18）─────────────────────
+
+async function triggerGm(io, socket, room, player, text) {
+  if (room.gmBusy) {
+    socket.emit('error', { message: 'GM 正在处理上一条请求，请稍候' });
+    return;
+  }
+  const limit = rateLimiter.tryConsumeAiRequest(socket.playerUid || socket.id, room.id);
+  if (!limit.ok) {
+    broadcastSystem(
+      io,
+      room,
+      limit.scope === 'player'
+        ? `AI 请求过于频繁（单玩家限流），请 ${limit.retryAfterSec} 秒后重试`
+        : `本房间 AI 请求过于频繁（房间限流），请 ${limit.retryAfterSec} 秒后重试`
+    );
+    return;
+  }
+
+  room.gmBusy = true;
+  try {
+    const parsed = await aiGm.gmRespond(room, { playerName: player.name, text });
+    const msgId = roomManager.saveMessage(room.id, null, 'gm', parsed.narrative);
+    io.to(room.id).emit('gm:response', {
+      id: msgId,
+      type: 'gm_response',
+      askerName: player.name,
+      narrative: parsed.narrative,
+      options: parsed.options,
+      sourceReferences: parsed.source_references,
+      at: new Date().toISOString(),
+    });
+    // Context 压缩检查（不阻塞主线）
+    maybeCompress(room, io, (msgs) => aiGm.summarizeHistory(room.id, msgs))
+      .then((note) => note && broadcastSystem(io, room, note))
+      .catch(() => {});
+  } catch (err) {
+    // 按真实原因提示：未配置 / 限速 / 余额不足 / 鉴权失败 / 超时 / 格式异常
+    broadcastSystem(io, room, `GM 无法回应：${err.message || '未知错误'}`);
+  } finally {
+    room.gmBusy = false;
+  }
+}
+
+// ── 事件注册 ─────────────────────────────────────────────
+
 module.exports = function registerSocketHandlers(io) {
   io.on('connection', (socket) => {
-    /** 创建房间（F3/F4）：校验名字 → 建房 → 创建者自动加入。 */
+    // 握手会话恢复（刷新/重连保持 playerId）
+    const handToken = socket.handshake.auth && socket.handshake.auth.sessionToken;
+    const sess = handToken ? resolveSession(handToken) : null;
+    if (sess) {
+      socket.playerRowId = sess.playerRowId;
+      socket.playerUid = sess.playerId;
+    }
+
+    /** 创建房间。 */
     socket.on('room:create', ({ playerName } = {}, ack) => {
       const { name, error } = validateName(playerName);
       if (error) return socket.emit('error', { message: error });
 
-      // 若已在某房间，先离开
       leaveCurrentRoom(io, socket, true);
 
       const room = roomManager.createRoom(socket.id);
-      roomManager.joinRoom(room.id, makePlayer(socket.id, name));
+      roomManager.joinRoom(room.id, { socketId: socket.id, name });
       socket.join(room.id);
 
-      const payload = { room: { id: room.id, maxPlayers: room.maxPlayers }, players: roomManager.publicPlayers(room) };
+      const row = roomManager.getPlayerRow(socket.id);
+      const session = attachSession(socket, row.id);
+      const payload = roomPayload(room, session);
       if (typeof ack === 'function') ack({ ok: true, ...payload });
       socket.emit('room:joined', payload);
     });
 
-    /** 加入房间（F5）。 */
+    /** 加入房间。 */
     socket.on('room:join', ({ playerName, roomId } = {}, ack) => {
       const { name, error } = validateName(playerName);
       if (error) return socket.emit('error', { message: error });
@@ -62,17 +161,22 @@ module.exports = function registerSocketHandlers(io) {
 
       leaveCurrentRoom(io, socket, true);
 
-      const result = roomManager.joinRoom(code, makePlayer(socket.id, name));
+      const result = roomManager.joinRoom(code, {
+        socketId: socket.id,
+        name,
+        existingRowId: socket.playerRowId,
+      });
       if (result.error) return socket.emit('error', { message: result.error });
 
       const { room } = result;
       socket.join(room.id);
 
-      const payload = { room: { id: room.id, maxPlayers: room.maxPlayers }, players: roomManager.publicPlayers(room) };
+      const row = roomManager.getPlayerRow(socket.id);
+      const session = attachSession(socket, row.id);
+      const payload = roomPayload(room, session);
       if (typeof ack === 'function') ack({ ok: true, ...payload });
       socket.emit('room:joined', payload);
 
-      // 通知房间内其他人（F9）
       socket.to(room.id).emit('player:joined', { playerName: name, players: payload.players });
       broadcastSystem(io, room, `${name} 加入了房间`);
     });
@@ -82,7 +186,10 @@ module.exports = function registerSocketHandlers(io) {
       leaveCurrentRoom(io, socket);
     });
 
-    /** 聊天消息（F7/F8）：校验 → 持久化 → 广播全房间。 */
+    /**
+     * 聊天（Step 8）：普通消息直接广播；包含 @AI 时额外触发 GM 流水线。
+     * @玩家 只是提及（前端高亮），绝不触发 AI。
+     */
     socket.on('chat:send', ({ text } = {}) => {
       const room = roomManager.findRoomBySocket(socket.id);
       if (!room) return socket.emit('error', { message: '你不在任何房间中' });
@@ -104,9 +211,151 @@ module.exports = function registerSocketHandlers(io) {
         text: content,
         at: new Date().toISOString(),
       });
+
+      // 仅显式 @AI 触发 GM；玩家间 @ 消息不能调用 AI
+      if (/@AI\b/i.test(content)) {
+        triggerGm(io, socket, room, player, content).catch(() => {});
+      }
     });
 
-    /** 断线即离开（F9）。 */
+    // ── Roblox 身份绑定（公开信息，无登录）──
+
+    /** 绑定：提供 Roblox User ID 或 username，服务端抓取公开资料。 */
+    socket.on('player:bindRoblox', async ({ userId, username } = {}, ack) => {
+      const room = roomManager.findRoomBySocket(socket.id);
+      if (!room) return socket.emit('error', { message: '你不在任何房间中' });
+      try {
+        const profile = userId
+          ? await robloxUsers.getUserById(userId)
+          : await robloxUsers.getUserByUsername(username);
+        const thumbs = await robloxThumbnails
+          .getUserThumbnails(profile.userId)
+          .catch(() => ({ headshot: null, fullbody: null }));
+
+        const db = getDb();
+        db.prepare(
+          `INSERT INTO roblox_profiles (roblox_user_id, username, display_name, description, headshot_url, fullbody_url)
+           VALUES (?, ?, ?, ?, ?, ?)
+           ON CONFLICT(roblox_user_id) DO UPDATE SET
+             username = excluded.username, display_name = excluded.display_name,
+             description = excluded.description, headshot_url = excluded.headshot_url,
+             fullbody_url = excluded.fullbody_url, fetched_at = datetime('now')`
+        ).run(
+          profile.userId,
+          profile.username,
+          profile.displayName,
+          profile.description,
+          thumbs.headshot && thumbs.headshot.state !== 'Blocked' ? thumbs.headshot.imageUrl : null,
+          thumbs.fullbody && thumbs.fullbody.state !== 'Blocked' ? thumbs.fullbody.imageUrl : null
+        );
+        const profileRow = db.prepare('SELECT id FROM roblox_profiles WHERE roblox_user_id = ?').get(profile.userId);
+        db.prepare('UPDATE players SET roblox_profile_id = ?, avatar_type = ? WHERE socket_id = ?').run(
+          profileRow.id,
+          'roblox',
+          socket.id
+        );
+
+        if (typeof ack === 'function') ack({ ok: true, profile });
+        broadcastPlayers(io, room);
+        const player = room.players.find((p) => p.socketId === socket.id);
+        broadcastSystem(io, room, `${player.name} 绑定了 Roblox 形象（${profile.username}，仅公开信息）`);
+      } catch (err) {
+        if (typeof ack === 'function') ack({ ok: false, error: err.message });
+        socket.emit('error', { message: err.message || 'Roblox 资料获取失败' });
+      }
+    });
+
+    /** 解绑 → 培根头。 */
+    socket.on('player:unbindRoblox', (_data, ack) => {
+      const room = roomManager.findRoomBySocket(socket.id);
+      if (!room) return;
+      getDb().prepare('UPDATE players SET roblox_profile_id = NULL, avatar_type = ? WHERE socket_id = ?').run(
+        'bacon',
+        socket.id
+      );
+      if (typeof ack === 'function') ack({ ok: true });
+      broadcastPlayers(io, room);
+    });
+
+    // ── 副本（Roblox Experience）选择（多结果不自动选定）──
+
+    /** 搜索体验（仅回给请求者）。 */
+    socket.on('dungeon:search', async ({ query } = {}, ack) => {
+      try {
+        const results = await robloxSearch.searchExperiences(query, 5);
+        if (typeof ack === 'function') ack({ ok: true, results });
+      } catch (err) {
+        if (typeof ack === 'function') ack({ ok: false, error: err.message, kind: err.kind });
+      }
+    });
+
+    /** URL / ID 解析体验。 */
+    socket.on('dungeon:resolve', async ({ input } = {}, ack) => {
+      try {
+        const experience = await robloxExperiences.resolveExperience(input);
+        if (typeof ack === 'function') ack({ ok: true, results: [experience] });
+      } catch (err) {
+        if (typeof ack === 'function') ack({ ok: false, error: err.message, kind: err.kind });
+      }
+    });
+
+    /** 玩家选定体验 → 绑定为房间副本来源（官方资料快照）。 */
+    socket.on('dungeon:select', async ({ universeId } = {}, ack) => {
+      const room = roomManager.findRoomBySocket(socket.id);
+      if (!room) return socket.emit('error', { message: '你不在任何房间中' });
+      try {
+        const experience = await robloxExperiences.getExperienceByUniverse(universeId);
+        roomManager.setRoomExperience(room, experience);
+        if (typeof ack === 'function') ack({ ok: true, experience });
+        io.to(room.id).emit('dungeon:set', { experience });
+        broadcastSystem(io, room, `副本来源已锁定：${experience.name}（Roblox 官方公开资料，source=roblox_api）`);
+      } catch (err) {
+        if (typeof ack === 'function') ack({ ok: false, error: err.message });
+      }
+    });
+
+    socket.on('dungeon:clear', (_data, ack) => {
+      const room = roomManager.findRoomBySocket(socket.id);
+      if (!room) return;
+      roomManager.clearRoomExperience(room);
+      if (typeof ack === 'function') ack({ ok: true });
+      io.to(room.id).emit('dungeon:set', { experience: null });
+      broadcastSystem(io, room, '已解除副本绑定');
+    });
+
+    // ── Context Viewer（Step 15-16，开发期调试用）──
+    socket.on('context:view', (_data, ack) => {
+      const room = roomManager.findRoomBySocket(socket.id);
+      if (!room) return typeof ack === 'function' && ack({ ok: false, error: '你不在任何房间中' });
+
+      if (CONTEXT_VIEWER_SCOPE === 'none') {
+        return typeof ack === 'function' && ack({ ok: false, error: 'Context Viewer 已关闭' });
+      }
+      if (CONTEXT_VIEWER_SCOPE === 'host') {
+        const db = getDb();
+        const roomRow = db.prepare('SELECT creator_socket_id FROM rooms WHERE id = ?').get(room.id);
+        if (!roomRow || roomRow.creator_socket_id !== socket.id) {
+          return typeof ack === 'function' && ack({ ok: false, error: '仅房主可查看 Context' });
+        }
+      }
+      // 脱敏：构建器从不包含 API Key / session token；这里再做一道长度保险
+      const ctx = buildContext(room);
+      if (typeof ack === 'function') {
+        ack({
+          ok: true,
+          sections: ctx.sections.map((s) => ({
+            key: s.key,
+            label: s.label,
+            tokens: s.tokens,
+            content: s.content.length > 8000 ? `${s.content.slice(0, 8000)}\n…（已截断显示）` : s.content,
+          })),
+          totalTokens: ctx.totalTokens,
+          budget: require('../config').AI_CONTEXT_BUDGET,
+        });
+      }
+    });
+
+    /** 断线即离开。 */
     socket.on('disconnect', () => {
       leaveCurrentRoom(io, socket);
     });

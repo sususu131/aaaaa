@@ -1,11 +1,26 @@
 import { useState } from 'react';
 import PlayerList from './PlayerList.jsx';
 import ChatPanel from './ChatPanel.jsx';
+import ContextViewer from './ContextViewer.jsx';
+import DungeonPanel from './DungeonPanel.jsx';
+import RobloxBindPanel from './RobloxBindPanel.jsx';
 
 /**
- * 房间视图：房间ID + 玩家列表 + 聊天区。
+ * 房间视图：房间ID / 副本卡片 / 玩家列表 / 聊天区 + 三个功能面板。
  */
-export default function RoomScreen({ room, myName, players, messages, onLeave, onSend }) {
+export default function RoomScreen({
+  room,
+  myName,
+  players,
+  messages,
+  chatDraft,
+  onChatDraftChange,
+  onLeave,
+  onSend,
+  onPickOption,
+  modal,
+  onOpenModal,
+}) {
   const [copied, setCopied] = useState(false);
 
   const copyRoomId = async () => {
@@ -31,15 +46,54 @@ export default function RoomScreen({ room, myName, players, messages, onLeave, o
         <span className="room-count">
           {players.length}/{room.maxPlayers} 人
         </span>
+        <button className="btn small" onClick={() => onOpenModal(modal === 'context' ? null : 'context')}>
+          查看 Context
+        </button>
+        <button className="btn small" onClick={() => onOpenModal(modal === 'dungeon' ? null : 'dungeon')}>
+          副本
+        </button>
+        <button className="btn small" onClick={() => onOpenModal(modal === 'avatar' ? null : 'avatar')}>
+          Roblox形象
+        </button>
         <button className="btn danger" onClick={onLeave}>
-          离开房间
+          离开
         </button>
       </div>
 
+      {room.experience && (
+        <div className="dungeon-banner">
+          {room.experience.iconUrl && <img src={room.experience.iconUrl} alt="" className="dungeon-icon" />}
+          <div>
+            <strong>当前副本来源：{room.experience.name}</strong>
+            <span className="source-badge">source=roblox_api</span>
+            <p className="dungeon-desc">
+              universeId={room.experience.universeId} · 创作者：
+              {room.experience.creator ? room.experience.creator.name : '未知'}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="room-body">
         <PlayerList players={players} myName={myName} maxPlayers={room.maxPlayers} />
-        <ChatPanel messages={messages} myName={myName} onSend={onSend} />
+        <ChatPanel
+          messages={messages}
+          myName={myName}
+          players={players}
+          chatDraft={chatDraft}
+          onChatDraftChange={onChatDraftChange}
+          onSend={onSend}
+          onPickOption={onPickOption}
+        />
       </div>
+
+      {modal === 'context' && <ContextViewer onClose={() => onOpenModal(null)} />}
+      {modal === 'dungeon' && (
+        <DungeonPanel current={room.experience} onClose={() => onOpenModal(null)} />
+      )}
+      {modal === 'avatar' && (
+        <RobloxBindPanel players={players} myName={myName} onClose={() => onOpenModal(null)} />
+      )}
     </main>
   );
 }

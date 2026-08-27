@@ -1,5 +1,5 @@
 /**
- * 玩家列表：实时同步（F6/F9）。阶段1统一显示为培根头占位。
+ * 玩家列表：实时同步。已绑定公开 Roblox 资料的显示头像，否则培根头。
  */
 export default function PlayerList({ players, myName, maxPlayers }) {
   const slots = Array.from({ length: maxPlayers });
@@ -11,16 +11,25 @@ export default function PlayerList({ players, myName, maxPlayers }) {
         {slots.map((_, i) => {
           const p = players[i];
           return (
-            <li key={p ? p.name : `empty-${i}`} className={`player-item ${p ? '' : 'empty'}`}>
-              <span className="avatar">🥓</span>
-              {p ? (
-                <span className="player-name">
-                  {p.name}
-                  {p.name === myName && <em>（我）</em>}
-                </span>
+            <li key={p ? `${p.uid || p.name}-${i}` : `empty-${i}`} className={`player-item ${p ? '' : 'empty'}`}>
+              {p && p.headshotUrl ? (
+                <img src={p.headshotUrl} alt="" className="avatar-img" />
               ) : (
-                <span className="player-name muted">等待加入…</span>
+                <span className="avatar">🥓</span>
               )}
+              <span className="player-name-col">
+                <span className="player-name">
+                  {p ? p.name : '等待加入…'}
+                  {p && p.name === myName && <em>（我）</em>}
+                </span>
+                {p && p.roblox ? (
+                  <span className="roblox-tag" title={`Roblox User ID: ${p.roblox.userId}`}>
+                    R6 · {p.roblox.displayName || p.roblox.username}
+                  </span>
+                ) : p ? (
+                  <span className="bacon-tag">培根头</span>
+                ) : null}
+              </span>
             </li>
           );
         })}

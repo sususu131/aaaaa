@@ -294,3 +294,198 @@ body {
 }
 
 .chat-input-row input:focus { border-color: #5b8cff; }
+
+/* ── 阶段2 ── */
+.player-id-badge {
+  margin-left: auto;
+  font-size: 11px;
+  color: #67718a;
+  background: #1d212b;
+  border: 1px solid #2c3242;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-family: ui-monospace, monospace;
+}
+
+.player-name-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.avatar-img {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+.roblox-tag { font-size: 11px; color: #7fd18b; }
+.bacon-tag { font-size: 11px; color: #8a93a8; }
+
+/* GM 消息 */
+.msg.gm {
+  align-self: stretch;
+  max-width: 100%;
+  background: #26213a;
+  border: 1px solid #4a3f6e;
+}
+.gm-meta strong, .gm-meta { color: #c9b8ff; }
+.source-refs { font-size: 11px; color: #67718a; margin-top: 4px; }
+.source-refs summary { cursor: pointer; }
+.source-refs ul { margin: 4px 0 0 16px; }
+
+/* AI 行动选项 */
+.action-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.option-btn {
+  background: #3f6ce0;
+  color: #fff;
+  border: none;
+  border-radius: 16px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.option-btn:hover { background: #4d7cf0; }
+
+/* @ 提及补全 */
+.mention-box {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px;
+  border-top: 1px solid #2c3242;
+  background: #181c26;
+  flex-wrap: wrap;
+}
+.mention-box button {
+  background: #232836;
+  border: 1px solid #333b4e;
+  color: #e6e8ee;
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.mention-box button:hover { border-color: #5b8cff; }
+
+/* 副本横幅 */
+.dungeon-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1d212b;
+  border: 1px solid #2c3242;
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+.dungeon-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.dungeon-desc {
+  color: #8a93a8;
+  font-size: 12px;
+  margin-top: 2px;
+  word-break: break-word;
+}
+.source-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 10px;
+  color: #7fd18b;
+  background: #1d3326;
+  border: 1px solid #2e5d3f;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-family: ui-monospace, monospace;
+}
+
+/* 弹窗 */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 10, 14, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 20px;
+}
+.modal {
+  background: #1d212b;
+  border: 1px solid #2c3242;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 640px;
+  max-height: 84vh;
+  overflow-y: auto;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-header h2 { font-size: 16px; }
+.small { font-size: 12px; }
+
+/* Context Viewer */
+.context-total { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.token-bar {
+  height: 8px;
+  background: #12151c;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.token-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3f6ce0, #b44ce0);
+}
+.context-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  font-size: 11px;
+  background: #232836;
+  border: 1px solid #333b4e;
+  color: #9aa3b8;
+  padding: 3px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.chip.active { border-color: #5b8cff; color: #e6e8ee; }
+.context-content {
+  background: #12151c;
+  border: 1px solid #2c3242;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 40vh;
+  overflow-y: auto;
+  color: #c3cad9;
+}
+
+/* 搜索结果 */
+.search-results { display: flex; flex-direction: column; gap: 8px; }
+.search-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #232836;
+  border-radius: 10px;
+  padding: 10px;
+}
+.result-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }

@@ -2,6 +2,36 @@ module.exports = {
   PORT: process.env.PORT || 3000,
   ROOM_MAX_PLAYERS: 3,      // 单房间容量上限（需求F6：2-3名玩家）
   PLAYER_NAME_MAX: 16,      // 名字长度上限
-  MESSAGE_MAX: 500,         // 单条消息长度上限
+  MESSAGE_MAX: 2000,        // 单条消息长度上限（阶段2：防刷，2000字符）
   ROOM_CODE_LENGTH: 6,      // 房间码长度
+
+  // ── 阶段2：AI GM（OpenAI 兼容 API，Key 只存服务端环境变量）──
+  AI_BASE_URL: process.env.AI_BASE_URL || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+  AI_API_KEY: process.env.AI_API_KEY || process.env.OPENAI_API_KEY || '',
+  AI_MODEL: process.env.AI_MODEL || 'gpt-4o-mini',
+  AI_TIMEOUT_MS: 25000,
+  AI_CONTEXT_BUDGET: Number(process.env.AI_CONTEXT_BUDGET || 100000), // tokens
+
+  // Context 压缩阈值（占 budget 比例）
+  CONTEXT_WARN_RATIO: 0.7,
+  CONTEXT_PREPARE_RATIO: 0.8,
+  CONTEXT_COMPRESS_RATIO: 0.9,
+  RECENT_EVENTS_KEEP: 15,   // 压缩后保留的最近消息条数
+
+  // AI 请求频率限制
+  AI_RATE_PER_PLAYER: Number(process.env.AI_RATE_PER_PLAYER || 6),   // 每玩家每分钟
+  AI_RATE_PER_ROOM: Number(process.env.AI_RATE_PER_ROOM || 12),      // 每房间每分钟
+
+  // Context Viewer 可见范围：all（开发期）/ host / none
+  CONTEXT_VIEWER_SCOPE: process.env.CONTEXT_VIEWER_SCOPE || 'all',
+
+  // Roblox 公开信息缓存 TTL（毫秒）
+  ROBLOX_TTL_EXPERIENCE: 30 * 60 * 1000,   // 体验资料 30 分钟
+  ROBLOX_TTL_USER: 6 * 60 * 60 * 1000,     // 用户资料 6 小时
+  ROBLOX_TTL_THUMBNAIL: 12 * 60 * 60 * 1000, // 缩略图 12 小时
+  ROBLOX_TIMEOUT_MS: 8000,
+
+  // 会话（临时身份）
+  SESSION_TTL_DAYS: 30,
+  COOKIE_NAME: 'rtp_session',
 };
