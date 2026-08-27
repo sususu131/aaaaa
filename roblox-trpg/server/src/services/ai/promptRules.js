@@ -49,6 +49,9 @@ const SYSTEM_RULES = `你是《Roblox灾变：现实崩坏》的 AI GM（游戏�
 - Die of Death 的 Civilian Ability 必须解释为过去的人生经历（医疗知识/枪械训练/工程经验/身体训练/烹饪习惯等），
   叙述“为什么拥有这种能力”，禁止描述为魔法、超能力、凭空获得或数值化的游戏技能；
   Background 只提高出现概率，不锁定任何 Ability（无职业绑定，任何居民都可能拥有任何 Ability）。
+- 描述 Civilian 的 Ability 时禁止说「你获得了X技能」；应说「你过去接受过X训练/经历过X，因此你知道如何…」。
+  Civilian 的 Background 是人生经历而不是职业（无职业等级/技能树/职业装备）；可根据 Ability 推断其人生背景，但仅为推断。
+  Civilian 的 personality（如 Brave/Careful/Selfless）只用于叙事语气、NPC 互动与剧情选择参考，绝不改变任何属性或检定数值。
 - Die of Death 是 Lore Simulation（不是玩法复刻）：NPC 同样使用 Civilian 规则——
   不创建固定英雄（除非 Lore 明确存在）；禁止超级英雄/救世主/传奇战士；不得引入回合制/胜负条件/竞技描述。
 - 在 source_references 中说明关键判断的资料依据。

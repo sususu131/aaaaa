@@ -60,6 +60,9 @@ const factionByUid = (uid) => db.prepare('SELECT * FROM factions WHERE uid = ?')
 async function main() {
   console.log('[test] 阶段12 就绪（70 项）\n');
 
+  // 阶段20：初始阵营关系改由预设声明（seed.sql 不再写死）——先运行预设导入器
+  require('../src/services/presets/presetSeeder').runPresetSeeder(fakeIo);
+
   // ══ A. 数据模型 ══
   const locs = npcSimulation.listLocations();
   assert.ok(locs.length >= 5 && locs.some((l) => l.key === 'loc_lobby') && locs.some((l) => l.key === 'loc_basement'));
@@ -68,9 +71,9 @@ async function main() {
   const entities = factionByUid('faction_doors_entities');
   const keeper = factionByUid('faction_doors_keeper');
   assert.strictEqual(factionRelations.getFactionRelation(survivors.id, entities.id).relation, 'HOSTILE');
-  ok('2. 种子阵营关系：幸存者↔实体=HOSTILE');
+  ok('2. 初始阵营关系（预设声明）：幸存者↔实体=HOSTILE');
   assert.strictEqual(factionRelations.getFactionRelation(survivors.id, keeper.id).relation, 'NEUTRAL');
-  ok('3. 种子阵营关系：幸存者↔管理员=NEUTRAL');
+  ok('3. 初始阵营关系（预设声明）：幸存者↔管理员=NEUTRAL');
   assert.ok(Object.keys(worldEvents.EVENT_CATALOG).length === 7 && worldEvents.EVENT_CATALOG.POWER_OUTAGE.category === 'NATURAL');
   ok('4. 世界事件目录（自然/剧情/系统 7 类）');
   mkRoomDb('RT0');
@@ -253,9 +256,9 @@ async function main() {
   // ══ G. 动态副本 ══
   const doors = db.prepare("SELECT * FROM dungeons WHERE roblox_experience_name = 'Doors'").get();
   db.prepare(
-    "INSERT INTO dungeon_versions (dungeon_id, version, definition_json, status, published_at) VALUES (?, 900, '{}', 'PUBLISHED', datetime('now'))"
+    "INSERT INTO dungeon_versions (dungeon_id, version, definition_json, status, published_at) VALUES (?, 901, '{}', 'PUBLISHED', datetime('now'))"
   ).run(doors.id);
-  const dvId = db.prepare('SELECT id FROM dungeon_versions WHERE dungeon_id = ? AND version = 900').get(doors.id).id;
+  const dvId = db.prepare('SELECT id FROM dungeon_versions WHERE dungeon_id = ? AND version = 901').get(doors.id).id;
   mkRoomDb('GD1');
   assert.strictEqual(dynamicDungeon.resolveRoomVariant('Doors', 'GD1').variant, 'NORMAL');
   ok('57. 无事件：副本变体 NORMAL');

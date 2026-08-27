@@ -836,3 +836,42 @@ Synergy 预留（候选保存、逻辑未新增、Loveshot 不触发）/ 边界�
 - 跨世界解释（`interpretAbility`）覆盖全部 18 项；Trait 池保持 9 项（未新增）；
   新增五项均为 **Lore 项**：不入 ABILITY_CATALOG 发放目录、不播种技能
 - 测试：72→**88 项**（新增官方 Library 全量专节 73-88）；全套 **1237 项**通过
+
+---
+
+# 阶段20：Civilian Background & Personality Simulation + 阵营关系去写死
+
+## 阵营关系修复（不再写死于 seed）
+
+- 移除 `seed.sql` 中硬编码的 DOORS 初始关系（幸存者↔实体=HOSTILE、幸存者↔管理员=NEUTRAL）
+- 初始关系改由**各预设 JSON 声明**：`faction_relations`（按阵营名或 uid 后缀定位，限本预设副本范围），
+  由 presetSeeder 导入时幂等落库（`factionRelations.ensureInitialRelation`：仅该对无关系行时插入，
+  静默无事件；运行期改动如 FACTION_WAR 永不被重复导入覆盖）
+- DOD 预设声明：`Civilian↔Killer=HOSTILE`（Killers 猎杀居民，天生敌对）、`Civilian↔Government=NEUTRAL`（观望）；
+  `dodCivilian.ensureSeeded` 同步播种 `Robloxia Citizens` 的对应关系
+- stage12 断言不变（来源改为预设导入）；官方定义物化版本号与测试夹具冲突已调（900→901）
+
+## Civilian Background & Personality Simulation
+
+- **`civilian_background_profiles` 表**（迁移 018）：`id / background_type / description /
+  possible_traits / possible_abilities / personality_patterns`（+source）；幂等播种 6 档案
+  （Engineer/Medic/Athlete/Security/Cook/Artist——Artist 为官方背景池补全，关联表演系 Ability）
+- **Background = 人生经历，不是职业**（无职业等级/职业技能树/职业装备）：
+  Engineer=机械/建筑/创造经验、Medic=医疗/护理/助人经验（**护士/医生/志愿者/照顾家人**——
+  1 Ability ≠ 1 职业）、Athlete=体育训练、Security=安全/防卫/危险环境、Cook=料理经验
+- **Trait 生成**（Trait 不是技能：人格/经历/知识，不入 skills 表）：主特点来自背景档案，
+  次特点从全档案并集随机（`civilian_instance.profile_traits`）
+- **Personality 生成**：官方六词池 `Brave/Careful/Selfless/Practical/Creative/Nervous`
+  （`civilian_instance.personality`）；主人格来自背景倾向——只影响 GM 叙事、NPC 互动、
+  剧情选择，绝不改变属性数值
+- **Ability 解释**：`gmAbilityPhrasing` 第二人称句式（"你过去接受过医疗训练，因此你知道如何处理伤员"）；
+  SYSTEM_RULES 明令禁止"你获得了X技能"句式
+- **Ability → Background 推断**（`inferBackgroundFromAbilities`）：Lore 关联 +2/项、
+  档案命中 +1/项，返回全部候选排序——仅为推断，注明不构成职业绑定
+- **随机生成流**：进入 DOD → Background → Traits（官方 + 档案）→ Personality → Ability 解释
+  （`generateCivilianLore` 一并写入新列）
+- **`CIVILIAN_PROFILE_CONTEXT`** 新分区：`Background: / Traits: / Personality: /
+  Life Experience: / Ability Explanation: / Survival Lore: / Inferred Background:` + 用语纪律
+- **REST（只读）**：`GET /api/dod/civilian/profile`、`GET /api/dod/backgrounds`
+- 测试：新增阶段20（66 项：档案库/定义内容/Trait与Personality生成随机性/推断/生成流/
+  Context 格式/无职业系统边界/阵营关系预设化与幂等）；全套 **1303 项**通过

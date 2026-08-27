@@ -198,11 +198,15 @@ function generateCivilianLore(io, playerId, { rng = null, background = null } = 
   const personalityTraits = rollPersonalityTraits(bg, nextRoll());
   // 阶段19：背景关联只提高概率（+权重），不锁定 —— 任何背景仍可能获得任何 Ability
   const abilities = rollAbilitiesByTraits(personalityTraits, 2, nextRoll(), bg);
+  // 阶段20：Background & Personality Simulation —— 背景档案特点 + 人格（非技能/非数值）
+  const profileSvc = require('./dodBackgroundProfile');
+  const profileTraits = profileSvc.rollProfileTraits(bg, nextRoll());
+  const personality = profileSvc.rollPersonality(bg, nextRoll());
   const lifeExperience = generateLifeExperience(bg);
 
   db.prepare(
-    `INSERT INTO civilian_instance (player_id, background, traits, abilities, synergy_state, source, life_experience, personality_traits)
-     VALUES (?, ?, ?, ?, 'NONE', ?, ?, ?)`
+    `INSERT INTO civilian_instance (player_id, background, traits, abilities, synergy_state, source, life_experience, personality_traits, personality, profile_traits)
+     VALUES (?, ?, ?, ?, 'NONE', ?, ?, ?, ?, ?)`
   ).run(
     playerId,
     bg,
@@ -210,7 +214,9 @@ function generateCivilianLore(io, playerId, { rng = null, background = null } = 
     JSON.stringify(abilities.map((a) => a.key)),
     dodCivilian.SOURCE,
     lifeExperience,
-    JSON.stringify(personalityTraits)
+    JSON.stringify(personalityTraits),
+    JSON.stringify(personality),
+    JSON.stringify(profileTraits)
   );
 
   const characterService = require('../character/characterService');
@@ -282,6 +288,9 @@ function loreView(playerId, experienceName = null) {
     background: civ.background,
     lifeExperience: civ.life_experience,
     personalityTraits: parse(civ.personality_traits && civ.personality_traits !== '[]' ? civ.personality_traits : civ.traits, []),
+    // 阶段20：人格（影响叙事/NPC互动/剧情选择）+ 背景档案特点（经历/知识，非技能）
+    personality: parse(civ.personality, []),
+    profileTraits: parse(civ.profile_traits, []),
     abilities: parse(civ.abilities, []).map((key) => {
       const lore = abilityLore.getAbilityLore(key);
       return {
@@ -305,6 +314,38 @@ function loreView(playerId, experienceName = null) {
   };
 }
 
+/**
+ * 阶段20：Profile 视图 —— Background 档案 + 人格 + 人生经历 + Ability 解释 + 背景推断。
+ * 供 CIVILIAN_PROFILE_CONTEXT（GM 叙事）与 REST 使用；不含任何数值。
+ */
+function profileView(playerId) {
+  const abilityLore = require('./dodAbilityLore');
+  const profileSvc = require('./dodBackgroundProfile');
+  const view = loreView(playerId);
+  if (!view) return null;
+  const profile = profileSvc.getProfile(view.background);
+  const abilityKeys = view.abilities.map((a) => a.key);
+  return {
+    playerId,
+    background: view.background,
+    backgroundDescription: profile ? profile.description : null,
+    backgroundSurvivalLore: profileSvc.survivalLore(view.background),
+    traits: view.personalityTraits,          // 官方 Trait 池特点（决定 Ability 倾向）
+    profileTraits: view.profileTraits,        // 背景档案特点（人格/经历/知识，非技能）
+    personality: view.personality,            // 人格（影响叙事/NPC互动/剧情选择）
+    lifeExperience: view.lifeExperience,
+    abilities: view.abilities.map((a) => ({
+      key: a.key,
+      gmPhrasing: profileSvc.gmAbilityPhrasing(a.key),
+      loreExplanation: a.loreExplanation,
+    })),
+    inferredBackground: profileSvc.inferBackgroundFromAbilities(abilityKeys),
+    personalityNote: '人格只影响 GM 叙事、NPC 互动与剧情选择，不改变任何属性或检定数值。',
+    phrasingRule: profileSvc.GM_PHRASING_RULE,
+    loreNote: abilityLore.ABILITY_EXPLANATION_RULE,
+  };
+}
+
 module.exports = {
   DodLoreError,
   WORLD_SETTING,
@@ -321,4 +362,5 @@ module.exports = {
   rollCivilianNpcTemplate,
   interpretAbility,
   loreView,
+  profileView,
 };

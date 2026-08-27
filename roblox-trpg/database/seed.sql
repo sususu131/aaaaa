@@ -373,17 +373,10 @@ INSERT OR IGNORE INTO npc_locations (key, name, description, is_safe) VALUES
   ('loc_gate',     '出入口', '通往外界的出入口。', 1),
   ('loc_watch',    '瞭望台', '可以观察远处动静的高处。', 0);
 
--- 阵营关系初始状态（规范化：faction_a < faction_b 由服务层保证）
-INSERT OR IGNORE INTO faction_relations (faction_a, faction_b, relation, updated_by, reason)
-SELECT MIN(a.id, b.id), MAX(a.id, b.id), 'HOSTILE', 'seed', '幸存者与实体天生敌对'
-FROM factions a, factions b
-WHERE a.uid = 'faction_doors_survivors' AND b.uid = 'faction_doors_entities'
-  AND NOT EXISTS (SELECT 1 FROM faction_relations fr WHERE fr.faction_a = MIN(a.id, b.id) AND fr.faction_b = MAX(a.id, b.id));
-INSERT OR IGNORE INTO faction_relations (faction_a, faction_b, relation, updated_by, reason)
-SELECT MIN(a.id, b.id), MAX(a.id, b.id), 'NEUTRAL', 'seed', '幸存者对旅馆管理员保持观望'
-FROM factions a, factions b
-WHERE a.uid = 'faction_doors_survivors' AND b.uid = 'faction_doors_keeper'
-  AND NOT EXISTS (SELECT 1 FROM faction_relations fr WHERE fr.faction_a = MIN(a.id, b.id) AND fr.faction_b = MAX(a.id, b.id));
+-- 阵营关系初始状态：不再写死于 seed（阶段20 修复）。
+-- 初始关系由各预设 JSON 的 faction_relations 声明（如 doors.json：幸存者↔实体 天生敌对、
+-- 幸存者↔旅馆管理员 保持观望；dod.json：Civilian↔Killer 天生敌对、Civilian↔Government 观望），
+-- 由 presetSeeder 导入时幂等落库；运行期改动（FACTION_WAR 等）不会被重复导入覆盖。
 
 -- 传奇人物世界模拟条件（不是简单随机：由剑术/世界状态/剧情决定；保留原有概率键）
 UPDATE legendary_npcs SET spawn_rules_json = '{"base_chance":0.02,"experience_boost":{"Sword Fight on the Heights":0.25},"min_level":1,"world_conditions":{"any_skill":["Sword","剑"],"any_world_flag":["sword_knowledge"],"min_quest_progress":1}}' WHERE display_name = 'Shedletsky';

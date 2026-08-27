@@ -9,6 +9,31 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '018_stage20_civilian_profile',
+    up(db) {
+      // ── 阶段20：Civilian Background & Personality Simulation ──
+      // Background 档案（人生经历解释，不是职业系统：无等级/技能树/装备）。
+      db.exec(`CREATE TABLE IF NOT EXISTS civilian_background_profiles (
+        id                  TEXT PRIMARY KEY,             -- 语义 id（engineer/medic/...）
+        background_type     TEXT NOT NULL UNIQUE,         -- Engineer/Medic/Athlete/Security/Cook/Artist
+        description         TEXT NOT NULL,                -- 这类人生经历是什么（不是职业定义）
+        possible_traits     TEXT NOT NULL DEFAULT '[]',   -- JSON：可能的知识/经历/人格特点（非技能）
+        possible_abilities  TEXT NOT NULL DEFAULT '[]',   -- JSON：可能出现的 Ability（只提高概率，不锁定）
+        personality_patterns TEXT NOT NULL DEFAULT '[]',  -- JSON：常见人格倾向（Brave/Careful/...）
+        source              TEXT NOT NULL DEFAULT 'DIE_OF_DEATH',
+        created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      // Civilian 身份扩展：人格（影响 GM 叙事/NPC互动/剧情选择）+ 背景档案特点
+      const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+      if (!hasCol('civilian_instance', 'personality')) {
+        db.exec("ALTER TABLE civilian_instance ADD COLUMN personality TEXT NOT NULL DEFAULT '[]'");
+      }
+      if (!hasCol('civilian_instance', 'profile_traits')) {
+        db.exec("ALTER TABLE civilian_instance ADD COLUMN profile_traits TEXT NOT NULL DEFAULT '[]'");
+      }
+    },
+  },
+  {
     name: '017_stage19b_flashlight_library',
     up(db) {
       // ── 阶段19 增补：Flashlight 官方 Library（hiking/exploration/tour guide）──

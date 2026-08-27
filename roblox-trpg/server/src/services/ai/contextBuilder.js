@@ -324,6 +324,52 @@ function civilianContextContent(room) {
   }
 }
 
+/**
+ * 阶段20：CIVILIAN_PROFILE_CONTEXT —— Background 档案 / Traits / 人格 /
+ * 人生经历 / Ability 第二人称解释 / 背景推断（供 GM 叙事、NPC 互动、剧情选择）。
+ * 人格不改变任何数值；Ability 解释遵守"人生经历"用语纪律。
+ */
+function civilianProfileContextContent(room) {
+  try {
+    const db = getDb();
+    const dodLore = require('../presets/dodLore');
+    const profileSvc = require('../presets/dodBackgroundProfile');
+    const blocks = [];
+    for (const p of room.players) {
+      const row = db.prepare('SELECT id FROM players WHERE socket_id = ?').get(p.socketId);
+      if (!row) continue;
+      const view = dodLore.profileView(row.id);
+      if (!view) continue;
+      const lines = [
+        `- ${p.name}:`,
+        `  Background: ${view.background} —— ${view.backgroundDescription || '（未知经历类型）'}`,
+        `  Traits: ${(view.traits.length ? view.traits.join('、') : '（未知）')}${view.profileTraits.length ? `｜背景特点：${view.profileTraits.join('、')}` : ''}`,
+        `  Personality: ${view.personality.length ? view.personality.join('、') : '（未知）'}`,
+        `  Life Experience: ${view.lifeExperience || '（未知）'}`,
+      ];
+      for (const a of view.abilities) {
+        lines.push(`  Ability Explanation: ${a.key} —— ${a.gmPhrasing || a.loreExplanation || '（该能力的经历来源未知）'}`);
+      }
+      if (view.backgroundSurvivalLore) lines.push(`  Survival Lore: ${view.backgroundSurvivalLore}`);
+      const inf = view.inferredBackground;
+      if (inf && inf.top) {
+        const top = inf.candidates[0];
+        lines.push(`  Inferred Background: ${inf.top}（依据 ${top.matchedAbilities.join('、') || '—'}；仅为推断，同一能力可来自多种人生，不构成职业绑定）`);
+      }
+      blocks.push(lines.join('\n'));
+    }
+    if (!blocks.length) return '（房间内没有 Civilian 身份）';
+    return (
+      `Civilian Profile（Background=人生经历，不是职业；无职业等级/技能树/装备）：\n` +
+      `${blocks.join('\n')}\n` +
+      `（GM 用语纪律：${profileSvc.GM_PHRASING_RULE}\n` +
+      `人格 Personality 只影响叙事语气、NPC 互动与剧情选择，绝不改变属性或检定数值；禁止英雄化描述。）`
+    );
+  } catch (err) {
+    return `（Civilian Profile 上下文不可用：${err.message}）`;
+  }
+}
+
 /** 构建完整 Context。返回 { sections, totalTokens }。 */
 function buildContext(room) {
   const exp = room.currentExperience || null;
@@ -375,6 +421,7 @@ function buildContext(room) {
     { key: 'decisions', label: 'DECISION_CONTEXT', content: decisionContextContent(room.id) },
     { key: 'inventory', label: 'INVENTORY_CONTEXT', content: inventoryContextContent(room) },
     { key: 'civilian', label: 'DOD_CIVILIAN_CONTEXT (Die of Death Lore Simulation)', content: civilianContextContent(room) },
+    { key: 'civilian_profile', label: 'CIVILIAN_PROFILE_CONTEXT', content: civilianProfileContextContent(room) },
     { key: 'avatar', label: 'Avatar / Initial State', content: avatarContext(room) },
     { key: 'roblox', label: 'Roblox Source Data', content: robloxBlock },
   ];

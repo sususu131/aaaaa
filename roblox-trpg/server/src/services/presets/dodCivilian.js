@@ -91,6 +91,22 @@ function ensureSeeded() {
        VALUES (?, ?, ?, 'DUNGEON', 'reaction', 'epic', 'approved', ?)`
     ).run(s.result, s.description, dungeon.id, JSON.stringify({ dod_ability: true, synergy: true, requires: s.requires, source: SOURCE }));
   }
+  // 阶段20：阵营初始关系（预设声明，幂等；不写死于 seed）
+  //   Robloxia Citizens ↔ Killer = HOSTILE（Killers 猎杀居民：Civilian - The Victims 官方设定）
+  //   Robloxia Citizens ↔ Government = NEUTRAL（居民对政府力量保持观望）
+  const factionRelations = require('../world/factionRelations');
+  factionRelations.ensureInitialRelation({
+    uidA: CIVILIAN_FACTION.uid,
+    uidB: 'faction_preset_dod_killer',
+    relation: 'HOSTILE',
+    reason: 'Killers猎杀居民（Civilian - The Victims 官方设定）：天生敌对',
+  });
+  factionRelations.ensureInitialRelation({
+    uidA: CIVILIAN_FACTION.uid,
+    uidB: 'faction_preset_dod_government',
+    relation: 'NEUTRAL',
+    reason: '居民对政府力量保持观望',
+  });
   return dungeon;
 }
 

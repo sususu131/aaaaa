@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node src/index.js",
     "start": "node src/index.js",
-    "test": "node test/smoke.test.js && node test/stage3.test.js && node test/stage3b-vision.test.js && node test/stage4-pipeline.test.js && node test/stage5-runtime.test.js && node test/stage6-character.test.js && node test/stage7-agent.test.js && node test/stage8-quest.test.js && node test/stage9-npc.test.js && node test/stage10-legend.test.js && node test/stage11-encounter.test.js && node test/stage12-world.test.js && node test/stage13-party.test.js && node test/stage14-inventory.test.js && node test/stage15-playable.test.js && node test/stage16-presets.test.js && node test/stage17-dod-civilian.test.js && node test/stage18-dod-lore.test.js && node test/stage19-dod-ability-lore.test.js",
+    "test": "node test/smoke.test.js && node test/stage3.test.js && node test/stage3b-vision.test.js && node test/stage4-pipeline.test.js && node test/stage5-runtime.test.js && node test/stage6-character.test.js && node test/stage7-agent.test.js && node test/stage8-quest.test.js && node test/stage9-npc.test.js && node test/stage10-legend.test.js && node test/stage11-encounter.test.js && node test/stage12-world.test.js && node test/stage13-party.test.js && node test/stage14-inventory.test.js && node test/stage15-playable.test.js && node test/stage16-presets.test.js && node test/stage17-dod-civilian.test.js && node test/stage18-dod-lore.test.js && node test/stage19-dod-ability-lore.test.js && node test/stage20-dod-background-profile.test.js",
     "test:stage12": "node test/stage12-world.test.js",
     "test:stage13": "node test/stage13-party.test.js",
     "test:stage14": "node test/stage14-inventory.test.js",
@@ -16,6 +16,7 @@
     "test:stage17": "node test/stage17-dod-civilian.test.js",
     "test:stage18": "node test/stage18-dod-lore.test.js",
     "test:stage19": "node test/stage19-dod-ability-lore.test.js",
+    "test:stage20": "node test/stage20-dod-background-profile.test.js",
     "test:stage3": "node test/stage3.test.js",
     "test:stage3b": "node test/stage3b-vision.test.js",
     "test:stage4": "node test/stage4-pipeline.test.js",

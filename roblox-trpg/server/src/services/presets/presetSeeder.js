@@ -91,6 +91,39 @@ function ensureFactions(preset, dungeonId) {
   return factions.length;
 }
 
+/**
+ * 阶段20：预设声明的初始阵营关系（取代 seed.sql 写死）。
+ * 配置格式（二选一定位阵营）：
+ *   { "faction_a_suffix": "civilian", "faction_b_suffix": "killer", "relation": "HOSTILE", "reason": "…" }
+ *   { "names": ["幸存者", "实体"], "relation": "HOSTILE", "reason": "…" }  // 按名（限本预设副本范围）
+ * 幂等：仅在该对尚无关系行时插入；运行期改动不被重复导入覆盖。
+ */
+function ensureFactionRelations(preset, dungeon) {
+  const factionRelations = require('../world/factionRelations');
+  const entries = preset.faction_relations || [];
+  let seeded = 0;
+  for (const r of entries) {
+    const relation = String(r.relation || 'NEUTRAL').toUpperCase();
+    if (Array.isArray(r.names) && r.names.length === 2) {
+      seeded += factionRelations.ensureInitialRelation({
+        nameA: r.names[0],
+        nameB: r.names[1],
+        dungeonIds: [dungeon.id],
+        relation,
+        reason: r.reason || `${preset.name} 预设声明的初始关系`,
+      });
+    } else if (r.faction_a_suffix && r.faction_b_suffix) {
+      seeded += factionRelations.ensureInitialRelation({
+        uidA: `faction_preset_${preset.key}_${r.faction_a_suffix}`,
+        uidB: `faction_preset_${preset.key}_${r.faction_b_suffix}`,
+        relation,
+        reason: r.reason || `${preset.name} 预设声明的初始关系`,
+      });
+    }
+  }
+  return seeded;
+}
+
 function ensureNpcs(preset, dungeonId) {
   const db = getDb();
   let count = 0;
@@ -258,6 +291,7 @@ function importPreset(io, preset) {
   const dungeon = ensureDungeon(preset);
   const locations = ensureLocations(preset);
   const factions = ensureFactions(preset, dungeon.id);
+  const factionRelationsSeeded = ensureFactionRelations(preset, dungeon);
   const npcs = ensureNpcs(preset, dungeon.id);
   const quest = ensureQuest(preset, dungeon.id);
   const version = ensureDefinitionVersion(preset, dungeon);
@@ -277,7 +311,7 @@ function importPreset(io, preset) {
     dungeonId: dungeon.id,
     versionId: version.id,
     questUid: quest ? quest.uid : null,
-    created: { locations, factions, npcs, rewards },
+    created: { locations, factions, factionRelations: factionRelationsSeeded, npcs, rewards },
   };
 }
 

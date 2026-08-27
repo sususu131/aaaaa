@@ -83,6 +83,52 @@ function getFactionRelation(factionAId, factionBId) {
   return { relation: row ? row.relation : 'NEUTRAL', row };
 }
 
+/**
+ * 阶段20：幂等播种初始关系（预设声明，取代 seed.sql 写死）。
+ * - 仅在该阵营对【尚无任何关系行】时插入；运行期改动永不被覆盖；
+ * - 静默写入（updated_by='preset'，不发 Event Bus 事件——导入是初始化，不是世界变化）；
+ * - 支持 uid 对（faction_a_suffix 解析后的完整 uid）或 阵营名对（可限定 dungeonIds 范围）。
+ * 返回实际播种的阵营对数量。
+ */
+function ensureInitialRelation({ uidA = null, uidB = null, nameA = null, nameB = null, dungeonIds = null, relation = 'NEUTRAL', reason = '' } = {}) {
+  if (!RELATIONS.includes(relation)) {
+    throw new FactionRelationError('INVALID_RELATION', `非法关系 ${relation}（允许：${RELATIONS.join('/')}）`);
+  }
+  const db = getDb();
+  let factionsA = [];
+  let factionsB = [];
+  if (uidA && uidB) {
+    factionsA = [db.prepare('SELECT * FROM factions WHERE uid = ?').get(uidA)].filter(Boolean);
+    factionsB = [db.prepare('SELECT * FROM factions WHERE uid = ?').get(uidB)].filter(Boolean);
+  } else if (nameA && nameB) {
+    // 按阵营名解析（可限定副本范围，避免跨世界误连）；同名多行时全部配对
+    const byName = (name) => {
+      const rows = db.prepare('SELECT * FROM factions WHERE name = ?').all(name);
+      return dungeonIds && dungeonIds.length ? rows.filter((r) => dungeonIds.includes(r.dungeon_id)) : rows;
+    };
+    factionsA = byName(nameA);
+    factionsB = byName(nameB);
+  } else {
+    throw new FactionRelationError('BAD_INITIAL_RELATION', '初始关系必须提供 uid 对或阵营名对');
+  }
+  if (!factionsA.length || !factionsB.length) return 0; // 阵营尚未导入：静默跳过（导入器幂等重试）
+  let seeded = 0;
+  const ins = db.prepare(
+    `INSERT OR IGNORE INTO faction_relations (faction_a, faction_b, relation, updated_by, reason)
+     SELECT ?, ?, ?, 'preset', ?
+     WHERE NOT EXISTS (SELECT 1 FROM faction_relations fr WHERE fr.faction_a = ? AND fr.faction_b = ?)`
+  );
+  for (const fa of factionsA) {
+    for (const fb of factionsB) {
+      if (fa.id === fb.id) continue;
+      const [a, b] = normalizePair(fa.id, fb.id);
+      const res = ins.run(a, b, relation, reason || '预设声明的初始关系', a, b);
+      if (res.changes > 0) seeded += 1;
+    }
+  }
+  return seeded;
+}
+
 /** 全部关系（带阵营名，UI/Context 用）。 */
 function allRelations() {
   return getDb()
@@ -104,6 +150,7 @@ module.exports = {
   RELATIONS,
   FactionRelationError,
   setFactionRelation,
+  ensureInitialRelation,
   getFactionRelation,
   allRelations,
   relationsOfFaction,

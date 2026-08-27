@@ -106,4 +106,35 @@ router.get('/api/dod/abilities/lore', (req, res) => {
   }
 });
 
+// ── 阶段20：Civilian Background & Personality Simulation（只读；非职业系统）──
+
+/** GET /api/dod/civilian/profile —— 我的 Civilian 档案（背景/特点/人格/经历/Ability 解释/背景推断）。 */
+router.get('/api/dod/civilian/profile', (req, res) => {
+  const sess = authPlayer(req, res);
+  if (!sess) return;
+  try {
+    const dodLore = require('../services/presets/dodLore');
+    res.json({ profile: dodLore.profileView(sess.playerRowId) });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'DOD_ERROR' });
+  }
+});
+
+/** GET /api/dod/backgrounds —— Background 档案库（人生经历模板；无等级/技能树/装备）。 */
+router.get('/api/dod/backgrounds', (req, res) => {
+  const sess = authPlayer(req, res);
+  if (!sess) return;
+  try {
+    const dodBackgroundProfile = require('../services/presets/dodBackgroundProfile');
+    res.json({
+      note: 'Background 是人生经历（不是职业）：无职业等级/职业技能树/职业装备；possible_abilities 只提高概率，不锁定。',
+      personalityPool: dodBackgroundProfile.PERSONALITY_POOL,
+      phrasingRule: dodBackgroundProfile.GM_PHRASING_RULE,
+      backgrounds: dodBackgroundProfile.listProfiles(),
+    });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'DOD_ERROR' });
+  }
+});
+
 module.exports = router;
