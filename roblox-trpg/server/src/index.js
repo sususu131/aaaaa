@@ -20,7 +20,7 @@ const io = new Server(server, {
 });
 
 app.use(express.json());
-app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 2 }));
+app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 3 }));
 app.use('/api', apiRoutes);
 
 registerSocketHandlers(io);
