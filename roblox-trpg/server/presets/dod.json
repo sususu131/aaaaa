@@ -297,25 +297,39 @@
         "Medic": ["Caretaker"],
         "Athlete": ["Punch", "Dash"],
         "Security": ["Revolver", "Block"],
-        "Cook": ["Hotdog", "Pie"]
+        "Cook": ["Hotdog", "Pie"],
+        "Artist": ["Banana Peel", "Bugle"]
       },
-      "background_weight_note": "只是概率提高（权重 3，其余 1），不是固定绑定；任何 Civilian 都可能获得任何 Ability（无职业锁定）。",
+      "background_weight_note": "只是概率提高（权重 3，其余 1），不是固定绑定；任何 Civilian 都可能获得任何 Ability（无职业锁定）。Artist 关联源自官方 Library：Banana Peel 与 Bugle 居民都有表演或戏剧的背景。",
       "background_agnostic": {
-        "Flashlight": "官方 Library：Flashlight 居民来自 wide variety of backgrounds（多为徒步/探索爱好者，不少是向导或户外工作者，偶有技工/水管工）——不设关联背景，所有背景权重相同。"
+        "Flashlight": "官方 Library：Flashlight 居民来自 wide variety of backgrounds（多为徒步/探索爱好者，不少是向导或户外工作者，偶有技工/水管工）——不设关联背景，所有背景权重相同。",
+        "Adrenaline": "官方 Library：背景通常并不显眼——普通平民、普通工作、过好自己的一天——不设关联背景。",
+        "Cloak": "官方 Library：实验性政府科技，非政府官员的居民也搞得到——不设关联背景。",
+        "Taunt": "官方 Library：恶作剧者/媒体频道经营者，无出身背景信息——不设关联背景。"
       },
       "trait_examples": {
         "Caretaker": ["Medical Knowledge", "Empathy", "First Aid Experience"],
         "Revolver": ["Weapon Familiarity", "Marksmanship"],
-        "Flashlight": ["Outdoor Experience", "Navigation"]
+        "Flashlight": ["Outdoor Experience", "Navigation"],
+        "Banana Peel": ["Special Habit", "Engineering Experience"],
+        "Cloak": ["Engineering Experience", "Outdoor Experience"],
+        "Bugle": ["Special Habit"]
       },
       "trait_note": "Ability 的出现由 Trait 解释（该 Civilian 拥有的人生特点）。",
-      "library_note": "官方 Library 文本（CANON）保存于 dod_abilities_lore.library_excerpt：只含背景/性格设定（如 Flashlight=徒步/探索/向导/组织者，不是战斗人员），不含使用机制与战斗数值。",
+      "library_note": "官方 Library 文本（CANON）保存于 dod_abilities_lore.library_excerpt：收录全部 14 项基础 Ability 的 Traits（性格/背景）段落——只含背景与性格设定（如 Flashlight=徒步/探索/向导，Block=盔甲下的和蔼老兵，Bugle=士气领袖），Functionality 段的使用机制与战斗数值一律不入库。",
       "possible_synergy": {
         "BonusPad": [{ "with": "Caretaker", "result": "CarePad" }],
-        "Revolver": [{ "with": "Caretaker", "result": "Loveshot" }]
+        "Caretaker": [{ "with": "BonusPad", "result": "CarePad" }, { "with": "Revolver", "result": "Loveshot" }],
+        "Revolver": [{ "with": "Caretaker", "result": "Loveshot" }],
+        "Hotdog": [{ "with": "Pie", "result": "SweetTooth" }],
+        "Pie": [{ "with": "Hotdog", "result": "SweetTooth" }],
+        "Taunt": [{ "with": "Bugle", "result": "Noisemaker" }],
+        "Bugle": [{ "with": "Taunt", "result": "Noisemaker" }],
+        "Banana Peel": [{ "with": "Artful", "result": "Showtime" }]
       },
-      "synergy_note": "只保存 possible_synergy 候选（预留），不实现 Synergy 逻辑。",
-      "flashlight_note": "Flashlight 为 Lore 项（官方 Library 集成）：解释为徒步/户外探索/向导经历，随身携带手电是生活习惯；使用机制（光锥/减速/闪光/数值）不实现、不入库。"
+      "synergy_note": "只保存 possible_synergy 候选（预留，官方 Synergy 表：CarePad/Loveshot/SweetTooth/Noisemaker + Banana Peel 备注 Showtime），不实现 Synergy 逻辑。",
+      "flashlight_note": "Flashlight 为 Lore 项（官方 Library 集成）：解释为徒步/户外探索/向导经历，随身携带手电是生活习惯；使用机制（光锥/减速/闪光/数值）不实现、不入库。",
+      "relations_note": "居民间关系保存在 personality_connection（官方 Library）：如 Adrenaline 与 Dash 赛跑、是 Block 的粉丝、讨厌 Banana Peel/Taunt；Block 与 Punch/Caretaker 相处融洽；Revolver 与 Block/BonusPad/Caretaker 投缘；Bugle 与 Banana Peel 同有表演背景——供 GM 叙事邻里关系使用。"
     },
     "synergy_note": "Synergy 代表能力组合达到大师级水平（不是升级/职业进化）。示例：Caretaker + BonusPad → CarePad。",
     "npc_rule": "NPC 也使用 Civilian 规则；不创建固定英雄，除非 Lore 明确存在。"

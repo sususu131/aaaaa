@@ -1,9 +1,10 @@
 /**
- * 阶段19 测试：Civilian Ability Lore Integration（72 项）。
+ * 阶段19 测试：Civilian Ability Lore Integration（88 项）。
  * 覆盖：Ability Lore 数据库读取 / 解释规则（不是魔法）/ Background 权重关联（无职业锁定）/
  *       Trait 解释 / AI Context（DOD_CIVILIAN_CONTEXT + Lore Explanation）/ Synergy 预留 /
  *       边界（无战斗数值字段、无技能UI）/ Flashlight 官方 Library 集成（徒步/探索/向导，
- *       使用机制与数值不入库）/ library_excerpt 无战斗数值。
+ *       使用机制与数值不入库）/ 官方 Library 合集全量集成（14 项基础 library_excerpt、
+ *       官方 Synergy 表 4 条登记、Artist↔表演系关联、居民关系、全库无数字）。
  * 红线：不制作游戏技能系统 —— 不实现 Cooldown/Damage/HP/SP/战斗数值/技能UI；不实现 Synergy 逻辑。
  */
 const assert = require('assert');
@@ -58,7 +59,7 @@ const MAGIC_WORDS = /魔法|法术|超能力|召唤|咒语|mana/i;
 const NUMERIC_KEYS = /"(cooldown|damage|hp|sp|attack|crit|mana|combat_value|damage_value)"/i;
 
 async function main() {
-  console.log('[test] 阶段19 就绪（72 项）\n');
+  console.log('[test] 阶段19 就绪（88 项）\n');
 
   presetSeeder.runPresetSeeder(fakeIo);
 
@@ -74,8 +75,8 @@ async function main() {
   assert.strictEqual(db.prepare('SELECT COUNT(*) c FROM dod_abilities_lore').get().c, count1);
   ok('3. 播种幂等（重复运行不重复）');
   const allLore = dodAbilityLore.listAbilityLore();
-  assert.strictEqual(allLore.length, 11); // 8 基础 Ability + 2 Synergy 结果登记 + Flashlight（官方 Library）
-  ok('4. Lore 目录完整（Punch/Caretaker/Revolver/Hotdog/Pie/BonusPad/Dash/Block + CarePad/Loveshot + Flashlight）');
+  assert.strictEqual(allLore.length, 18); // 14 基础 Ability + 4 官方 Synergy 结果登记
+  ok('4. Lore 目录完整（14 基础：Punch/Caretaker/Revolver/Hotdog/Pie/BonusPad/Dash/Block/Flashlight/Adrenaline/BananaPeel/Cloak/Taunt/Bugle + 4 Synergy：CarePad/Loveshot/SweetTooth/Noisemaker）');
   assert.ok(allLore.every((l) => l.source === 'DIE_OF_DEATH'));
   ok('5. 全部 source = DIE_OF_DEATH');
   assert.ok(allLore.every((l) => l.category && l.core_trait && l.lore_description && l.personality_connection));
@@ -87,8 +88,8 @@ async function main() {
   ok('8. possible_background / synergy_candidates / explaining_traits 为列表');
   assert.strictEqual(dodAbilityLore.getAbilityLore('不存在的Ability'), null);
   ok('9. 未知 Ability 返回空（不虚构 Lore）');
-  assert.strictEqual(db.prepare("SELECT COUNT(*) c FROM dod_abilities_lore WHERE category = 'synergy'").get().c, 2);
-  ok('10. Synergy 结果单独分类（carepad / loveshot 仅登记）');
+  assert.strictEqual(db.prepare("SELECT COUNT(*) c FROM dod_abilities_lore WHERE category = 'synergy'").get().c, 4);
+  ok('10. Synergy 结果单独分类（carepad/loveshot/sweettooth/noisemaker 仅登记）');
 
   // ══ B. 解释规则：Ability 不是魔法，是过去的人生经历 ══
   assert.ok(/优秀身体素质/.test(punchLore.lore_description) && /格斗训练/.test(punchLore.lore_description) && /体育经历/.test(punchLore.lore_description) && /长期锻炼/.test(punchLore.lore_description));
@@ -276,7 +277,7 @@ async function main() {
   const res401 = await fetch(url('/api/dod/abilities/lore'));
   assert.strictEqual(res401.status, 401);
   const loreRes = await fetch(url(`/api/dod/abilities/lore?sessionToken=${encodeURIComponent(sess.token)}`)).then((r) => r.json());
-  assert.ok(loreRes.abilities.length === 11 && /不是魔法/.test(loreRes.rule) && /无战斗数值/.test(loreRes.note));
+  assert.ok(loreRes.abilities.length === 18 && /不是魔法/.test(loreRes.rule) && /无战斗数值/.test(loreRes.note));
   ok('62. GET /api/dod/abilities/lore（只读；401 保护；无数值说明）');
 
   // ══ H. Flashlight（官方 Library 集成：徒步/探索/向导，非游戏机制）══
@@ -310,9 +311,83 @@ async function main() {
   assert.ok(!MAGIC_WORDS.test(flSec.replace(/不是魔法/g, '')));
   ok('72. AI Context 渲染 Flashlight（Lore Explanation=徒步经历 + 无绑定说明；非魔法）');
 
+  // ══ I. 官方 Library 合集全量集成（13 项中文 Library + 官方 Synergy 表）══
+  const baseLore = allLore.filter((l) => l.category !== 'synergy');
+  assert.strictEqual(baseLore.length, 14);
+  assert.ok(baseLore.every((l) => l.library_excerpt && l.library_excerpt.length > 20));
+  ok('73. 全部 14 项基础 Ability 均保存官方 Library 文本（library_excerpt）');
+  assert.ok(allLore.every((l) => !/\d/.test(l.library_excerpt || '')));
+  ok('74. 全部 library_excerpt 无任何数字（只存 Traits 性格/背景段，机制数值不入库）');
+  const resultOf = Object.fromEntries(allLore.filter((l) => l.category === 'synergy').map((l) => [l.name, l.synergy_result_of]));
+  assert.deepStrictEqual(resultOf.CarePad, ['Caretaker', 'BonusPad']);
+  assert.deepStrictEqual(resultOf.Loveshot, ['Revolver', 'Caretaker']);
+  assert.deepStrictEqual(resultOf.SweetTooth, ['Hotdog', 'Pie']);
+  assert.deepStrictEqual(resultOf.Noisemaker, ['Taunt', 'Bugle']);
+  ok('75. 官方 Synergy 表四条全登记（CarePad/Loveshot/SweetTooth/Noisemaker 来源组合）');
+  assert.deepStrictEqual(dodAbilityLore.synergyCandidates('Caretaker'), [
+    { with: 'BonusPad', result: 'CarePad' },
+    { with: 'Revolver', result: 'Loveshot' },
+  ]);
+  assert.deepStrictEqual(dodAbilityLore.synergyCandidates('Hotdog'), [{ with: 'Pie', result: 'SweetTooth' }]);
+  assert.deepStrictEqual(dodAbilityLore.synergyCandidates('Pie'), [{ with: 'Hotdog', result: 'SweetTooth' }]);
+  assert.deepStrictEqual(dodAbilityLore.synergyCandidates('Taunt'), [{ with: 'Bugle', result: 'Noisemaker' }]);
+  assert.deepStrictEqual(dodAbilityLore.synergyCandidates('Bugle'), [{ with: 'Taunt', result: 'Noisemaker' }]);
+  ok('76. Synergy 候选双向登记（Caretaker/Hotdog/Pie/Taunt/Bugle）');
+  assert.deepStrictEqual(dodAbilityLore.synergyCandidates('Banana Peel'), [{ with: 'Artful', result: 'Showtime' }]);
+  assert.ok(!allLore.some((l) => l.name === 'Showtime' || l.name === 'Artful'));
+  assert.ok(!db.prepare("SELECT 1 FROM skills WHERE name IN ('Showtime','Artful','SweetTooth','Noisemaker')").get());
+  ok('77. Banana Peel ↔ Artful → Showtime 仅候选（无条目/不入技能库/Artful 未入目录）');
+  assert.ok(dodAbilityLore.backgroundAbilityWeight('Bugle', 'Artist') === 3 && dodAbilityLore.backgroundAbilityWeight('Banana Peel', 'Artist') === 3);
+  assert.deepStrictEqual(dodAbilityLore.linkedAbilities('Artist').sort(), ['Banana Peel', 'Bugle']);
+  ok('78. Artist ↔ Banana Peel/Bugle 权重提高（官方 Library：都有表演或戏剧的背景）');
+  assert.ok(dodAbilityLore.backgroundAbilityWeight('Bugle', 'Engineer') === 1 && dodAbilityLore.backgroundAbilityWeight('Punch', 'Artist') === 1);
+  for (const bg of dodCivilian.BACKGROUNDS) {
+    for (const ab of ['Adrenaline', 'Cloak', 'Taunt', 'Flashlight']) {
+      assert.strictEqual(dodAbilityLore.backgroundAbilityWeight(ab, bg), 1);
+    }
+  }
+  ok('79. 无职业锁定：Artist 其他 Ability 仍 1；Adrenaline/Cloak/Taunt/Flashlight 全背景 1（官方：普通背景/政府科技/无背景信息）');
+  const adLore = dodAbilityLore.getAbilityLore('Adrenaline');
+  assert.ok(/受惊/.test(adLore.lore_description) && /只是普通平民，做着普通的工作/.test(adLore.library_excerpt) && !MAGIC_WORDS.test(adLore.lore_description));
+  ok('80. Adrenaline = 受惊即逃的生存反应（官方 Library：普通背景普通工作，非魔法）');
+  const cloakLore = dodAbilityLore.getAbilityLore('Cloak');
+  assert.ok(/实验性政府科技/.test(cloakLore.lore_description) && /观察野生动物/.test(cloakLore.lore_description) && !MAGIC_WORDS.test(cloakLore.lore_description));
+  ok('81. Cloak = 实验性政府科技 + 野生动物研究（科技来源解释，非魔法）');
+  const loreOnly = ['Adrenaline', 'Banana Peel', 'Cloak', 'Taunt', 'Bugle'];
+  assert.ok(!loreOnly.some((n) => dodCivilian.ABILITY_CATALOG.some((a) => a.key === n)));
+  assert.ok(!db.prepare("SELECT 1 FROM skills WHERE name IN ('Adrenaline','Banana Peel','Cloak','Taunt','Bugle')").get());
+  ok('82. 新增五项均为 Lore 项：不入 ABILITY_CATALOG、不播种技能（非游戏技能系统）');
+  assert.strictEqual(dodLore.TRAIT_POOL.length, 9);
+  assert.ok(['Adrenaline', 'Banana Peel', 'Cloak', 'Taunt', 'Bugle'].every((n) => dodLore.TRAIT_POOL.includes(dodAbilityLore.getAbilityLore(n).core_trait)));
+  ok('83. Trait 池仍 9 项（未新增）；新增 Ability 的 core_trait 全部来自官方池');
+  assert.ok(/Dash/.test(adLore.personality_connection) && /Block/.test(adLore.personality_connection));
+  assert.ok(/Punch/.test(dodAbilityLore.getAbilityLore('Block').personality_connection) && /Caretaker/.test(dodAbilityLore.getAbilityLore('Block').personality_connection));
+  assert.ok(/Hotdog/.test(dodAbilityLore.getAbilityLore('Pie').personality_connection) && /Bugle/.test(dodAbilityLore.getAbilityLore('Pie').personality_connection));
+  ok('84. 居民间官方关系入 personality_connection（Adrenaline↔Dash/Block；Block↔Punch/Caretaker；Pie↔Hotdog/Bugle）');
+  assert.ok(allLore.every((l) => !/\d/.test(l.lore_description) && !/\d/.test(l.personality_connection)));
+  assert.ok(allLore.every((l) => !/冷却|伤害|得分|Points|\bHP\b|\bSP\b/i.test(l.lore_description)));
+  ok('85. 全库 lore_description/personality_connection 无数字与机制词（无冷却/HP/SP/伤害/得分）');
+  const pBugle = mkPlayerDb('号手居民', 'LORE9');
+  mkCivilianDb(pBugle.id, 'Artist', ['Special Habit'], ['Bugle']);
+  const ctxBugle = contextBuilder.buildContext({ id: 'LORE9', players: [{ name: '号手居民', socketId: pBugle.socket_id }], currentExperience: null, currentDungeon: null });
+  const bugleSec = ctxBugle.sections.find((s) => s.key === 'civilian').content;
+  assert.ok(/Background: Artist/.test(bugleSec) && /Lore Explanation: Bugle —— 该居民过去拥有艺术创作与观察生活的经历，因此能用号角声提振身边人的士气。/.test(bugleSec));
+  ok('86. AI Context 渲染 Bugle（Artist 关联 → 背景因果解释句式）');
+  assert.strictEqual(dodLore.interpretAbility('Bugle', 'DOORS'), '吹奏与鼓舞士气经验');
+  assert.strictEqual(dodLore.interpretAbility('Cloak', 'Die of Death'), '专业生存能力');
+  assert.strictEqual(dodLore.interpretAbility('SweetTooth', 'DOORS'), '烹饪与食欲的组合（预留）');
+  ok('87. 跨世界解释覆盖全部新增 Ability（DOD=生存能力；普通世界=人生经验）');
+  const presetSyn = cfg.civilian.ability_lore.possible_synergy;
+  for (const [ability, cands] of Object.entries(presetSyn)) {
+    assert.deepStrictEqual(dodAbilityLore.synergyCandidates(ability), cands, `预设与服务层 Synergy 候选不一致：${ability}`);
+  }
+  assert.ok(['CarePad', 'Loveshot', 'SweetTooth', 'Noisemaker', 'Showtime'].every((r) => JSON.stringify(presetSyn).includes(r)));
+  assert.deepStrictEqual(cfg.civilian.ability_lore.background_weights.Artist.sort(), ['Banana Peel', 'Bugle'].sort());
+  ok('88. 预设 possible_synergy（8 键）与 background_weights.Artist 和服务层完全一致');
+
   server.close();
   console.log(`\n[阶段19] 通过 ${passed} 项测试`);
-  if (passed < 68) {
+  if (passed < 84) {
     console.error('测试数量不足！');
     process.exit(1);
   }

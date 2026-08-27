@@ -808,3 +808,31 @@ Synergy 预留（候选保存、逻辑未新增、Loveshot 不触发）/ 边界�
   仅用于 AI GM 理解"居民为什么带手电"（徒步/探索/向导的生活习惯）。
 - 测试：62→72 项（新增 Flashlight 专节 63-72：读取/背景无关/Trait 解释/无数值/Context 渲染）；
   全套 1221 项通过。
+
+## 阶段19 增补二：官方 Library 合集全量集成（2026-08-28）
+
+**dod_abilities_lore 11 → 18 条**（14 基础 + 4 官方 Synergy 结果登记）：
+
+- **新增 5 项基础 Ability**（官方 Library Traits 段全量入库）：
+  `Adrenaline`（mobility——受惊即逃的反应与体能；官方：普通背景普通工作，无背景锁定）、
+  `Banana Peel`（trap——捣蛋鬼与"喜剧效果香蕉皮"小装置；与 Bugle 同有表演/戏剧背景）、
+  `Cloak`（stealth——实验性政府科技斗篷；与 BonusPad 居民共同研究、近距离观察野生动物）、
+  `Taunt`（disruption——挑衅者与"恶作剧"媒体频道；无背景锁定）、
+  `Bugle`（morale——士气领袖；所有人保持理智的基石，与 Banana Peel 最投缘）
+- **新增 2 项官方 Synergy 结果登记**：`SweetTooth`（Hotdog + Pie）、`Noisemaker`（Taunt + Bugle）
+  ——官方 Synergy 表四条（CarePad/Loveshot/SweetTooth/Noisemaker）全部只登记、不实现逻辑；
+  Banana Peel 备注的 `Showtime`（与 Artful）仅存候选（Artful 无 Library 数据，不入目录）
+- **既有 8 项全部升级官方 Library**：Punch（街头/不良少年成长）、Caretaker（分流抉择/最怕粗心）、
+  Revolver（退伍军人/警官/射击场）、Hotdog（被误解的贪吃者/惊人职业道德）、Pie（糕点师/美食家）、
+  BonusPad（协调者/把弱点转为优势）、Dash（最接地气/与 Adrenaline 赛跑）、Block（盔甲下的和蔼老兵）
+- **Artist 获得关联 Ability**：Banana Peel / Bugle（官方 Library："他们都有表演或戏剧的背景"）——
+  权重 3，其余背景仍 1（无职业锁定）；Adrenaline/Cloak/Taunt/Flashlight 保持全背景等权
+- **居民间官方关系**入 `personality_connection`（Adrenaline↔Dash/Block、讨厌 BananaPeel/Taunt；
+  Block↔Punch/Caretaker；Revolver↔Block/BonusPad/Caretaker；Pie↔Hotdog；Bugle↔BananaPeel 等）
+  供 GM 叙事邻里关系
+- **library_excerpt 收录纪律**：只存官方 Library 的 **Traits（性格/背景）段**——
+  Functionality 段的全部使用机制（速度/秒数/伤害/治疗/得分/任务）与战斗数值一律不入库
+  （测试守护：全库 excerpt/lore/personality 无任何数字与机制词）
+- 跨世界解释（`interpretAbility`）覆盖全部 18 项；Trait 池保持 9 项（未新增）；
+  新增五项均为 **Lore 项**：不入 ABILITY_CATALOG 发放目录、不播种技能
+- 测试：72→**88 项**（新增官方 Library 全量专节 73-88）；全套 **1237 项**通过

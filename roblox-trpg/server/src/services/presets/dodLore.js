@@ -68,7 +68,8 @@ const BACKGROUND_AFFINITY = {
 };
 
 // Ability 跨世界解释（官方示例：Caretaker 在 DOD=专业生存能力，普通世界=医疗经验）
-// 阶段19 补充 Lore 目录扩展项（Block/Dash/Pie/Loveshot/Flashlight：Lore 解释数据，非发放技能）
+// 阶段19 补充 Lore 目录扩展项（Block/Dash/Pie/Loveshot/Flashlight + Library 合集：
+// Adrenaline/BananaPeel/Cloak/Taunt/Bugle/SweetTooth/Noisemaker——Lore 解释数据，非发放技能）
 const ABILITY_INTERPRETATIONS = {
   Punch: { dod: '专业生存能力', default: '强大的身体训练' },
   Caretaker: { dod: '专业生存能力', default: '医疗经验' },
@@ -79,8 +80,15 @@ const ABILITY_INTERPRETATIONS = {
   Block: { dod: '专业生存能力', default: '防护与工事经验' },
   Pie: { dod: '专业生存能力', default: '烘焙与烹饪经验' },
   Flashlight: { dod: '专业生存能力', default: '徒步与户外探索经验' },
+  Adrenaline: { dod: '专业生存能力', default: '应激反应与奔逃经验' },
+  'Banana Peel': { dod: '专业生存能力', default: '恶作剧与道具制作经验' },
+  Cloak: { dod: '专业生存能力', default: '科技装置操作经验' },
+  Taunt: { dod: '专业生存能力', default: '吸引注意的表演经验' },
+  Bugle: { dod: '专业生存能力', default: '吹奏与鼓舞士气经验' },
   CarePad: { dod: '大师级能力组合', default: '医疗知识 + 工程能力的组合' },
   Loveshot: { dod: '大师级能力组合', default: '射击经验 + 关怀之心的组合（预留）' },
+  SweetTooth: { dod: '大师级能力组合', default: '烹饪与食欲的组合（预留）' },
+  Noisemaker: { dod: '大师级能力组合', default: '号角与表演的组合（预留）' },
 };
 
 // 未来扩展接口（预留，不实现）
