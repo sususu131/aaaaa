@@ -9,6 +9,34 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '013_stage16_presets',
+    up(db) {
+      // ── 官方体验预设（第一节）：预设条目与配置，与玩家设计流水线完全分离 ──
+      db.exec(`CREATE TABLE IF NOT EXISTS preset_experiences (
+        id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+        key                TEXT NOT NULL UNIQUE,          -- doors / forsaken / dod / high_tier_sword / something_evil
+        name               TEXT NOT NULL,
+        roblox_universe_id TEXT,                          -- CANON 资料（公开 API）
+        roblox_place_id    TEXT,
+        description        TEXT,
+        genre              TEXT,
+        difficulty         INTEGER NOT NULL DEFAULT 1,
+        icon_url           TEXT,
+        source_type        TEXT NOT NULL DEFAULT 'CANON_PRESET',
+        created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS preset_dungeon_configs (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        preset_id   INTEGER NOT NULL UNIQUE REFERENCES preset_experiences(id),
+        dungeon_id  INTEGER REFERENCES dungeons(id),
+        config_json TEXT NOT NULL,                        -- 世界/地点/实体/任务/奖励配置（含 lore_source 标记）
+        status      TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','PUBLISHED')),
+        published_at TEXT,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+    },
+  },
+  {
     name: '012_stage15_playable',
     up(db) {
       const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);

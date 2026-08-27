@@ -1,0 +1,61 @@
+{
+  "key": "something_evil",
+  "name": "Something Evil Will Happen",
+  "roblox_universe_id": null,
+  "roblox_place_id": null,
+  "lore_note": "随机灾害体验：核心是事件系统。灾害/怪物/环境变化由服务器事件引擎驱动（AI 仅可提供白名单候选）。",
+  "description": "随机灾害：某件邪恶的事即将发生。目标只有一个——生存。事件由服务器随机抽取并执行。",
+  "genre": "Random Disaster",
+  "difficulty": 3,
+  "world": {
+    "name": "The Town",
+    "lore_source": "TRPG_EXTENSION",
+    "locations": [
+      { "key": "evil:town_square", "name": "城镇广场", "description": "告示牌上写着：今天一切正常。", "is_safe": 1 },
+      { "key": "evil:alley", "name": "后巷", "description": "阴影里似乎有什么在动。", "is_safe": 0 },
+      { "key": "evil:safehouse", "name": "避难屋", "description": "钉上木板的窗户，最后的庇护所。", "is_safe": 1 }
+    ]
+  },
+  "npcs": [
+    { "uid_suffix": "neighbor", "name": "邻居", "nature": "neutral", "description": "坚持说什么都没发生的邻居。", "lore_source": "TRPG_EXTENSION" }
+  ],
+  "enemies": [
+    {
+      "id": "evil_manifestation",
+      "name": "Evil Manifestation",
+      "description": "邪恶具象化的产物。",
+      "stats": { "hp": 36, "damage": 5 },
+      "behaviour": "attack|attack|special|chase",
+      "loot": [{ "type": "currency", "amount": 90 }],
+      "lore_source": "TRPG_EXTENSION"
+    }
+  ],
+  "quest": {
+    "uid": "quest_preset_something_evil",
+    "name": "活过今天",
+    "description": "灾难正在酝酿。生存下去。",
+    "objectives": [
+      { "key": "witness_disaster", "name": "目击灾变", "type": "CUSTOM", "order_index": 1, "event_type": "WORLD_EVENT_STARTED", "match": {} },
+      { "key": "reach_safehouse", "name": "抵达避难屋", "type": "REACH_LOCATION", "order_index": 2, "event_type": "PLAYER_ENTERED_SCENE", "match": { "scene": "scene_safehouse" } },
+      { "key": "survive", "name": "活下来", "type": "ESCAPE", "order_index": 3 }
+    ]
+  },
+  "dungeon": {
+    "dungeon_name": "Something Evil Will Happen",
+    "scenes": [
+      { "id": "scene_square", "name": "城镇广场", "description": "平静得反常。", "order": 1, "exits": ["scene_alley", "scene_safehouse"], "encounters": [], "events": ["evt_omen"] },
+      { "id": "scene_alley", "name": "后巷", "description": "垃圾袋自己动了一下。", "order": 2, "exits": ["scene_square", "scene_safehouse"], "encounters": ["enc_evil"], "events": [] },
+      { "id": "scene_safehouse", "name": "避难屋", "description": "暂时的安全。", "order": 3, "exits": [], "encounters": ["enc_evil"], "events": [] }
+    ],
+    "encounters": [
+      { "id": "enc_evil", "name": "邪恶显现", "type": "COMBAT", "description": "它来了。", "participants": ["evil_manifestation"], "difficulty": 3 }
+    ],
+    "events": [{ "id": "evt_omen", "name": "征兆", "description": "天空的颜色不对。" }]
+  },
+  "rewards": [
+    { "type": "currency", "name": "金币", "amount": 120 },
+    { "type": "item", "name": "治疗药水" }
+  ],
+  "random_events": ["POWER_OUTAGE", "MONSTER_INVASION", "WEATHER_CHANGE"],
+  "random_events_on_start": true
+}

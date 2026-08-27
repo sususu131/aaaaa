@@ -11,8 +11,15 @@ const leveling = require('../character/leveling');
 
 /** 实例对应的 dungeon 行（经 universe 关联，用于查询 approved 奖励表）。 */
 function dungeonRowFor(definition) {
-  if (!definition.roblox_universe_id) return null;
-  return getDb().prepare('SELECT * FROM dungeons WHERE roblox_universe_id = ?').get(definition.roblox_universe_id);
+  if (definition.roblox_universe_id) {
+    const byUniverse = getDb().prepare('SELECT * FROM dungeons WHERE roblox_universe_id = ?').get(definition.roblox_universe_id);
+    if (byUniverse) return byUniverse;
+  }
+  // 阶段16：预设副本无官方 universeId 时，用定义内的 dungeon_id 回退
+  if (definition.dungeon_id) {
+    return getDb().prepare('SELECT * FROM dungeons WHERE id = ?').get(definition.dungeon_id) || null;
+  }
+  return null;
 }
 
 /**

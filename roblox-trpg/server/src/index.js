@@ -18,6 +18,7 @@ const npcRoutes = require('./routes/npcRoutes');
 const worldRoutes = require('./routes/worldRoutes');
 const partyDecisionRoutes = require('./routes/partyDecisionRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
+const presetRoutes = require('./routes/presetRoutes');
 
 // 启动即建表（幂等）
 initDb();
@@ -29,7 +30,7 @@ const io = new Server(server, {
 });
 
 app.use(express.json({ limit: '2mb' }));
-app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 15 }));
+app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 16 }));
 app.use('/api', apiRoutes);
 app.use(visionRoutes); // /api/vision/avatar/analyze、/vision-test 等
 app.use(dungeonRoutes); // 阶段4：Dungeon Design Pipeline
@@ -40,6 +41,7 @@ app.use(npcRoutes); // 阶段9：NPC & Living World
 app.use(worldRoutes); // 阶段12：World Simulation & Dynamic Events
 app.use(partyDecisionRoutes); // 阶段13：Party & Narrative Decision
 app.use(inventoryRoutes); // 阶段14：Persistent Inventory
+app.use(presetRoutes); // 阶段16：Preset Experience Dungeon Library
 
 registerSocketHandlers(io);
 
@@ -52,8 +54,15 @@ require('./services/party/playerRelations').registerPlayerRelationsListener();
 
 // 作为入口运行时才监听端口（测试可直接 require 后自管端口）
 if (require.main === module) {
+  // 阶段16：官方体验预设导入（幂等；测试环境不自动执行）
+  try {
+    const results = require('./services/presets/presetSeeder').runPresetSeeder();
+    console.log(`[server] 预设副本导入完成：${results.map((r) => r.key || `${r.error}`).join(', ')}`);
+  } catch (err) {
+    console.error('[server] 预设副本导入失败:', err.message);
+  }
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`[server] roblox-trpg 服务器已启动（阶段15：可玩闭环）: http://localhost:${PORT}`);
+    console.log(`[server] roblox-trpg 服务器已启动（阶段16：预设副本库）: http://localhost:${PORT}`);
     // 阶段12：World Tick 调度器（周期驱动世界演化；可经 /api/world/pause 暂停）
     if (process.env.WORLD_TICK_ENABLED !== 'off') {
       const worldSim = require('./services/world/worldSim');

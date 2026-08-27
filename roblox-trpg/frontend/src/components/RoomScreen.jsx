@@ -14,6 +14,7 @@ import WorldPanel from './WorldPanel.jsx';
 import PartyPanel from './PartyPanel.jsx';
 import DecisionPanel from './DecisionPanel.jsx';
 import InventoryPanel from './InventoryPanel.jsx';
+import ExperienceSelectPanel from './ExperienceSelectPanel.jsx';
 import { socket } from '../lib/socket.js';
 
 /**
@@ -185,6 +186,9 @@ export default function RoomScreen({
           <button className={`btn tiny ${modal === 'inventory' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'inventory' ? null : 'inventory')}>
             🎒 背包
           </button>
+          <button className={`btn tiny ${modal === 'experiences' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'experiences' ? null : 'experiences')}>
+            ⭐ 体验
+          </button>
           <button className={`btn tiny ${modal === 'character' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'character' ? null : 'character')}>
             👤 角色
           </button>
@@ -284,6 +288,13 @@ export default function RoomScreen({
       {modal === 'party' && <PartyPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} myName={myName} />}
       {modal === 'decision' && <DecisionPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
       {modal === 'inventory' && <InventoryPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
+      {modal === 'experiences' && (
+        <ExperienceSelectPanel
+          onClose={() => onOpenModal(null)}
+          getSessionToken={getSessionToken}
+          onStarted={() => onOpenModal('runtime')}
+        />
+      )}
     </main>
   );
 }

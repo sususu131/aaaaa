@@ -1,0 +1,59 @@
+{
+  "key": "high_tier_sword",
+  "name": "High Tier Sword Fight",
+  "roblox_universe_id": null,
+  "roblox_place_id": null,
+  "lore_note": "高地剑斗体验；奖励剑列表严格取自 Sword Fight on the Heights 已登记的真实剑库（experience_items），禁止 AI 创造武器。",
+  "description": "战斗竞技场：与强者决斗，按表现评分 S/A/B/C 获得永久剑。剑会保存在背包；进入其他副本时按世界规则自动削弱。",
+  "genre": "Combat Arena",
+  "difficulty": 5,
+  "world": {
+    "name": "High Tier Arena",
+    "lore_source": "TRPG_EXTENSION",
+    "locations": [
+      { "key": "htsword:arena_floor", "name": "竞技场场地", "description": "石砌的圆形场地，观众席空无一人。", "is_safe": 0 },
+      { "key": "htsword:weapon_rack", "name": "武器架", "description": "陈列着各式剑的架子。", "is_safe": 1 }
+    ]
+  },
+  "npcs": [
+    { "uid_suffix": "arbiter", "name": "竞技场裁判", "nature": "neutral", "description": "记录胜负与表现评分的人。", "lore_source": "TRPG_EXTENSION" }
+  ],
+  "enemies": [
+    {
+      "id": "duelist",
+      "name": "High Tier Duelist",
+      "description": "身经百战的剑士。",
+      "stats": { "hp": 60, "damage": 7 },
+      "behaviour": "attack|attack|defend|special",
+      "loot": [],
+      "lore_source": "TRPG_EXTENSION"
+    }
+  ],
+  "quest": {
+    "uid": "quest_preset_htsword",
+    "name": "高地决斗",
+    "description": "击败竞技场剑士，赢得评分与剑。",
+    "objectives": [
+      { "key": "enter_arena", "name": "进入竞技场", "type": "ENTER_DUNGEON", "order_index": 1 },
+      { "key": "win_duel", "name": "击败决斗者", "type": "DEFEAT_ENEMY", "order_index": 2, "event_type": "ENEMY_DEFEATED", "match": { "enemy": "duelist" } }
+    ]
+  },
+  "dungeon": {
+    "dungeon_name": "High Tier Sword Fight",
+    "scenes": [
+      { "id": "scene_floor", "name": "竞技场场地", "description": "决斗即将开始。", "order": 1, "exits": ["scene_rack"], "encounters": ["enc_duel"], "events": [] },
+      { "id": "scene_rack", "name": "武器架", "description": "胜利者可以在此挑选战利品。", "order": 2, "exits": [], "encounters": [], "events": [] }
+    ],
+    "encounters": [
+      { "id": "enc_duel", "name": "高地决斗", "type": "COMBAT", "description": "裁判宣布决斗开始。", "participants": ["duelist"], "difficulty": 5 }
+    ],
+    "events": []
+  },
+  "rewards": [],
+  "sword_reward": {
+    "experience": "Sword Fight on the Heights",
+    "grades": { "S": 90, "A": 75, "B": 50, "C": 25 },
+    "grade_rarity": { "S": "legendary", "A": "epic", "B": "rare", "C": "common" },
+    "note": "剑来源 = experience_items 已登记的 SFOTH 真实剑库；评分→档位→该档真实剑；永久保存 + 跨副本削弱。"
+  }
+}

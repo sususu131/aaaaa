@@ -1,0 +1,62 @@
+{
+  "key": "dod",
+  "name": "Die of Death",
+  "roblox_universe_id": null,
+  "roblox_place_id": null,
+  "lore_note": "官方 universe/place ID 待 Roblox Service 在线解析补充（不伪造来源）。",
+  "description": "生存恐怖：躲入地堡，在异常事件中活下来。阵营：Government / Civilian / Killer。名称为 CANON，数值与事件为 TRPG_EXTENSION。",
+  "genre": "Survival Horror",
+  "difficulty": 4,
+  "world": {
+    "name": "Die of Death",
+    "lore_source": "CANON",
+    "locations": [
+      { "key": "dod:bunker_entrance", "name": "地堡入口（Bunker Entrance）", "description": "厚重的防爆门半开着。", "is_safe": 0 },
+      { "key": "dod:bunker_hall", "name": "地堡通道（Bunker Hall）", "description": "应急灯忽明忽暗。", "is_safe": 0 },
+      { "key": "dod:safe_room", "name": "安全屋", "description": "临时加固的房间。", "is_safe": 1 }
+    ]
+  },
+  "factions": [
+    { "uid_suffix": "government", "name": "Government", "description": "试图控制局势的官方人员。", "lore_source": "CANON" },
+    { "uid_suffix": "civilian", "name": "Civilian", "description": "躲进地堡的平民。", "lore_source": "CANON" },
+    { "uid_suffix": "killer", "name": "Killer", "description": "潜藏在地堡中的威胁。", "lore_source": "CANON" }
+  ],
+  "npcs": [
+    { "uid_suffix": "agent", "name": "Government Agent", "nature": "neutral", "faction_suffix": "government", "description": "持枪的特工，对陌生人保持警惕。", "lore_source": "CANON" },
+    { "uid_suffix": "civilian", "name": "Civilian", "nature": "neutral", "faction_suffix": "civilian", "description": "瑟瑟发抖的平民，知道地堡的一些近路。", "lore_source": "CANON" }
+  ],
+  "enemies": [
+    { "id": "pursuer", "name": "Pursuer", "description": "不知疲倦的追踪者。", "stats": { "hp": 40, "damage": 5 }, "behaviour": "attack|attack|chase", "loot": [{ "type": "currency", "amount": 100 }], "lore_source": "CANON" },
+    { "id": "badware", "name": "Badware", "description": "被污染的电子造物。", "stats": { "hp": 30, "damage": 4 }, "behaviour": "attack|defend|attack", "loot": [{ "type": "item", "item": "治疗药水", "chance": 0.5 }], "lore_source": "CANON" },
+    { "id": "harken", "name": "Harken", "description": "地堡深处的回声。", "stats": { "hp": 55, "damage": 7 }, "behaviour": "attack|attack|special|chase", "loot": [{ "type": "currency", "amount": 180 }], "lore_source": "CANON" }
+  ],
+  "quest": {
+    "uid": "quest_preset_dod",
+    "name": "地堡求生",
+    "description": "进入地堡，查明异常的来源，活到救援到来。",
+    "objectives": [
+      { "key": "enter_bunker", "name": "进入地堡", "type": "ENTER_DUNGEON", "order_index": 1 },
+      { "key": "meet_agent", "name": "接触 Government Agent", "type": "TALK_TO_NPC", "order_index": 2, "event_type": "NPC_TALKED", "match": { "npc": "npc_preset_dod_agent" } },
+      { "key": "survive_anomaly", "name": "在异常事件中幸存", "type": "CUSTOM", "order_index": 3, "event_type": "WORLD_EVENT_EXPIRED", "match": { "event": "POWER_OUTAGE" } }
+    ]
+  },
+  "dungeon": {
+    "dungeon_name": "Die of Death 地堡",
+    "scenes": [
+      { "id": "scene_entrance", "name": "地堡入口", "description": "防爆门在你们身后缓缓合上。", "order": 1, "exits": ["scene_hall"], "encounters": [], "events": ["evt_anomaly"] },
+      { "id": "scene_hall", "name": "地堡通道", "description": "应急灯忽明忽暗，墙上有抓痕。", "order": 2, "exits": ["scene_safe", "scene_entrance"], "encounters": ["enc_pursuer", "enc_badware"], "events": [] },
+      { "id": "scene_safe", "name": "安全屋", "description": "加固的铁门，暂时的安宁。", "order": 3, "exits": [], "encounters": ["enc_harken"], "events": [] }
+    ],
+    "encounters": [
+      { "id": "enc_pursuer", "name": "Pursuer 出现", "type": "COMBAT", "description": "追踪者堵住了通道。", "participants": ["pursuer"], "difficulty": 3 },
+      { "id": "enc_badware", "name": "Badware 伏击", "type": "COMBAT", "description": "屏幕亮起，Badware 扑来。", "participants": ["badware"], "difficulty": 3 },
+      { "id": "enc_harken", "name": "Harken 回声", "type": "COMBAT", "description": "回声凝聚成形。", "participants": ["harken"], "difficulty": 5 }
+    ],
+    "events": [{ "id": "evt_anomaly", "name": "异常", "description": "灯灭了。有什么东西在地堡里。" }]
+  },
+  "rewards": [
+    { "type": "currency", "name": "金币", "amount": 200 },
+    { "type": "item", "name": "治疗药水" }
+  ],
+  "random_events": ["POWER_OUTAGE", "MONSTER_INVASION"]
+}

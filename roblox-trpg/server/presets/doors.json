@@ -1,0 +1,45 @@
+{
+  "key": "doors",
+  "name": "DOORS",
+  "roblox_universe_id": "2753915549",
+  "roblox_place_id": "6516141723",
+  "description": "恐怖生存：入住旅馆，避开实体，抵达100号门。实体名称为官方设定（CANON），数值与跑团机制为 TRPG_EXTENSION。",
+  "genre": "Horror Survival",
+  "difficulty": 3,
+  "reuse_existing_dungeon": "Doors",
+  "reuse_official_definition": true,
+  "world": {
+    "name": "DOORS Hotel",
+    "lore_source": "CANON",
+    "locations": [
+      { "key": "doors:Lobby", "name": "旅馆大厅（Lobby）", "description": "入住的起点，灯光尚且完好。", "is_safe": 1 },
+      { "key": "doors:Rooms", "name": "客房区（Rooms）", "description": "一扇扇门在身后合上。", "is_safe": 0 },
+      { "key": "doors:Library", "name": "图书馆（Library）", "description": "安静。太安静了。保持肃静。", "is_safe": 0 },
+      { "key": "doors:SeekChase", "name": "Seek 追逐（Seek Chase）", "description": "黑色的眼睛在走廊尽头亮起。跑。", "is_safe": 0 },
+      { "key": "doors:Door100", "name": "100号门（Door100）", "description": "终点之门。", "is_safe": 0 }
+    ]
+  },
+  "entities": [
+    { "uid_suffix": "rush", "name": "Rush", "description": "伴随着电流声疾驰而来的黑暗。躲进柜子。", "lore_source": "CANON" },
+    { "uid_suffix": "ambush", "name": "Ambush", "description": "比 Rush 更执着，会折返。", "lore_source": "CANON" },
+    { "uid_suffix": "screech", "name": "Screech", "description": "藏在黑暗里的小东西，盯着你看。", "lore_source": "CANON" },
+    { "uid_suffix": "figure", "name": "Figure", "description": "图书馆的盲眼守卫，靠声音狩猎。", "lore_source": "CANON" },
+    { "uid_suffix": "seek", "name": "Seek", "description": "追逐者。别回头。", "lore_source": "CANON" }
+  ],
+  "quest": {
+    "uid": "quest_preset_doors_escape",
+    "name": "逃离旅馆（Escape Hotel）",
+    "description": "进入旅馆，找到钥匙，打开房间，穿过图书馆，从100号门逃离。",
+    "objectives": [
+      { "key": "enter_hotel", "name": "进入旅馆", "type": "ENTER_DUNGEON", "order_index": 1 },
+      { "key": "find_key", "name": "寻找钥匙", "type": "COLLECT_ITEM", "order_index": 2, "event_type": "ITEM_ACQUIRED", "match": { "item": "骨架钥匙" } },
+      { "key": "open_room", "name": "打开房间", "type": "OPEN_DOOR", "order_index": 3, "event_type": "DOOR_OPENED", "match": { "flag": "door_open" } },
+      { "key": "pass_library", "name": "通过图书馆", "type": "REACH_LOCATION", "order_index": 4, "event_type": "PLAYER_ENTERED_SCENE", "match": { "scene": "scene_rooms" } },
+      { "key": "escape_door100", "name": "逃离100号门", "type": "ESCAPE", "order_index": 5 }
+    ]
+  },
+  "rewards": [
+    { "type": "currency", "name": "金币", "amount": 300 },
+    { "type": "item", "name": "治疗药水" }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "key": "forsaken",
+  "name": "Forsaken",
+  "roblox_universe_id": null,
+  "roblox_place_id": null,
+  "lore_note": "官方 universe/place ID 待 Roblox Service 在线解析补充（不伪造来源）。",
+  "description": "非对称恐怖：一名 Killer 追逐多名 Survivor。机制转换为跑团：追逐 / 隐藏 / 逃生。角色概念为 CANON，数值与事件为 TRPG_EXTENSION。",
+  "genre": "Asymmetric Horror",
+  "difficulty": 4,
+  "world": {
+    "name": "Forsaken Arena",
+    "lore_source": "CANON",
+    "locations": [
+      { "key": "forsaken:arena", "name": "竞技场", "description": "开阔的场地，无处藏身。", "is_safe": 0 },
+      { "key": "forsaken:hideout", "name": "藏匿点", "description": "杂物堆与阴影。屏住呼吸。", "is_safe": 1 },
+      { "key": "forsaken:exit", "name": "逃生出口", "description": "铁丝网后的自由。", "is_safe": 0 }
+    ]
+  },
+  "npcs": [
+    { "uid_suffix": "survivor", "name": "幸存者", "nature": "neutral", "description": "和你一样被困在这里的人。也许可以互相帮助。", "lore_source": "TRPG_EXTENSION" }
+  ],
+  "enemies": [
+    {
+      "id": "killer_1",
+      "name": "Killer",
+      "description": "沉默的追逐者。",
+      "stats": { "hp": 46, "damage": 6 },
+      "behaviour": "attack|attack|chase|defend",
+      "loot": [{ "type": "currency", "amount": 120 }],
+      "lore_source": "CANON"
+    }
+  ],
+  "quest": {
+    "uid": "quest_preset_forsaken",
+    "name": "逃出猎场",
+    "description": "躲过 Killer，找到出口，活着离开。",
+    "objectives": [
+      { "key": "hide_once", "name": "隐藏一次", "type": "REACH_LOCATION", "order_index": 1, "event_type": "PLAYER_ENTERED_SCENE", "match": { "scene": "scene_hideout" } },
+      { "key": "survive_killer", "name": "击退或躲过 Killer", "type": "DEFEAT_ENEMY", "order_index": 2, "event_type": "ENEMY_DEFEATED", "match": { "enemy": "killer_1" } },
+      { "key": "escape_arena", "name": "逃离竞技场", "type": "ESCAPE", "order_index": 3 }
+    ]
+  },
+  "dungeon": {
+    "dungeon_name": "Forsaken 猎场",
+    "scenes": [
+      { "id": "scene_arena", "name": "竞技场", "description": "开阔而危险的场地。", "order": 1, "exits": ["scene_hideout"], "encounters": [], "events": ["evt_hunt_begin"] },
+      { "id": "scene_hideout", "name": "藏匿点", "description": "可以暂时喘息的地方。", "order": 2, "exits": ["scene_exit", "scene_arena"], "encounters": ["enc_killer"], "events": [] },
+      { "id": "scene_exit", "name": "逃生出口", "description": "出口就在眼前。", "order": 3, "exits": [], "encounters": ["enc_killer"], "events": [] }
+    ],
+    "encounters": [
+      { "id": "enc_killer", "name": "Killer 来袭", "type": "COMBAT", "description": "Killer 找到了你们。", "participants": ["killer_1"], "difficulty": 4 }
+    ],
+    "events": [{ "id": "evt_hunt_begin", "name": "狩猎开始", "description": "远处传来脚步声。" }]
+  },
+  "rewards": [
+    { "type": "currency", "name": "金币", "amount": 150 },
+    { "type": "item", "name": "治疗药水" }
+  ],
+  "random_events": ["POWER_OUTAGE", "WEATHER_CHANGE"]
+}

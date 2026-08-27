@@ -181,6 +181,13 @@ function startInstance(io, instance) {
     console.error('[instanceManager] npc auto-spawn error:', err.message);
   }
 
+  // 阶段16：预设副本随机事件（如 Something Evil Will Happen；服务器抽签，按实例幂等）
+  try {
+    require('../presets/presetSeeder').maybeTriggerPresetEvents(io, fresh);
+  } catch (err) {
+    console.error('[instanceManager] preset events error:', err.message);
+  }
+
   // 阶段11：传奇遭遇判定（NPC_ENCOUNTER_CHECK；概率由副本/幸运/任务进度决定；幂等不重复生成）
   try {
     const encounter = require('../legends/legendEncounter');
