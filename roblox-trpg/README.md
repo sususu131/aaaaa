@@ -152,3 +152,84 @@ frontend/src/components/
 `players` 增加 `uid` 与 `roblox_profile_id`。
 
 设计文档：[阶段2架构确认](docs/04-stage2-architecture.md)
+
+---
+
+# 阶段3：AI GM Agent + 世界状态 + 工具调用系统
+
+AI GM 从"聊天机器人"升级为**受服务器规则约束的 Agent**：读取世界状态 → 判断检定 →
+调用白名单工具 → 服务器验证+写库 → 叙事。AI 永远不能直接执行 SQL、编造骰子或发放奖励。
+
+## 架构
+
+```
+AI → Tool Call → Server 验证（参数/权限/范围/冲突）→ Execute → Tool Result → AI → 最终回答
+PLAYER → SERVER → AI → RULE ENGINE → DATABASE → ALL PLAYERS
+```
+
+## Tool 系统（16 个，全部白名单 + 审计）
+
+| Tool | 权限 | 说明 |
+|------|------|------|
+| get_world_state / get_player_state / get_dungeon_state | read | 服务器权威状态查询（跨房间读取被拒绝） |
+| roll_dice / skill_check | mutate | **服务器生成随机数**；双骰拼点（1d20 vs 1d20）；技能所有权验证 |
+| modify_world_state | mutate | 白名单字段（door_open 等）+ 乐观锁 world_version |
+| modify_player_state | mutate | 白名单（hp/状态效果/位置）+ 数值范围验证 |
+| grant_item / grant_skill | mutate | **数据库奖励表驱动**：通关验证→防重复→drop_rate/is_guaranteed→写库 |
+| complete_dungeon | mutate | 通关登记（grant_skill 的前置条件） |
+| create_option | read | 追加行动选项（仍只填入输入框） |
+| get_roblox_experience / user / avatar / search_roblox_experiences | read | 封装阶段2服务，CANONICAL_FACT 只读围栏 |
+| web_search | read | 服务器搜索适配器（Serper 可插拔），AI 不直连网络 |
+
+## Provider 层（可切换，不锁死格式）
+
+`AI_API_FORMAT=openai`（OpenAI/DeepSeek-OpenAI 兼容）或 `anthropic`
+（处理 content[] 的 thinking / tool_use / text）。业务层只调用统一接口。
+
+DeepSeek 配置示例：
+
+```bash
+export AI_API_KEY=sk-xxx
+export AI_BASE_URL=https://api.deepseek.com
+export AI_MODEL=deepseek-v4-flash     # 默认允许 Thinking（reasoning_content 不外显）
+# 第三方网关返回 Anthropic 风格时：
+export AI_API_FORMAT=anthropic
+```
+
+## 新增数据库表
+
+`world_states`（版本号乐观锁）/ `world_events`（who/when/action/before/after/source 审计）/
+`player_states`（HP/状态效果）/ `player_items` / `dice_rolls` / `tool_calls`（脱敏审计）/
+`player_dungeon_progress`；`dungeons` 增加 `roblox_universe_id` / `roblox_place_id`。
+种子新增**阶段3测试奖励数据**（approved 测试夹具：危险感知/开锁能力/果实能力 + 骨架钥匙/撬棍）。
+
+## 测试（46 项）
+
+```bash
+npm test                # 16（阶段1/2回归）+ 30（阶段3）
+npm run test:stage3     # 仅阶段3（本地 mock AI 端点，无需外网）
+```
+
+阶段3 覆盖：普通回答/单工具/多工具/多轮/参数非法/工具不存在/无权限/非法字段/
+伪造骰子/伪造奖励/重复领取/未通关领取/正常获得/随机掉落/必得奖励/搜索/
+Roblox工具/共享状态/并发一致性/版本冲突/Context集成/压缩保护/超时/429/5xx/
+工具失败/无限循环/最大轮次/注入防护/Key不泄露。
+
+## 两浏览器多人演示流程
+
+1. `npm run dev`，打开两个浏览器/无痕窗口访问前端
+2. 玩家A 建房 → 玩家B 输入房间ID加入
+3. 副本面板：绑定 DOORS（可粘贴 `https://www.roblox.com/games/6516141723/DOORS`，
+   无外网时用"数据库登记副本"离线绑定）
+4. 玩家A：`@AI 我打开第一扇门` → GM 读取世界状态 → 决定检定 → `skill_check`
+   服务器掷双骰 → 按真实结果叙事 → `modify_world_state` → 广播 WORLD_STATE_CHANGED，
+   A、B 同时看到
+5. `@AI 我们通关了` → `complete_dungeon` → `grant_skill` → 玩家获得「危险感知」，
+   另一名玩家看到 SKILL_GAINED 广播
+6. 刷新页面：世界状态仍在（数据库），playerId 不变（会话），技能仍在
+
+## 已知限制
+
+- 预览沙箱无外网：Roblox/Web Search/AI 均走各自的"不可用"错误分支（规范行为）
+- `dungeon_rewards` 的 currency 类型奖励尚未接入发放工具（表结构已预留）
+- Anthropic Provider 已实现但未在真实 Anthropic 端点回归（沙箱无外网）

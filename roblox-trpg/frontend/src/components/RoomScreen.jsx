@@ -18,6 +18,7 @@ export default function RoomScreen({
   onLeave,
   onSend,
   onPickOption,
+  gmStatus,
   modal,
   onOpenModal,
 }) {
@@ -60,19 +61,30 @@ export default function RoomScreen({
         </button>
       </div>
 
-      {room.experience && (
+      {(room.experience || room.dungeon) && (
         <div className="dungeon-banner">
-          {room.experience.iconUrl && <img src={room.experience.iconUrl} alt="" className="dungeon-icon" />}
+          {room.experience && room.experience.iconUrl && (
+            <img src={room.experience.iconUrl} alt="" className="dungeon-icon" />
+          )}
           <div>
-            <strong>当前副本来源：{room.experience.name}</strong>
-            <span className="source-badge">source=roblox_api</span>
+            <strong>
+              当前副本：{room.dungeon ? room.dungeon.name : room.experience.name}
+            </strong>
+            {room.experience ? (
+              <span className="source-badge">source=roblox_api</span>
+            ) : (
+              <span className="source-badge db">database</span>
+            )}
             <p className="dungeon-desc">
-              universeId={room.experience.universeId} · 创作者：
-              {room.experience.creator ? room.experience.creator.name : '未知'}
+              {room.experience
+                ? `universeId=${room.experience.universeId} · 创作者：${room.experience.creator ? room.experience.creator.name : '未知'}`
+                : '数据库登记副本（离线绑定）'}
             </p>
           </div>
         </div>
       )}
+
+      {gmStatus && <div className="gm-status">🎲 {gmStatus}</div>}
 
       <div className="room-body">
         <PlayerList players={players} myName={myName} maxPlayers={room.maxPlayers} />
@@ -89,7 +101,7 @@ export default function RoomScreen({
 
       {modal === 'context' && <ContextViewer onClose={() => onOpenModal(null)} />}
       {modal === 'dungeon' && (
-        <DungeonPanel current={room.experience} onClose={() => onOpenModal(null)} />
+        <DungeonPanel current={room.experience} currentDungeon={room.dungeon} onClose={() => onOpenModal(null)} />
       )}
       {modal === 'avatar' && (
         <RobloxBindPanel players={players} myName={myName} onClose={() => onOpenModal(null)} />

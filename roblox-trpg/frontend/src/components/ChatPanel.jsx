@@ -47,6 +47,34 @@ export default function ChatPanel({
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   };
 
+  // 关键游戏事件（骰子/检定/获得/世界变化）：渲染为事件条
+  const renderEvent = (m) => {
+    let d = {};
+    try {
+      d = JSON.parse(m.text);
+    } catch {
+      return m.text;
+    }
+    switch (d.event) {
+      case 'dice:rolled':
+        return `🎲 服务器掷骰 ${d.count}d${d.sides} = [${(d.rolls || []).join(', ')}] 合计 ${d.total}`;
+      case 'skill:check':
+        return `⚔ ${d.playerName} 技能检定「${d.skill}」：${d.playerRoll}${d.modifier ? `+${d.modifier}` : ''} vs ${d.difficultyRoll} → ${d.success ? '✅成功' : d.draw ? '🤝平局' : '❌失败'}`;
+      case 'skill:gained':
+        return `✨ ${d.playerName} 获得技能「${d.skillName}」（来源副本：${d.dungeon}）`;
+      case 'item:gained':
+        return `🎁 ${d.playerName} 获得物品「${d.itemName}」×${d.quantity}`;
+      case 'world:changed':
+        return `🌍 世界状态变更：${d.field} = ${JSON.stringify(d.value)}（v${d.version}）`;
+      case 'dungeon:completed':
+        return `🏁 副本「${d.dungeon}」通关：${(d.players || []).join('、')}`;
+      default:
+        return JSON.stringify(d).slice(0, 100);
+    }
+  };
+
+  const EVENT_TYPES = ['dice', 'skill_check', 'gain', 'world', 'dungeon'];
+
   return (
     <section className="chat-panel">
       <div className="chat-messages" ref={listRef}>
@@ -56,6 +84,13 @@ export default function ChatPanel({
             return (
               <p key={m.id} className="msg system">
                 {m.text}
+              </p>
+            );
+          }
+          if (EVENT_TYPES.includes(m.type)) {
+            return (
+              <p key={m.id} className="msg event-line">
+                {renderEvent(m)}
               </p>
             );
           }

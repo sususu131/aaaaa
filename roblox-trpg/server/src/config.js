@@ -34,4 +34,23 @@ module.exports = {
   // 会话（临时身份）
   SESSION_TTL_DAYS: 30,
   COOKIE_NAME: 'rtp_session',
+
+  // ── 阶段3：AI Agent + Tool 系统 ──
+  AI_API_FORMAT: process.env.AI_API_FORMAT || 'openai', // openai | anthropic
+  AI_MAX_TOOL_ROUNDS: Number(process.env.AI_MAX_TOOL_ROUNDS || 6), // 防无限 Tool Loop
+  AI_MAX_FINAL_CHARS: 2000,
+  WORLD_ALLOWED_FIELDS: [
+    // 仅允许 AI 通过 modify_world_state 修改的 TRPG_ORIGINAL 字段（白名单）
+    'door_open',
+    'generator_power',
+    'alarm_active',
+    'current_scene',
+    'dungeon_completed',
+    'lights_on',
+    'note_found',
+  ],
+  ITEM_MAX_QUANTITY: 99,        // grant_item 单次数量上限
+  PLAYER_MAX_HP: 999,           // modify_player_state 数值范围上限
+  SEARCH_PROVIDER: process.env.SEARCH_PROVIDER || 'null', // null | serper
+  SERPER_API_KEY: process.env.SERPER_API_KEY || '',
 };

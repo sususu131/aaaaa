@@ -11,7 +11,7 @@ const { getDb } = require('@roblox-trpg/database');
 const roomManager = require('../rooms/roomManager');
 const { validateName } = require('../players/playerManager');
 const { createSession, resolveSession } = require('../sessions/sessionManager');
-const aiGm = require('../services/ai/aiGm');
+const aiAgent = require('../services/ai/aiAgent');
 const rateLimiter = require('../services/ai/rateLimiter');
 const { maybeCompress } = require('../services/ai/contextCompressor');
 const { buildContext } = require('../services/ai/contextBuilder');
@@ -19,6 +19,16 @@ const robloxUsers = require('../services/roblox/robloxUsers');
 const robloxThumbnails = require('../services/roblox/robloxThumbnails');
 const robloxExperiences = require('../services/roblox/robloxExperiences');
 const robloxSearch = require('../services/roblox/robloxSearch');
+
+/** Tool 广播事件 → 持久化消息类型映射（关键事件可追溯、可进 Context）。 */
+const EVENT_MSG_TYPE = {
+  'dice:rolled': 'dice',
+  'skill:check': 'skill_check',
+  'skill:gained': 'gain',
+  'item:gained': 'gain',
+  'world:changed': 'world',
+  'dungeon:completed': 'dungeon',
+};
 
 // ── 通用工具 ──────────────────────────────────────────────
 
@@ -70,14 +80,19 @@ function attachSession(socket, playerRowId) {
 /** 组装 create/join 的成功载荷。 */
 function roomPayload(room, session) {
   return {
-    room: { id: room.id, maxPlayers: room.maxPlayers, experience: room.currentExperience || null },
+    room: {
+      id: room.id,
+      maxPlayers: room.maxPlayers,
+      experience: room.currentExperience || null,
+      dungeon: room.currentDungeon || null,
+    },
     players: roomManager.publicPlayers(room),
     playerId: session.playerId,
     ...(session.sessionToken ? { sessionToken: session.sessionToken } : {}),
   };
 }
 
-// ── @AI → GM 流水线（Step 8-11 + 18）─────────────────────
+// ── @AI → GM Agent 流水线（阶段3：多轮 Tool Calling）──────
 
 async function triggerGm(io, socket, room, player, text) {
   if (room.gmBusy) {
@@ -97,9 +112,23 @@ async function triggerGm(io, socket, room, player, text) {
   }
 
   room.gmBusy = true;
+  const ctx = {
+    io,
+    room,
+    socket,
+    playerUid: socket.playerUid,
+    actingPlayerName: player.name,
+    /** Tool 广播：实时推送 + 关键事件持久化（谁/何时/前后状态可追溯）。 */
+    broadcast: (event, payload) => {
+      io.to(room.id).emit(event, payload);
+      const msgType = EVENT_MSG_TYPE[event];
+      if (msgType) roomManager.saveMessage(room.id, null, msgType, JSON.stringify(payload));
+    },
+  };
+
   try {
-    const parsed = await aiGm.gmRespond(room, { playerName: player.name, text });
-    const msgId = roomManager.saveMessage(room.id, null, 'gm', parsed.narrative);
+    const parsed = await aiAgent.runAgentTurn(ctx, text);
+    const msgId = aiAgent.persistGmOutcome(room, parsed);
     io.to(room.id).emit('gm:response', {
       id: msgId,
       type: 'gm_response',
@@ -110,7 +139,7 @@ async function triggerGm(io, socket, room, player, text) {
       at: new Date().toISOString(),
     });
     // Context 压缩检查（不阻塞主线）
-    maybeCompress(room, io, (msgs) => aiGm.summarizeHistory(room.id, msgs))
+    maybeCompress(room, io, (msgs) => aiAgent.summarizeHistory(room.id, msgs))
       .then((note) => note && broadcastSystem(io, room, note))
       .catch(() => {});
   } catch (err) {
@@ -118,7 +147,20 @@ async function triggerGm(io, socket, room, player, text) {
     broadcastSystem(io, room, `GM 无法回应：${err.message || '未知错误'}`);
   } finally {
     room.gmBusy = false;
+    io.to(room.id).emit('gm:status', { status: null });
   }
+}
+
+/** 把 Roblox 体验快照关联到数据库登记的副本（按 universeId 或体验名）。 */
+function linkDungeonFromExperience(room, experience) {
+  const db = getDb();
+  const row =
+    db.prepare('SELECT * FROM dungeons WHERE roblox_universe_id = ?').get(experience.universeId) ||
+    db.prepare('SELECT * FROM dungeons WHERE LOWER(roblox_experience_name) = LOWER(?)').get(experience.name);
+  if (row) {
+    room.currentDungeon = { dungeonId: row.id, name: row.dungeon_name, robloxUniverseId: row.roblox_universe_id };
+  }
+  return room.currentDungeon;
 }
 
 // ── 事件注册 ─────────────────────────────────────────────
@@ -299,27 +341,52 @@ module.exports = function registerSocketHandlers(io) {
       }
     });
 
-    /** 玩家选定体验 → 绑定为房间副本来源（官方资料快照）。 */
+    /** 玩家选定体验 → 绑定为房间副本来源（官方资料快照 + 关联数据库副本）。 */
     socket.on('dungeon:select', async ({ universeId } = {}, ack) => {
       const room = roomManager.findRoomBySocket(socket.id);
       if (!room) return socket.emit('error', { message: '你不在任何房间中' });
       try {
         const experience = await robloxExperiences.getExperienceByUniverse(universeId);
         roomManager.setRoomExperience(room, experience);
-        if (typeof ack === 'function') ack({ ok: true, experience });
-        io.to(room.id).emit('dungeon:set', { experience });
-        broadcastSystem(io, room, `副本来源已锁定：${experience.name}（Roblox 官方公开资料，source=roblox_api）`);
+        const dungeon = linkDungeonFromExperience(room, experience);
+        if (typeof ack === 'function') ack({ ok: true, experience, dungeon });
+        io.to(room.id).emit('dungeon:set', { experience, dungeon });
+        broadcastSystem(
+          io,
+          room,
+          `副本来源已锁定：${experience.name}（Roblox 官方公开资料，source=roblox_api）` +
+            (dungeon ? `，已关联数据库副本「${dungeon.name}」` : '，该体验暂未在副本数据库登记')
+        );
       } catch (err) {
         if (typeof ack === 'function') ack({ ok: false, error: err.message });
       }
+    });
+
+    /** 直接绑定数据库登记副本（离线/无 Roblox 网络时可用）。 */
+    socket.on('dungeon:bindDb', ({ dungeonId } = {}, ack) => {
+      const room = roomManager.findRoomBySocket(socket.id);
+      if (!room) return socket.emit('error', { message: '你不在任何房间中' });
+      const row = getDb().prepare('SELECT * FROM dungeons WHERE id = ?').get(Number(dungeonId));
+      if (!row) return typeof ack === 'function' && ack({ ok: false, error: '副本不存在' });
+      room.currentDungeon = { dungeonId: row.id, name: row.dungeon_name, robloxUniverseId: row.roblox_universe_id };
+      if (typeof ack === 'function') ack({ ok: true, dungeon: room.currentDungeon });
+      io.to(room.id).emit('dungeon:set', { experience: room.currentExperience, dungeon: room.currentDungeon });
+      broadcastSystem(io, room, `已绑定数据库副本「${row.dungeon_name}」（对应体验：${row.roblox_experience_name}）`);
+    });
+
+    /** 列出数据库登记的副本（供离线绑定）。 */
+    socket.on('dungeon:listDb', (_data, ack) => {
+      const rows = getDb().prepare('SELECT id, dungeon_name, roblox_experience_name, difficulty FROM dungeons ORDER BY id').all();
+      if (typeof ack === 'function') ack({ ok: true, dungeons: rows });
     });
 
     socket.on('dungeon:clear', (_data, ack) => {
       const room = roomManager.findRoomBySocket(socket.id);
       if (!room) return;
       roomManager.clearRoomExperience(room);
+      room.currentDungeon = null;
       if (typeof ack === 'function') ack({ ok: true });
-      io.to(room.id).emit('dungeon:set', { experience: null });
+      io.to(room.id).emit('dungeon:set', { experience: null, dungeon: null });
       broadcastSystem(io, room, '已解除副本绑定');
     });
 

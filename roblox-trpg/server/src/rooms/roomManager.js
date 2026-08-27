@@ -15,8 +15,9 @@ function newRoomState(id) {
     maxPlayers: ROOM_MAX_PLAYERS,
     players: [],
     currentExperience: null, // ROBLOX_SOURCE_DATA 来源（官方公开资料快照）
+    currentDungeon: null,    // 数据库登记副本 { dungeonId, name, robloxUniverseId }
     contextFlags: {},        // 压缩阈值提示去重标记
-    gmBusy: false,           // GM 并发保护
+    gmBusy: false,           // GM 并发保护（同一房间 GM 串行，防并发覆盖）
   };
 }
 

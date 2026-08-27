@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "node src/index.js",
     "start": "node src/index.js",
-    "test": "node test/smoke.test.js"
+    "test": "node test/smoke.test.js && node test/stage3.test.js",
+    "test:stage12": "node test/smoke.test.js",
+    "test:stage3": "node test/stage3.test.js"
   },
   "dependencies": {
     "@roblox-trpg/database": "file:../database",

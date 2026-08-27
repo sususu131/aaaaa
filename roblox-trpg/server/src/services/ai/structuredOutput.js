@@ -31,8 +31,8 @@ function parseGmResponse(text) {
   const cleanOptions = options
     .filter((o) => o && typeof o === 'object')
     .map((o) => ({
-      label: str(o.label || o.action, 40),
-      action: str(o.action || o.label, 200),
+      label: str(o.label || o.action || o.value, 40),
+      action: str(o.action || o.value || o.label, 200),
     }))
     .filter((o) => o.label);
 

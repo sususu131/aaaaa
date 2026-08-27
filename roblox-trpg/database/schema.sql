@@ -115,6 +115,8 @@ CREATE TABLE IF NOT EXISTS dungeons (
   id                     INTEGER PRIMARY KEY AUTOINCREMENT,
   roblox_experience_id   TEXT UNIQUE,               -- Roblox 体验ID
   roblox_experience_name TEXT NOT NULL UNIQUE,      -- Doors / Jailbreak / Blox Fruits ...
+  roblox_universe_id     TEXT UNIQUE,               -- Roblox Universe ID（阶段3）
+  roblox_place_id        TEXT,                      -- Roblox Place ID（阶段3）
   dungeon_name           TEXT NOT NULL,             -- 副本名
   difficulty             INTEGER NOT NULL DEFAULT 1,-- 1~10
   description            TEXT,
@@ -199,3 +201,86 @@ CREATE TABLE IF NOT EXISTS player_skills (
 );
 
 CREATE INDEX IF NOT EXISTS idx_player_skills_player ON player_skills(player_id);
+
+-- ============================================================
+-- 阶段3：AI Agent + 世界状态 + 工具调用系统
+-- ============================================================
+
+-- ── 世界状态（每房间一份，服务器权威，乐观锁版本号）──
+CREATE TABLE IF NOT EXISTS world_states (
+  room_id    TEXT PRIMARY KEY REFERENCES rooms(id),
+  version    INTEGER NOT NULL DEFAULT 0,
+  state      TEXT NOT NULL DEFAULT '{}',   -- JSON：白名单字段（TRPG_ORIGINAL 状态）
+  updated_by TEXT,                         -- 最后修改者（player_xxx / ai_tool）
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ── 世界事件审计：每次重要变化可追溯 who/when/action/before/after/source ──
+CREATE TABLE IF NOT EXISTS world_events (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  room_id      TEXT NOT NULL REFERENCES rooms(id),
+  actor        TEXT,                       -- player_xxxx / ai_tool / server
+  action       TEXT NOT NULL,              -- open_door / grant_skill / ...
+  before_state TEXT,                       -- JSON
+  after_state  TEXT,                       -- JSON
+  source       TEXT NOT NULL DEFAULT 'ai_tool', -- ai_tool / rule_engine / server
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_world_events_room ON world_events(room_id);
+
+-- ── 玩家状态（HP/状态效果/位置；技能物品在各自关联表）──
+CREATE TABLE IF NOT EXISTS player_states (
+  player_id      INTEGER PRIMARY KEY REFERENCES players(id),
+  hp             INTEGER NOT NULL DEFAULT 10,
+  max_hp         INTEGER NOT NULL DEFAULT 10,
+  status_effects TEXT NOT NULL DEFAULT '[]',  -- JSON 数组
+  location       TEXT NOT NULL DEFAULT 'start',
+  updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ── 玩家物品 ──
+CREATE TABLE IF NOT EXISTS player_items (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id   INTEGER NOT NULL REFERENCES players(id),
+  item_id     INTEGER NOT NULL REFERENCES items(id),
+  quantity    INTEGER NOT NULL DEFAULT 1,
+  source      TEXT,                        -- 来源（dungeon:xxx / ai_tool）
+  reason      TEXT,
+  obtained_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (player_id, item_id)
+);
+
+-- ── 骰子记录（全部由服务器生成，可审计）──
+CREATE TABLE IF NOT EXISTS dice_rolls (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  room_id    TEXT NOT NULL REFERENCES rooms(id),
+  player_id  INTEGER REFERENCES players(id),
+  kind       TEXT NOT NULL DEFAULT 'roll', -- roll / skill_check
+  data       TEXT NOT NULL,                -- JSON：{sides,count,rolls,total,difficulty?...}
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ── Tool Call 审计（不记录 API Key / token 等敏感信息）──
+CREATE TABLE IF NOT EXISTS tool_calls (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  room_id    TEXT NOT NULL,
+  player_uid TEXT,
+  tool_name  TEXT NOT NULL,
+  arguments  TEXT,                          -- JSON（入库前脱敏）
+  result     TEXT,                          -- 摘要（截断）
+  success    INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_tool_calls_room ON tool_calls(room_id);
+
+-- ── 玩家副本进度（通关状态 + 防重复领取）──
+CREATE TABLE IF NOT EXISTS player_dungeon_progress (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id    INTEGER NOT NULL REFERENCES players(id),
+  dungeon_id   INTEGER NOT NULL REFERENCES dungeons(id),
+  status       TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed')),
+  completed_at TEXT,
+  UNIQUE (player_id, dungeon_id)
+);

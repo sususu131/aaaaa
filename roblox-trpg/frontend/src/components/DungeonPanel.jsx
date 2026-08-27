@@ -1,16 +1,31 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { socket } from '../lib/socket.js';
 import { api } from '../lib/api.js';
 
 /**
  * 副本面板：搜索 / 粘贴 URL 解析 Roblox Experience（官方公开信息）。
  * 多个结果时列出候选由玩家选择——不自动选定。
+ * 另支持直接绑定数据库登记副本（无 Roblox 网络时可用）。
  */
-export default function DungeonPanel({ current, onClose }) {
+export default function DungeonPanel({ current, currentDungeon, onClose }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
+  const [dbDungeons, setDbDungeons] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    socket.emit('dungeon:listDb', {}, (res) => {
+      if (res && res.ok) setDbDungeons(res.dungeons || []);
+    });
+  }, []);
+
+  const bindDb = (dungeonId) => {
+    socket.emit('dungeon:bindDb', { dungeonId }, (res) => {
+      if (!res || !res.ok) setError((res && res.error) || '绑定失败');
+      else onClose();
+    });
+  };
 
   const runSearch = async () => {
     const q = query.trim();
@@ -99,6 +114,25 @@ export default function DungeonPanel({ current, onClose }) {
               </div>
               <button className="btn small primary" onClick={() => select(r.universeId)}>
                 选定
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <h3 className="small muted" style={{ marginTop: 8 }}>
+          数据库登记副本（离线绑定，奖励结算必需）{currentDungeon ? `：当前 ${currentDungeon.name}` : ''}
+        </h3>
+        <div className="search-results">
+          {dbDungeons.map((d) => (
+            <div key={d.id} className="search-result">
+              <div className="result-info">
+                <strong>{d.dungeon_name}</strong>
+                <span className="muted small">
+                  体验：{d.roblox_experience_name} · 难度 {d.difficulty}
+                </span>
+              </div>
+              <button className="btn small" onClick={() => bindDb(d.id)}>
+                绑定
               </button>
             </div>
           ))}

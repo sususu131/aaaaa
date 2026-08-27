@@ -15,6 +15,7 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const [modal, setModal] = useState(null); // null | context | dungeon | avatar
   const [chatDraft, setChatDraft] = useState(''); // 输入框内容（AI选项点击后填入，可编辑）
+  const [gmStatus, setGmStatus] = useState(''); // 「GM 掷骰中…」等（不含内部推理）
   const sessionTokenRef = useRef(null); // 只存内存，不进 URL / localStorage
 
   // 建立连接 + 绑定全部服务端事件（只绑定一次）
@@ -41,8 +42,13 @@ export default function App() {
     };
     const onPlayers = ({ players: ps }) => setPlayers(ps);
     const onChatMessage = (msg) => setMessages((prev) => [...prev, msg]);
-    const onGmResponse = (gm) => setMessages((prev) => [...prev, { ...gm, type: 'gm' }]);
-    const onDungeonSet = ({ experience }) => setRoom((prev) => (prev ? { ...prev, experience } : prev));
+    const onGmResponse = (gm) => {
+      setGmStatus('');
+      setMessages((prev) => [...prev, { ...gm, type: 'gm' }]);
+    };
+    const onDungeonSet = ({ experience, dungeon }) =>
+      setRoom((prev) => (prev ? { ...prev, experience, dungeon } : prev));
+    const onGmStatus = ({ status }) => setGmStatus(status || '');
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -53,6 +59,7 @@ export default function App() {
     socket.on('players:update', onPlayers);
     socket.on('chat:message', onChatMessage);
     socket.on('gm:response', onGmResponse);
+    socket.on('gm:status', onGmStatus);
     socket.on('dungeon:set', onDungeonSet);
 
     return () => {
@@ -65,6 +72,7 @@ export default function App() {
       socket.off('players:update', onPlayers);
       socket.off('chat:message', onChatMessage);
       socket.off('gm:response', onGmResponse);
+      socket.off('gm:status', onGmStatus);
       socket.off('dungeon:set', onDungeonSet);
       socket.disconnect();
     };
@@ -129,6 +137,7 @@ export default function App() {
           onLeave={leaveRoom}
           onSend={sendMessage}
           onPickOption={pickOption}
+          gmStatus={gmStatus}
           modal={modal}
           onOpenModal={setModal}
         />

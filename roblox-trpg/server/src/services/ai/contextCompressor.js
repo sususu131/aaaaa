@@ -16,6 +16,11 @@ const {
   RECENT_EVENTS_KEEP,
 } = require('../../config');
 
+/** 调用时读取预算（便于测试覆盖）。 */
+function budget() {
+  return Number(process.env.AI_CONTEXT_BUDGET || AI_CONTEXT_BUDGET);
+}
+
 /** 规则式兜底摘要（AI 不可用时）：保留系统事件与 GM 叙事，截断普通聊天。 */
 function ruleBasedSummary(messages) {
   const kept = [];
@@ -35,7 +40,7 @@ function ruleBasedSummary(messages) {
  */
 async function maybeCompress(room, io, summarizeFn) {
   const ctx = buildContext(room);
-  const ratio = ctx.totalTokens / AI_CONTEXT_BUDGET;
+  const ratio = ctx.totalTokens / budget();
   const flags = room.contextFlags || (room.contextFlags = {});
 
   if (ratio >= CONTEXT_COMPRESS_RATIO) {
@@ -45,14 +50,15 @@ async function maybeCompress(room, io, summarizeFn) {
       .get(room.id);
     const sinceId = (last && last.message_id_to) || 0;
 
-    const all = db
-      .prepare('SELECT * FROM messages WHERE room_id = ? AND id > ? ORDER BY id ASC')
+    // 只压缩 chat/gm；骰子结果、技能获得、世界变化等关键事件受保护，永不压缩
+    const compressible = db
+      .prepare("SELECT * FROM messages WHERE room_id = ? AND id > ? AND type IN ('chat','gm') ORDER BY id ASC")
       .all(room.id, sinceId);
-    if (all.length <= RECENT_EVENTS_KEEP) {
+    if (compressible.length <= RECENT_EVENTS_KEEP) {
       flags.prepared80 = true;
-      return '【Context】已达 90%，但近期消息过少，暂不压缩。';
+      return '【Context】已达 90%，但可压缩消息过少，暂不压缩。';
     }
-    const toCompress = all.slice(0, all.length - RECENT_EVENTS_KEEP);
+    const toCompress = compressible.slice(0, compressible.length - RECENT_EVENTS_KEEP);
 
     let summary;
     try {
@@ -67,7 +73,7 @@ async function maybeCompress(room, io, summarizeFn) {
 
     flags.warned70 = false;
     flags.prepared80 = false;
-    return `【Context】已达 ${Math.round(ratio * 100)}%，已自动压缩 ${toCompress.length} 条历史消息（重要状态仍来自数据库）。`;
+    return `【Context】已达 ${Math.round(ratio * 100)}%，已自动压缩 ${toCompress.length} 条历史消息（骰子/技能/世界变化等关键事件已保留，重要状态仍来自数据库）。`;
   }
 
   if (ratio >= CONTEXT_PREPARE_RATIO && !flags.prepared80) {

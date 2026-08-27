@@ -25,8 +25,11 @@ app.use('/api', apiRoutes);
 
 registerSocketHandlers(io);
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`[server] roblox-trpg 服务器已启动（阶段2）: http://localhost:${PORT}`);
-});
+// 作为入口运行时才监听端口（测试可直接 require 后自管端口）
+if (require.main === module) {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`[server] roblox-trpg 服务器已启动（阶段3）: http://localhost:${PORT}`);
+  });
+}
 
 module.exports = { app, server, io };
