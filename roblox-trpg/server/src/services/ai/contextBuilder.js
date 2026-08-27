@@ -314,7 +314,7 @@ function buildContext(room) {
   const sections = [
     { key: 'system', label: 'System Rules', content: SYSTEM_RULES },
     { key: 'world', label: 'World Setting', content: WORLD_SETTING },
-    { key: 'room_status', label: 'Room Status', content: `房间 ${room.id}，GM Agent 运行中（阶段3）。` },
+    { key: 'room_status', label: 'Room Status', content: `房间 ${room.id}：AI GM 主持中。世界模拟运行，抉择/队伍/背包系统就绪。` },
     { key: 'players', label: 'Player State', content: playerStateContent(room) },
     { key: 'location', label: 'Current Location', content: `当前地点：房间 ${room.id} 的集合点。` },
     { key: 'dungeon', label: 'Current Dungeon', content: dungeonContent },

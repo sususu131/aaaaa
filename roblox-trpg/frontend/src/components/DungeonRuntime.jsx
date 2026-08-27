@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { socket } from '../lib/socket.js';
 import { api } from '../lib/api.js';
+import CombatPanel from './CombatPanel.jsx';
 
 /**
  * Dungeon Runtime 面板（阶段5）：
@@ -20,6 +21,9 @@ export default function DungeonRuntime({ onClose, getSessionToken, onPickOption 
   const [timedResult, setTimedResult] = useState(null);
   const [timedLeft, setTimedLeft] = useState(1); // 剩余比例 0..1
   const [agentEvents, setAgentEvents] = useState([]); // Agent 轨迹（默认折叠）
+  const [combatRewards, setCombatRewards] = useState(null); // 阶段15：战斗奖励弹窗
+  const [defeatInfo, setDefeatInfo] = useState(null); // 阶段15：死亡界面
+  const [official, setOfficial] = useState([]); // 阶段15：官方可玩内容
 
   const token = () => (getSessionToken ? getSessionToken() : null);
 
@@ -50,7 +54,7 @@ export default function DungeonRuntime({ onClose, getSessionToken, onPickOption 
   };
 
   useEffect(() => {
-    api.listDungeons().then((d) => setDungeons(d.dungeons || [])).catch(() => {});
+    api.listDungeons().then((d) => { setDungeons(d.dungeons || []); setOfficial(d.official || []); }).catch(() => {});
     // 已有活跃实例 → 直接恢复（断线重连语义）
     socket.emit('instance:sync', {}, (res) => {
       if (res && res.ok && res.instance) {
@@ -81,7 +85,14 @@ export default function DungeonRuntime({ onClose, getSessionToken, onPickOption 
     socket.on('instance:timedEvent', onTimedEvent);
     socket.on('instance:timedExpired', onTimedExpired);
     socket.on('agent:event', onAgentEvent);
+    // 阶段15：战斗奖励弹窗 + 死亡界面
+    const onCombatRewards = (data) => setCombatRewards(data);
+    const onDefeat = (data) => setDefeatInfo(data);
+    socket.on('combat:rewards', onCombatRewards);
+    socket.on('instance:defeat', onDefeat);
     return () => {
+      socket.off('combat:rewards', onCombatRewards);
+      socket.off('instance:defeat', onDefeat);
       socket.off('instance:update', onUpdate);
       socket.off('instance:scene', onScene);
       socket.off('instance:combat', onCombat);
@@ -164,8 +175,17 @@ export default function DungeonRuntime({ onClose, getSessionToken, onPickOption 
             {dungeons.filter((d) => d.publishedVersions.length > 0).length === 0 && (
               <p className="muted">暂无已发布副本。请先在「副本设计」中生成 → 审核 → 发布。</p>
             )}
+            {official.map((o) => (
+              <div key={o.ref} className="search-result" style={{ borderLeft: '3px solid #e0b34c' }}>
+                <div className="result-info">
+                  <strong>⭐ {o.dungeonName}（官方新手流程）</strong>
+                  <span className="muted small">{o.description || '完整可玩闭环：探索→战斗→任务→奖励→成长'}</span>
+                </div>
+                <button className="btn small primary" disabled={busy} onClick={() => create(o.ref)}>开始游玩</button>
+              </div>
+            ))}
             {dungeons.map((d) =>
-              d.publishedVersions.map((v) => (
+              d.publishedVersions.filter((v) => v.version !== 900).map((v) => (
                 <div key={v.id} className="search-result">
                   <div className="result-info">
                     <strong>{d.dungeon_name}</strong>
@@ -213,12 +233,96 @@ export default function DungeonRuntime({ onClose, getSessionToken, onPickOption 
               ))}
             </div>
 
-            {snapshot.combat && (
-              <div className="dd-section canon">
-                <h4>战斗（{snapshot.combat.encounterId}）· {snapshot.combat.status}{snapshot.combat.bossPhase > 1 ? ` · Boss Phase ${snapshot.combat.bossPhase}` : ''}</h4>
-                {Object.entries(snapshot.combat.enemyStates).map(([id, e]) => (
-                  <div key={id} className="dd-item">{e.name}：HP {e.hp}/{e.maxHp}{e.hp <= 0 ? '（已击败）' : ''}</div>
-                ))}
+            {snapshot.combat && snapshot.instance.status === 'RUNNING' && (
+              <CombatPanel instanceUid={instanceUid} getSessionToken={getSessionToken} onChanged={() => setTimeout(refresh, 300)} />
+            )}
+
+            {/* 阶段15：场景移动 + 开始遭遇（可玩闭环按钮） */}
+            {snapshot.instance.status === 'RUNNING' && !snapshot.combat && snapshot.scene && (
+              <div className="dd-section">
+                <h4>🚪 当前：{snapshot.scene.name}</h4>
+                <p className="muted small">{snapshot.scene.description}</p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {(snapshot.scene.exits || []).map((exitId) => (
+                    <button
+                      key={exitId}
+                      className="btn tiny"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        setError('');
+                        try {
+                          await api.moveScene(instanceUid, exitId, token());
+                          await refresh();
+                        } catch (e) {
+                          setError(`${e.code ? `[${e.code}] ` : ''}${e.message}`);
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      前往 {exitId}
+                    </button>
+                  ))}
+                  {(snapshot.scene.encounters || []).map((encId) => (
+                    <button
+                      key={encId}
+                      className="btn tiny"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        setError('');
+                        try {
+                          await api.startEncounter(instanceUid, encId, token());
+                          await refresh();
+                        } catch (e) {
+                          setError(`${e.code ? `[${e.code}] ` : ''}${e.message}`);
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      ⚔ 迎战 {encId}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 阶段15：战斗奖励弹窗（Reward Popup） */}
+            {combatRewards && (
+              <div className="modal-backdrop" onClick={() => setCombatRewards(null)}>
+                <div className="modal" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <h2>🏆 战斗胜利！</h2>
+                    <button className="btn small" onClick={() => setCombatRewards(null)}>关闭</button>
+                  </div>
+                  {(combatRewards.rewards || []).map((rp) => (
+                    <div key={rp.playerId} className="quest-card">
+                      <div className="quest-head"><strong>玩家 #{rp.playerId}</strong></div>
+                      {rp.grants.map((g, i) => (
+                        <div key={i} className="objective-row">
+                          <span>{g.type === 'XP' ? `⭐ 经验 +${g.amount}${g.levelsGained ? `（升级 ×${g.levelsGained}！）` : ''}` : g.type === 'CURRENCY' ? `💰 ${g.name} +${g.amount}` : `🎁 ${g.name}`}</span>
+                          {g.skipped && <span className="muted small">（{g.skipped}）</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 阶段15：死亡界面（保留角色与永久物品） */}
+            {defeatInfo && (
+              <div className="modal-backdrop" onClick={() => setDefeatInfo(null)}>
+                <div className="modal" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <h2>💀 队伍倒下了…</h2>
+                    <button className="btn small" onClick={() => setDefeatInfo(null)}>关闭</button>
+                  </div>
+                  <p>副本挑战失败：{defeatInfo.reason}</p>
+                  <p className="muted">别灰心——你的角色进度与永久物品都已保留。休整之后，随时可以再次挑战。</p>
+                </div>
               </div>
             )}
 

@@ -58,6 +58,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ action, sessionToken, clientActionId }),
     }),
+  // ── 阶段15：回合制战斗 ──
+  getCombat: (id, sessionToken) =>
+    request(`/api/dungeon-instances/${id}/combat?sessionToken=${encodeURIComponent(sessionToken || '')}`),
+  startEncounter: (id, encounterId, sessionToken) =>
+    request(`/api/dungeon-instances/${id}/combat/start`, { method: 'POST', body: JSON.stringify({ encounterId, sessionToken }) }),
+  combatAction: (id, payload, sessionToken) =>
+    request(`/api/dungeon-instances/${id}/combat/action`, { method: 'POST', body: JSON.stringify({ ...payload, sessionToken }) }),
+  moveScene: (id, sceneId, sessionToken) =>
+    request(`/api/dungeon-instances/${id}/move`, { method: 'POST', body: JSON.stringify({ sceneId, sessionToken }) }),
   getInstance: (id) => request(`/api/dungeon-instances/${id}`),
   getInstanceEvents: (id) => request(`/api/dungeon-instances/${id}/events`),
   leaveInstance: (id, sessionToken) =>

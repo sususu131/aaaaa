@@ -100,9 +100,19 @@ function buildRuntimeContext(instance, definition, playerRows) {
   const recentLogs = im.events(instance, 12).slice(-8).map((e) => `[${e.sequence}] ${e.type} ${String(e.data).slice(0, 100)}`);
 
   const combat = combatEngine.activeCombat(instance.id);
-  const combatBlock = combat
-    ? `进行中战斗：${combat.encounter_id}，敌方状态：${combat.enemy_states}，回合 ${combat.turn}`
-    : '（无进行中战斗）';
+  // 阶段15：COMBAT_CONTEXT（敌人/玩家/可用行动；敌人行为由服务器按 Behavior Data 选择，AI 只叙事）
+  let combatBlock = '（无进行中战斗）';
+  if (combat) {
+    try {
+      const battleSystem = require('./battleSystem');
+      const view = battleSystem.combatView(instance, combat);
+      const enemyLines = view.enemies.map((e) => `- ${e.name} HP${e.hp}/${e.maxHp}${e.isBoss ? `(Boss${e.enraged ? '·狂暴' : ''}·阶段${view.bossPhase})` : ''}${e.defending ? '·防御' : ''}${e.fled ? '·逃跑' : ''}`).join('\n');
+      const playerLines = view.players.map((p) => `- ${p.name} HP${p.hp}/${p.maxHp}${p.downed ? '·倒地' : ''}${p.defending ? '·防御' : ''}${p.acted ? '·已行动' : ''}，技能：${p.skills.map((s) => `${s.name}${s.cooldownLeft ? `(冷却${s.cooldownLeft})` : ''}`).join('、') || '无'}`).join('\n');
+      combatBlock = `COMBAT_CONTEXT：阶段=${view.phase}，回合${view.turn}\n敌人：\n${enemyLines}\n玩家：\n${playerLines}\n可用行动：${view.availableActions.join('/')}\n（敌人行为由服务器按副本 Behavior Data 选择；AI 负责叙事与建议，不能指定伤害/状态数值。）`;
+    } catch {
+      combatBlock = `进行中战斗：${combat.encounter_id}，敌方状态：${combat.enemy_states}，回合 ${combat.turn}`;
+    }
+  }
 
   // 阶段8：任务上下文分区（ACTIVE_QUESTS / QUEST_PROGRESS / QUEST_OBJECTIVES）
   let questBlock = '（无进行中任务）';

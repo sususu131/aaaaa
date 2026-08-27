@@ -166,6 +166,21 @@ function startInstance(io, instance) {
     console.error('[instanceManager] quest auto-start error:', err.message);
   }
 
+  // 阶段15：自动生成定义中的 NPC（新手流程：进入副本即遇见关键 NPC；幂等）
+  try {
+    const npcEngine = require('../npcs/npcEngine');
+    for (const npcSpec of definition.npcs || []) {
+      const npc = npcEngine.getNpc(npcSpec.uid || npcSpec.name);
+      if (!npc) continue;
+      npcEngine.spawnNpcInstance(io, { npcId: npc.id, roomId: fresh.room_id, dungeonInstanceId: fresh.id });
+      if (npcSpec.spawn_scene) {
+        getDb().prepare('UPDATE npc_instances SET location_key = ? WHERE npc_id = ? AND room_id = ?').run(npcSpec.spawn_scene, npc.id, fresh.room_id);
+      }
+    }
+  } catch (err) {
+    console.error('[instanceManager] npc auto-spawn error:', err.message);
+  }
+
   // 阶段11：传奇遭遇判定（NPC_ENCOUNTER_CHECK；概率由副本/幸运/任务进度决定；幂等不重复生成）
   try {
     const encounter = require('../legends/legendEncounter');

@@ -9,6 +9,30 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '012_stage15_playable',
+    up(db) {
+      const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+      // 正式回合制战斗：阶段/已行动玩家/防御标记（阶段15）
+      if (!hasCol('instance_combats', 'phase')) {
+        db.exec("ALTER TABLE instance_combats ADD COLUMN phase TEXT NOT NULL DEFAULT 'PLAYER_TURN'");
+      }
+      if (!hasCol('instance_combats', 'acted_json')) {
+        db.exec("ALTER TABLE instance_combats ADD COLUMN acted_json TEXT NOT NULL DEFAULT '[]'");
+      }
+      if (!hasCol('instance_combats', 'defending_json')) {
+        db.exec("ALTER TABLE instance_combats ADD COLUMN defending_json TEXT NOT NULL DEFAULT '{}'");
+      }
+      // 官方可玩内容（与玩家设计流水线分离；开局时按需物化为 dungeon_versions）
+      db.exec(`CREATE TABLE IF NOT EXISTS official_dungeon_definitions (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        dungeon_name   TEXT NOT NULL UNIQUE,
+        definition_json TEXT NOT NULL,
+        description    TEXT,
+        created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+    },
+  },
+  {
     name: '011_stage14_inventory',
     up(db) {
       // ── 物品定义（与玩家持有分离；第一节）──

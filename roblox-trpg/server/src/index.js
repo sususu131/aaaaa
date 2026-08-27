@@ -29,7 +29,7 @@ const io = new Server(server, {
 });
 
 app.use(express.json({ limit: '2mb' }));
-app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 14 }));
+app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 15 }));
 app.use('/api', apiRoutes);
 app.use(visionRoutes); // /api/vision/avatar/analyze、/vision-test 等
 app.use(dungeonRoutes); // 阶段4：Dungeon Design Pipeline
@@ -53,7 +53,7 @@ require('./services/party/playerRelations').registerPlayerRelationsListener();
 // 作为入口运行时才监听端口（测试可直接 require 后自管端口）
 if (require.main === module) {
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`[server] roblox-trpg 服务器已启动（阶段14）: http://localhost:${PORT}`);
+    console.log(`[server] roblox-trpg 服务器已启动（阶段15：可玩闭环）: http://localhost:${PORT}`);
     // 阶段12：World Tick 调度器（周期驱动世界演化；可经 /api/world/pause 暂停）
     if (process.env.WORLD_TICK_ENABLED !== 'off') {
       const worldSim = require('./services/world/worldSim');
