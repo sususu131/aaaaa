@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.log
+database/data/*.db
+database/data/*.db-journal
+database/data/*.db-wal
+database/data/*.db-shm

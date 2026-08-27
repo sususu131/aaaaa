@@ -1,0 +1,13 @@
+{
+  "name": "@roblox-trpg/database",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SQLite 数据层：连接管理 + 自动建表（含未来扩展预留表）。使用 Node 22 内置 node:sqlite，零外部依赖。",
+  "main": "index.js",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "init": "node --no-warnings -e \"require('./index.js').initDb(); console.log('database ready')\""
+  }
+}
