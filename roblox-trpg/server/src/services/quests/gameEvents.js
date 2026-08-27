@@ -20,6 +20,8 @@ const EVENT_TYPES = [
   'DECISION_STARTED', 'DECISION_SELECTED', 'DECISION_TIMEOUT',
   // 阶段14：持久背包事件
   'ITEM_REMOVED',
+  // 阶段17：Die of Death Civilian System
+  'CIVILIAN_CREATED', 'CIVILIAN_SYNERGY',
 ];
 
 let listeners = [];

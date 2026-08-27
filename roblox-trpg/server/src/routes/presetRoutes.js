@@ -47,4 +47,45 @@ router.post('/api/presets/import', (req, res) => {
   }
 });
 
+// ── 阶段17：Die of Death Civilian System（模板制身份；服务器抽取 Deck）──
+
+/** GET /api/dod/civilian/offer —— 抽取 Ability Deck（3 个 Deck × 2 Ability；服务器随机）。 */
+router.get('/api/dod/civilian/offer', (req, res) => {
+  const sess = authPlayer(req, res);
+  if (!sess) return;
+  try {
+    const dodCivilian = require('../services/presets/dodCivilian');
+    const decks = dodCivilian.offerDecks(sess.playerRowId);
+    res.json({ ok: true, decks, backgrounds: dodCivilian.BACKGROUNDS });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'DOD_ERROR' });
+  }
+});
+
+/** POST /api/dod/civilian/select { deckIndex } —— 生成 Civilian 身份并获得该 Deck 的 Ability。 */
+router.post('/api/dod/civilian/select', (req, res) => {
+  const sess = authPlayer(req, res);
+  if (!sess) return;
+  try {
+    const { io } = require('../index.js');
+    const dodCivilian = require('../services/presets/dodCivilian');
+    const result = dodCivilian.createCivilianIdentity(io, sess.playerRowId, { deckIndex: (req.body || {}).deckIndex });
+    res.json({ ok: true, ...result, view: dodCivilian.civilianView(sess.playerRowId) });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'DOD_ERROR' });
+  }
+});
+
+/** GET /api/dod/civilian —— 我的 Civilian 身份（可带 experience 查询跨副本倍率）。 */
+router.get('/api/dod/civilian', (req, res) => {
+  const sess = authPlayer(req, res);
+  if (!sess) return;
+  try {
+    const dodCivilian = require('../services/presets/dodCivilian');
+    res.json({ civilian: dodCivilian.civilianView(sess.playerRowId, req.query.experience || null) });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'DOD_ERROR' });
+  }
+});
+
 module.exports = router;

@@ -269,6 +269,8 @@ async function main() {
   const bossRow1 = db.prepare("SELECT * FROM instance_combats WHERE instance_id = ? ORDER BY id DESC LIMIT 1").get(bossRoom.inst.id);
   assert.ok(bossRow1.boss_phase === 2);
   ok('51. Boss 阶段：HP≤70% → Phase 2');
+  // 清除 Boss 可能随机获得的防御标记，保证伤害断言确定
+  db.prepare("UPDATE instance_combats SET enemy_states = REPLACE(enemy_states, '\"defending\":true', '\"defending\":false') WHERE id = ?").run(bossRow1.id);
   battleSystem.performPlayerAction(fakeIo, bossRoom.inst, bossDef, battleSystem.getCombat(bossRoom.inst.id), bossRoom.players[0].id, { action: 'ATTACK', rollOverride: rollOf(28), rng: 0.01 });
   battleSystem.performPlayerAction(fakeIo, bossRoom.inst, bossDef, battleSystem.getCombat(bossRoom.inst.id), bossRoom.players[1].id, { action: 'DEFEND', rng: 0.01 });
   const bossRow2 = db.prepare("SELECT * FROM instance_combats WHERE instance_id = ? ORDER BY id DESC LIMIT 1").get(bossRoom.inst.id);

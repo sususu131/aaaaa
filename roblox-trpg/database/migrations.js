@@ -9,6 +9,31 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '014_stage17_dod_civilian',
+    up(db) {
+      // ── Die of Death 预设 Phase 1：Civilian System（模板制，非固定角色）──
+      // 玩家进入 DOD 时按模板生成身份实例；Civilian 代表一类普通居民
+      db.exec(`CREATE TABLE IF NOT EXISTS civilian_instance (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id     INTEGER NOT NULL UNIQUE REFERENCES players(id),
+        background    TEXT NOT NULL,                 -- Engineer/Medic/Athlete/Cook/Security/Artist（解释 Ability 来源，非职业系统）
+        traits        TEXT NOT NULL DEFAULT '[]',    -- JSON：Trait 列表（技能来源）
+        abilities     TEXT NOT NULL DEFAULT '[]',    -- JSON：所选 Deck 的 Ability 键
+        synergy_state TEXT,                          -- NULL/NONE 或 Synergy 键（如 CarePad）
+        source        TEXT NOT NULL DEFAULT 'DIE_OF_DEATH',
+        created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      // Ability Deck 抽取结果（3 个 Deck，每个 2 个 Ability；玩家选择其一）
+      db.exec(`CREATE TABLE IF NOT EXISTS dod_civilian_offers (
+        player_id  INTEGER NOT NULL UNIQUE REFERENCES players(id),
+        decks_json TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+    },
+  },
+  {
     name: '013_stage16_presets',
     up(db) {
       // ── 官方体验预设（第一节）：预设条目与配置，与玩家设计流水线完全分离 ──
