@@ -225,7 +225,10 @@ async function main() {
   ok('55. 无 Round 系统');
   assert.ok(!/win_condition|winCondition|victory_condition/i.test(srcAll));
   ok('56. 无胜负条件');
-  assert.ok(!/killer_gameplay|killerGameplay|competitive/i.test(srcAll));
+  // 注意：正则收窄为"竞技玩法"实现语义——阶段21 人格词 Competitive（Punch 倾向，官方规格）是形容词；
+  // docstring 中"不实现竞技模式"的红线声明本身不是实现。
+  const implSrc = srcAll.replace(/不实现[^\n]*竞技模式/g, '');
+  assert.ok(!/killer_gameplay|killerGameplay|competitive_(mode|gameplay)|竞技模式/i.test(implSrc));
   ok('57. 无 Killers 玩法/竞技模式');
   const routesSrc = fs.readFileSync(path.join(__dirname, '../src/routes/presetRoutes.js'), 'utf8');
   assert.ok(!/\/api\/dod\/round|\/api\/dod\/gacha|deck-ui/i.test(routesSrc));

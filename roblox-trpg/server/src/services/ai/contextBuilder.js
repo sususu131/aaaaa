@@ -126,11 +126,27 @@ function avatarContext(room) {
   return lines.join('\n') || '（无）';
 }
 
+/**
+ * NPC State（阶段21 修复）：名册唯一来源 = 服务器生成的 npc_instances
+ * （定义导入/遭遇判定/世界模拟生成，全部服务器流程）。
+ * AI GM 的 memory_update 不再写入 kind='npc'（防止 AI 凭叙事"创建"NPC）。
+ */
 function npcStateContent(roomId) {
-  const npcs = getDb()
-    .prepare("SELECT content FROM room_memories WHERE room_id = ? AND kind = 'npc' ORDER BY id DESC LIMIT 10")
-    .all(roomId);
-  return npcs.length ? npcs.map((n) => `- ${n.content}`).join('\n') : '（尚未出现重要NPC）';
+  try {
+    const npcEngine = require('../npcs/npcEngine');
+    const insts = npcEngine.npcInstancesInRoom(roomId);
+    if (!insts.length) return '（尚未出现重要NPC）';
+    return insts
+      .map((ni) => {
+        const npc = npcEngine.getNpc(ni.npc_id);
+        if (!npc) return null;
+        return `- ${npc.name}${npc.avatar ? ` ${npc.avatar}` : ''}｜${ni.alive ? '在场' : '已死亡'}｜情绪：${ni.mood || 'neutral'}`;
+      })
+      .filter(Boolean)
+      .join('\n');
+  } catch (err) {
+    return `（NPC 状态不可用：${err.message}）`;
+  }
 }
 
 function memoriesContent(roomId) {
@@ -370,6 +386,49 @@ function civilianProfileContextContent(room) {
   }
 }
 
+/**
+ * 阶段21：CIVILIAN_IDENTITY_CONTEXT —— Background / Traits / Ability / Appearance / Personality。
+ * 供 AI 叙事人物表现；Ability 名仅 GM 可见（NPC 与玩家叙事不得直呼，只能观察推测）。
+ * 外观是人生经历的可视化，不是装备（无属性/无数值）。
+ */
+function civilianIdentityContextContent(room) {
+  try {
+    const db = getDb();
+    const dodLore = require('../presets/dodLore');
+    const identitySvc = require('../presets/dodIdentityPresentation');
+    const blocks = [];
+    for (const p of room.players) {
+      const row = db.prepare('SELECT id FROM players WHERE socket_id = ?').get(p.socketId);
+      if (!row) continue;
+      const view = dodLore.loreView(row.id);
+      if (!view) continue;
+      const identity = identitySvc.ensureIdentityProfile(row.id);
+      if (!identity) continue;
+      const lines = [
+        `- ${p.name}:`,
+        `  Background: ${view.background}`,
+        `  Traits: ${view.personalityTraits.join('、') || '（未知）'}`,
+        `  Ability: ${view.abilities.map((a) => a.key).join('、') || '无'}（仅GM可见——叙事中不得直呼Ability名）`,
+        `  Appearance: ${identity.clothingStyle}；${identity.appearanceTraits.join('、') || '普通居民外表'}`,
+        `  Personality: ${view.personality.join('、') || '（未知）'}——${identity.personalityExpression.join('；') || '举止平常'}`,
+      ];
+      for (const sig of identity.abilitySignatures) {
+        lines.push(`  NPC观察提示（${sig.ability}）: 「${sig.observation}」`);
+      }
+      blocks.push(lines.join('\n'));
+    }
+    if (!blocks.length) return '（房间内没有 Civilian 身份）';
+    return (
+      `Civilian Identity（人物表现档案）：\n${blocks.join('\n')}\n` +
+      `（外观规则：${identitySvc.APPEARANCE_RULE}\n` +
+      `NPC 识别规则：${identitySvc.NPC_IDENTIFICATION_RULE}\n` +
+      `限制：${identitySvc.IDENTITY_LIMIT_RULE}）`
+    );
+  } catch (err) {
+    return `（Civilian Identity 上下文不可用：${err.message}）`;
+  }
+}
+
 /** 构建完整 Context。返回 { sections, totalTokens }。 */
 function buildContext(room) {
   const exp = room.currentExperience || null;
@@ -422,6 +481,7 @@ function buildContext(room) {
     { key: 'inventory', label: 'INVENTORY_CONTEXT', content: inventoryContextContent(room) },
     { key: 'civilian', label: 'DOD_CIVILIAN_CONTEXT (Die of Death Lore Simulation)', content: civilianContextContent(room) },
     { key: 'civilian_profile', label: 'CIVILIAN_PROFILE_CONTEXT', content: civilianProfileContextContent(room) },
+    { key: 'civilian_identity', label: 'CIVILIAN_IDENTITY_CONTEXT', content: civilianIdentityContextContent(room) },
     { key: 'avatar', label: 'Avatar / Initial State', content: avatarContext(room) },
     { key: 'roblox', label: 'Roblox Source Data', content: robloxBlock },
   ];

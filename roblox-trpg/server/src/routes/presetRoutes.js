@@ -137,4 +137,23 @@ router.get('/api/dod/backgrounds', (req, res) => {
   }
 });
 
+// ── 阶段21：Civilian Identity Presentation（只读外观表现档案；非装备系统）──
+
+/** GET /api/dod/civilian/identity —— 我的外观表现档案（外观=经历可视化，无数值无穿戴加成）。 */
+router.get('/api/dod/civilian/identity', (req, res) => {
+  const sess = authPlayer(req, res);
+  if (!sess) return;
+  try {
+    const identitySvc = require('../services/presets/dodIdentityPresentation');
+    res.json({
+      identity: identitySvc.ensureIdentityProfile(sess.playerRowId),
+      appearanceRule: identitySvc.APPEARANCE_RULE,
+      npcIdentificationRule: identitySvc.NPC_IDENTIFICATION_RULE,
+      limitRule: identitySvc.IDENTITY_LIMIT_RULE,
+    });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'DOD_ERROR' });
+  }
+});
+
 module.exports = router;

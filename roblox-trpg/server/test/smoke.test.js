@@ -200,7 +200,8 @@ async function main() {
   );
   assert.strictEqual(parsed.narrative.includes('黑色的门'), true);
   assert.strictEqual(parsed.options.length, 3);
-  assert.strictEqual(parsed.memory_update[0].kind, 'npc');
+  // 阶段21 修复：AI 不能创建 NPC —— kind='npc' 降级为 important_event（NPC 只能由服务器生成）
+  assert.strictEqual(parsed.memory_update[0].kind, 'important_event');
   assert.strictEqual(parsed.rule_requests[0].type, 'reward_request');
   assert.strictEqual(parseGmResponse('这不是JSON'), null, '非JSON应解析失败而非崩溃');
   ok('Structured Output：标准回复解析 + 非JSON容错');

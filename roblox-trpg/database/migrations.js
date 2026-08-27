@@ -9,6 +9,25 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '019_stage21_civilian_identity',
+    up(db) {
+      // ── 阶段21：Civilian Identity Presentation System ──
+      // 外观表现 = 人生经历的可视化（不是装备：无属性/无数值/无穿戴加成）。
+      db.exec(`CREATE TABLE IF NOT EXISTS civilian_identity_profile (
+        id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id             INTEGER NOT NULL UNIQUE REFERENCES players(id),
+        appearance_traits     TEXT NOT NULL DEFAULT '[]',  -- JSON：外观特点（来自 Ability 视觉表现）
+        clothing_style        TEXT NOT NULL DEFAULT '',     -- 穿着风格（来自 Background；不是装备）
+        visual_markers        TEXT NOT NULL DEFAULT '[]',   -- JSON：可观察的视觉标记
+        personality_expression TEXT NOT NULL DEFAULT '[]',  -- JSON：人格外向表现（含 Ability 倾向）
+        ability_signatures    TEXT NOT NULL DEFAULT '[]',   -- JSON：[{ability, observation}] 可观察迹象（不含数值）
+        source                TEXT NOT NULL DEFAULT 'DIE_OF_DEATH',
+        created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+    },
+  },
+  {
     name: '018_stage20_civilian_profile',
     up(db) {
       // ── 阶段20：Civilian Background & Personality Simulation ──

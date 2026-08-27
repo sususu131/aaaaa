@@ -219,6 +219,15 @@ function generateCivilianLore(io, playerId, { rng = null, background = null } = 
     JSON.stringify(profileTraits)
   );
 
+  // 阶段21：Identity Presentation —— Ability 之后生成外观/举止表现（Background→Traits→Ability→Appearance→Personality）
+  try {
+    const identitySvc = require('./dodIdentityPresentation');
+    identitySvc.saveIdentityProfile(
+      playerId,
+      identitySvc.buildIdentityProfile({ background: bg, abilities: abilities.map((a) => a.key), personality })
+    );
+  } catch { /* 表现档案失败不阻塞身份生成（可由 ensureIdentityProfile 补建） */ }
+
   const characterService = require('../character/characterService');
   const dungeon = dodCivilian.ensureSeeded();
   const grants = [];

@@ -37,10 +37,11 @@ function parseGmResponse(text) {
     .filter((o) => o.label);
 
   const memoryUpdate = Array.isArray(raw.memory_update) ? raw.memory_update.slice(0, 8) : [];
+  // 阶段21 修复：AI 不能创建 NPC（kind='npc' 名册条目）——相遇/见闻降级为 important_event 记忆
   const cleanMemory = memoryUpdate
     .filter((m) => m && typeof m === 'object' && m.content)
     .map((m) => ({
-      kind: ['important_event', 'npc', 'quest', 'location'].includes(m.kind) ? m.kind : 'important_event',
+      kind: m.kind === 'npc' ? 'important_event' : ['important_event', 'quest', 'location'].includes(m.kind) ? m.kind : 'important_event',
       content: str(m.content, 300),
     }));
 

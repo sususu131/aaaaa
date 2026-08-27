@@ -875,3 +875,42 @@ Synergy 预留（候选保存、逻辑未新增、Loveshot 不触发）/ 边界�
 - **REST（只读）**：`GET /api/dod/civilian/profile`、`GET /api/dod/backgrounds`
 - 测试：新增阶段20（66 项：档案库/定义内容/Trait与Personality生成随机性/推断/生成流/
   Context 格式/无职业系统边界/阵营关系预设化与幂等）；全套 **1303 项**通过
+
+---
+
+# 阶段21：Civilian Identity Presentation System + NPC 修复
+
+## Civilian Identity Presentation（外观表现档案）
+
+- **`civilian_identity_profile` 表**（迁移 019）：`appearance_traits / clothing_style /
+  visual_markers / personality_expression / ability_signatures`（每玩家单行；无属性/装备槽字段）
+- **外观不是装备**：Ability 反映人生经历——Caretaker→医疗相关物品/干净服饰/急救用品=医疗背景；
+  BonusPad→工程工具/建筑用品/工作服=建造工程经验；Revolver→射击相关装备/安全人员风格=枪械训练
+  （全部 14 项 Ability 均有 visual/lore/观察语/人格倾向；无数值/无穿戴加成，非皮肤系统）
+- **穿着风格**来自 Background（Engineer 工作服、Medic 干净便装、Cook 围裙…）；
+  **人格外向表现**覆盖六词池（Brave→遇险向前半步…）；**Ability 影响人格倾向**
+  （Caretaker→Selfless/Calm/Protective；Punch→Confident/Aggressive/Competitive；
+  Cloak→Careful/Secretive/Avoidant——只影响举止神态，不改变能力）
+- **NPC 识别纪律**：NPC（与玩家）不能直呼 Ability 名称（"你是Caretaker玩家"错误）；
+  只能观察推测（"你的医疗经验看起来很明显。"）——每项 Ability 附 NPC观察提示
+- **生成流**：Background → Traits → Ability → Appearance → Personality
+  （`generateCivilianLore` 自动落库；旧身份 `ensureIdentityProfile` 幂等补建）
+- **`CIVILIAN_IDENTITY_CONTEXT`** 新分区：Background:/Traits:/Ability:（仅GM可见）/
+  Appearance:/Personality:/NPC观察提示 + 三条规则（外观≠装备/NPC识别/无英雄化）
+- **REST**：`GET /api/dod/civilian/identity`
+
+## NPC 修复
+
+1. **进入副本不再显示其他副本的 NPC**：`startInstance` 调用 `cleanupRoomNpcs(roomId, instanceId)`
+   ——删除绑定其他副本实例的 `npc_instances` 与旧 NPC 名册记忆；世界级 NPC（未绑定实例，如世界模拟传奇）保留
+2. **AI GM 不能创建 NPC**：`memory_update.kind='npc'` 在 structuredOutput 降级为 `important_event`
+   （相遇记录保留为记忆）；`persistGmOutcome` 白名单写入（无 npc kind）；输出格式文档移除 npc 枚举；
+   **NPC_STATE 名册唯一来源 = 服务器 `npc_instances`**（不再读 AI 可写的 room_memories）；
+   SYSTEM_RULES 明令"你不能凭叙事创建 NPC"
+
+## 测试
+
+- 新增阶段21（76 项：外观映射/背景一致性/人格倾向与表现/NPC观察/生成流/Context/限制/
+  NPC 两项修复/REST/确定性映射）
+- 阶段18 红线正则收窄为"竞技玩法"实现语义（人格形容词 Competitive 不再误伤）
+- 全套 **1379 项**通过

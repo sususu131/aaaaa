@@ -146,8 +146,10 @@ function persistGmOutcome(room, parsed) {
     }
   } catch { /* 提示失败不阻塞回复 */ }
   const msgId = require('../../rooms/roomManager').saveMessage(room.id, null, 'gm', parsed.narrative);
+  // 阶段21 修复：记忆白名单（无 'npc'）——AI 不能凭叙事"创建"NPC 名册条目；NPC 只能由服务器流程生成
   for (const m of parsed.memory_update || []) {
-    db.prepare('INSERT INTO room_memories (room_id, kind, content) VALUES (?, ?, ?)').run(room.id, m.kind, m.content);
+    const kind = ['important_event', 'quest', 'location'].includes(m.kind) ? m.kind : 'important_event';
+    db.prepare('INSERT INTO room_memories (room_id, kind, content) VALUES (?, ?, ?)').run(room.id, kind, m.content);
   }
   for (const r of parsed.rule_requests || []) {
     db.prepare('INSERT INTO ai_rule_requests (room_id, request_type, payload) VALUES (?, ?, ?)').run(

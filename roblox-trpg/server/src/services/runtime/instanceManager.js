@@ -149,6 +149,9 @@ function startInstance(io, instance) {
   const fresh = getInstance(instance.id);
   logEvent(fresh, 'START', 'server', { scene: firstScene.id, party });
 
+  // 阶段21 修复：进入副本 = 清理属于【其他副本实例】的 NPC（不再显示不属于当前副本的 NPC）
+  cleanupRoomNpcs(fresh.room_id, fresh.id);
+
   // 阶段6：副本开始 = 角色快照（副本内用实例状态；结束才回写长期角色）
   const characterService = require('../character/characterService');
   for (const pid of party) {
@@ -298,6 +301,20 @@ function broadcastUpdate(io, instance) {
   });
 }
 
+/**
+ * 阶段21 修复：清理房间内属于【其他副本实例】的 NPC 与旧 NPC 名册记忆。
+ * - npc_instances：删除绑定其他 dungeon_instance 的行（进入新副本不显示旧副本 NPC）；
+ * - room_memories(kind='npc')：旧名册清空（NPC 名册唯一来源 = 服务器 npc_instances）；
+ * - 世界级 NPC（dungeon_instance_id IS NULL，如世界模拟传奇）保留。
+ */
+function cleanupRoomNpcs(roomId, keepInstanceId) {
+  const db = getDb();
+  db.prepare(
+    'DELETE FROM npc_instances WHERE room_id = ? AND dungeon_instance_id IS NOT NULL AND dungeon_instance_id != ?'
+  ).run(roomId, keepInstanceId);
+  db.prepare("DELETE FROM room_memories WHERE room_id = ? AND kind = 'npc'").run(roomId);
+}
+
 module.exports = {
   MIN_PLAYERS,
   MAX_PLAYERS,
@@ -310,6 +327,7 @@ module.exports = {
   joinInstance,
   leaveInstance,
   startInstance,
+  cleanupRoomNpcs,
   setStatus,
   setCurrentScene,
   logEvent,
