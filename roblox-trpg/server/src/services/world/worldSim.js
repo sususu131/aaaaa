@@ -83,6 +83,10 @@ function runTick(io, roomId, { tickNumber = null, force = false, now = Date.now(
   }
 
   const actions = [];
+  // 0. 阶段13：决策超时兜底结算（正常路径由服务器定时器触发；此为安全网）
+  const dueDecisions = require('../party/decisionEngine').resolveDueDecisions(io, roomId, now);
+  for (const d of dueDecisions) actions.push({ phase: 'decision_timeout', option: d.optionKey });
+
   // 1. 事件到期结算（停电结束恢复供电等）
   const expired = worldEvents.expireDueEvents(io, roomId, now);
   for (const e of expired) actions.push({ phase: 'expire_event', event: e.event_type, uid: e.uid });

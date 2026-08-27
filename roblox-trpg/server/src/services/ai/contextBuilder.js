@@ -166,7 +166,61 @@ function worldVarsContent(roomId) {
 }
 
 /**
- * 阶段12：WORLD_STATE（世界模拟）分区 ——
+ * 阶段13：PARTY_CONTEXT —— 队伍成员 / 叙事角色定位 / 玩家关系。
+ * 角色定位（EXPLORER/COMBATANT/SUPPORT/SCOUT/CUSTOM）只影响 GM 叙事措辞，绝不改变真实属性。
+ */
+function partyContextContent(room) {
+  try {
+    const partyService = require('../party/partyService');
+    const playerRelations = require('../party/playerRelations');
+    const parts = [];
+    const party = partyService.getActiveParty(room.id);
+    if (!party) {
+      parts.push('当前房间没有队伍。');
+    } else {
+      const view = partyService.partyView(party.id);
+      const leader = view.members.find((m) => m.isLeader);
+      parts.push(
+        `队伍 ${view.uid}（队长：${leader ? leader.name : '?'}）：` +
+          view.members.map((m) => `${m.name}[${m.roleLabel}${m.isLeader ? '/队长' : ''}]`).join('、')
+      );
+      if (view.relationships.length) {
+        parts.push(`成员关系：${view.relationships.map((r) => `${r.a}↔${r.b}=${r.type}(${r.value})`).join('；')}`);
+      }
+      parts.push('（叙事定位仅供描述参考，如「作为队伍侦察者，你提前发现异常气息」；不改变任何属性数值。）');
+    }
+    const rels = playerRelations.relationshipsInRoom(room.id);
+    if (!party && rels.length) parts.push(`房间玩家关系：${rels.map((r) => `${r.a}↔${r.b}=${r.type}(${r.value})`).join('；')}`);
+    return parts.join('\n');
+  } catch (err) {
+    return `（队伍状态不可用：${err.message}）`;
+  }
+}
+
+/**
+ * 阶段13：DECISION_CONTEXT —— 当前待决选择 / 剩余时间 / 可选方案。
+ * 剩余时间由服务器计算（客户端只显示）；AI 不得代替玩家选择或宣布结果。
+ */
+function decisionContextContent(roomId) {
+  try {
+    const decisionEngine = require('../party/decisionEngine');
+    const pending = decisionEngine.pendingDecisions(roomId);
+    if (!pending.length) return '（当前无待决选择）';
+    return pending
+      .map((d) => {
+        const view = decisionEngine.decisionView(d.id);
+        const timeLeft = view.remainingMs !== null ? `，剩余 ${Math.ceil(view.remainingMs / 1000)} 秒` : '，无时限';
+        const opts = view.options.map((o) => `${o.key}:${o.text}`).join(' / ');
+        const votes = d.type === 'PARTY' ? `，投票 ${view.totalVotes}/${view.requiredVotes}` : '';
+        return `[${d.type} DECISION ${view.uid}] ${d.prompt}${timeLeft}${votes}，选项：${opts}，默认：${view.defaultOption || '-'}（等待玩家选择，AI 不得代选）`;
+      })
+      .join('\n');
+  } catch (err) {
+    return `（决策状态不可用：${err.message}）`;
+  }
+}
+
+/** 阶段12：WORLD_STATE（世界模拟）分区 ——
  * 当前世界事件 / 阵营状态 / NPC活动 / 环境状态 / 副本变体。
  * 全部来自服务器数据库（WORLD_SIMULATION 数据，非 AI 生成）。
  */
@@ -249,6 +303,8 @@ function buildContext(room) {
     { key: 'memories', label: 'Important Memories', content: memoriesContent(room.id) },
     { key: 'world_vars', label: 'World State (versioned)', content: worldVarsContent(room.id) },
     { key: 'world_sim', label: 'WORLD_STATE (World Simulation)', content: worldSimContent(room.id) },
+    { key: 'party', label: 'PARTY_CONTEXT', content: partyContextContent(room) },
+    { key: 'decisions', label: 'DECISION_CONTEXT', content: decisionContextContent(room.id) },
     { key: 'avatar', label: 'Avatar / Initial State', content: avatarContext(room) },
     { key: 'roblox', label: 'Roblox Source Data', content: robloxBlock },
   ];

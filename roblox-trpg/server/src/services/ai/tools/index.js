@@ -185,6 +185,13 @@ const TOOL_META = {
   // 阶段12：世界模拟（AI 只能【申请】事件，无直接创造事件/生成怪物/发物品工具 —— 服务器专属）
   request_world_event: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
   get_world_simulation: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  // 阶段13：队伍与决策（AI 只能创建选择请求/只读；无关系修改/强制选择/改倒计时工具）
+  get_party_status: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  get_player_relationship: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  create_decision: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  create_timed_decision: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  request_party_vote: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  resolve_decision: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
 };
 
 function toolMeta(name) {
@@ -248,3 +255,5 @@ require('./legendTools');
 require('./encounterTools');
 // 阶段12 新增
 require('./worldTools');
+// 阶段13 新增
+require('./partyTools');

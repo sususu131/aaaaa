@@ -11,6 +11,8 @@ import QuestPanel from './QuestPanel.jsx';
 import NpcPanel from './NpcPanel.jsx';
 import LegendPanel from './LegendPanel.jsx';
 import WorldPanel from './WorldPanel.jsx';
+import PartyPanel from './PartyPanel.jsx';
+import DecisionPanel from './DecisionPanel.jsx';
 import { socket } from '../lib/socket.js';
 
 /**
@@ -99,10 +101,27 @@ export default function RoomScreen({
       setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
     };
     socket.on('world:event', onWorldEvent);
+
+    // 阶段13：新抉择提示（限时选择尤其需要玩家注意）
+    const onDecisionNew = (d) => {
+      const label = d.type === 'TIMED' ? '⏱ 限时抉择！' : d.type === 'PARTY' ? '🗳 团队决策' : '🎭 剧情抉择';
+      const id = `${Date.now()}_${Math.random()}`;
+      setToasts((t) => [...t.slice(-4), { id, text: `${label}：${String(d.prompt || '').slice(0, 30)}` }]);
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000);
+    };
+    const onPartyUpdate = () => {
+      const id = `${Date.now()}_${Math.random()}`;
+      setToasts((t) => [...t.slice(-4), { id, text: '🤝 队伍状态已更新' }]);
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3000);
+    };
+    socket.on('decision:new', onDecisionNew);
+    socket.on('party:update', onPartyUpdate);
     return () => {
       socket.off('quest:event', onQuestEvent);
       socket.off('npc:event', onNpcEvent);
       socket.off('world:event', onWorldEvent);
+      socket.off('decision:new', onDecisionNew);
+      socket.off('party:update', onPartyUpdate);
     };
   }, []);
 
@@ -144,6 +163,12 @@ export default function RoomScreen({
           </button>
           <button className={`btn tiny ${modal === 'world' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'world' ? null : 'world')}>
             🌍 世界
+          </button>
+          <button className={`btn tiny ${modal === 'party' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'party' ? null : 'party')}>
+            🤝 队伍
+          </button>
+          <button className={`btn tiny ${modal === 'decision' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'decision' ? null : 'decision')}>
+            🎭 抉择
           </button>
           <button className={`btn tiny ${modal === 'character' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'character' ? null : 'character')}>
             👤 角色
@@ -241,6 +266,8 @@ export default function RoomScreen({
       {modal === 'npc' && <NpcPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
       {modal === 'legend' && <LegendPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
       {modal === 'world' && <WorldPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
+      {modal === 'party' && <PartyPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} myName={myName} />}
+      {modal === 'decision' && <DecisionPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
     </main>
   );
 }

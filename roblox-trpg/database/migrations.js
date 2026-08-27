@@ -9,6 +9,105 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '010_stage13_party_decision',
+    up(db) {
+      // ── Party 系统（第一节）──
+      db.exec(`CREATE TABLE IF NOT EXISTS parties (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        uid              TEXT UNIQUE,
+        room_id          TEXT NOT NULL REFERENCES rooms(id),
+        leader_player_id INTEGER NOT NULL REFERENCES players(id),
+        status           TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','DISBANDED')),
+        created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+        disbanded_at     TEXT
+      )`);
+      // 一个房间只能存在一个主队伍（ACTIVE 唯一）
+      db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_parties_room_active ON parties(room_id) WHERE status = 'ACTIVE'`);
+      db.exec(`CREATE TABLE IF NOT EXISTS party_members (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        party_id   INTEGER NOT NULL REFERENCES parties(id),
+        player_id  INTEGER NOT NULL REFERENCES players(id),
+        role       TEXT NOT NULL DEFAULT 'CUSTOM',   -- 叙事定位（第二节），非职业，不改变属性
+        joined_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (party_id, player_id)
+      )`);
+      // 叙事角色定位（EXPLORER/COMBATANT/SUPPORT/SCOUT/CUSTOM；只影响 AI 描述）
+      db.exec(`CREATE TABLE IF NOT EXISTS party_roles (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        party_id   INTEGER NOT NULL REFERENCES parties(id),
+        player_id  INTEGER NOT NULL REFERENCES players(id),
+        role       TEXT NOT NULL DEFAULT 'CUSTOM'
+                   CHECK (role IN ('EXPLORER','COMBATANT','SUPPORT','SCOUT','CUSTOM')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (party_id, player_id)
+      )`);
+      // ── 玩家关系系统（第三节）：事件驱动，AI 无直接修改途径 ──
+      db.exec(`CREATE TABLE IF NOT EXISTS player_relationships (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_a          INTEGER NOT NULL REFERENCES players(id),
+        player_b          INTEGER NOT NULL REFERENCES players(id),
+        value             INTEGER NOT NULL DEFAULT 0 CHECK (value >= -100 AND value <= 100),
+        relationship_type TEXT NOT NULL DEFAULT 'FRIEND' CHECK (relationship_type IN ('FRIEND','TRUSTED','RIVAL','HOSTILE')),
+        updated_at        TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (player_a, player_b),
+        CHECK (player_a < player_b)                  -- 规范化存储
+      )`);
+      // 关系事件台账（幂等键 + 审计：同一事件不重复改变关系）
+      db.exec(`CREATE TABLE IF NOT EXISTS player_relation_events (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        dedupe_key  TEXT UNIQUE,
+        player_a    INTEGER NOT NULL,
+        player_b    INTEGER NOT NULL,
+        event_type  TEXT NOT NULL,
+        delta       INTEGER NOT NULL,
+        reason      TEXT,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      // ── Decision 系统（第四~七节）：服务器计时与结算 ──
+      db.exec(`CREATE TABLE IF NOT EXISTS decisions (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        uid              TEXT UNIQUE,
+        room_id          TEXT NOT NULL REFERENCES rooms(id),
+        instance_id      INTEGER REFERENCES dungeon_instances(id),  -- 可绑定副本（第八节）
+        type             TEXT NOT NULL CHECK (type IN ('NORMAL','TIMED','PARTY')),
+        status           TEXT NOT NULL DEFAULT 'PENDING'
+                         CHECK (status IN ('PENDING','RESOLVED','TIMEOUT','CANCELLED')),
+        creator          TEXT NOT NULL DEFAULT 'ai',                -- ai / server / player#id
+        prompt             TEXT NOT NULL,
+        tag              TEXT,                                      -- 任务联动匹配标签（第九节）
+        target_player_id INTEGER REFERENCES players(id),            -- NORMAL/TIMED 可指定决策者
+        default_option   TEXT,                                      -- 超时自动执行（第六节）
+        timeout_ms       INTEGER,
+        expires_at       TEXT,                                      -- 服务器时间（客户端只显示）
+        required_votes   INTEGER,                                   -- PARTY 决策
+        result_rule      TEXT NOT NULL DEFAULT 'FIRST_VOTE' CHECK (result_rule IN ('FIRST_VOTE','MAJORITY')),
+        resolved_option  TEXT,
+        resolved_by      INTEGER REFERENCES players(id),
+        resolved_reason  TEXT,                                      -- PLAYER / TIMEOUT / TALLY
+        resolved_at      TEXT,
+        created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_decisions_room ON decisions(room_id, status)');
+      db.exec(`CREATE TABLE IF NOT EXISTS decision_options (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        decision_id INTEGER NOT NULL REFERENCES decisions(id),
+        option_key  TEXT NOT NULL,                 -- A/B/C/D
+        text        TEXT NOT NULL,
+        result_data TEXT NOT NULL DEFAULT '{}',    -- JSON：服务器验证过的效果（结算时执行）
+        UNIQUE (decision_id, option_key)
+      )`);
+      // 投票（PARTY）：一人一票，投出不可改（UNIQUE 拦截）
+      db.exec(`CREATE TABLE IF NOT EXISTS decision_votes (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        decision_id INTEGER NOT NULL REFERENCES decisions(id),
+        player_id   INTEGER NOT NULL REFERENCES players(id),
+        option_key  TEXT NOT NULL,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (decision_id, player_id)
+      )`);
+    },
+  },
+  {
     name: '009_stage12_world_simulation',
     up(db) {
       const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);

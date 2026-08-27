@@ -596,11 +596,12 @@ function advanceQuest(io, qiId, playerRowId, objectiveKey) {
   if (!obj) throw new QuestError('OBJECTIVE_NOT_FOUND', `目标 ${objectiveKey} 不存在`, 404);
   if (obj.status !== 'ACTIVE') throw new QuestError('OBJECTIVE_NOT_ACTIVE', `目标状态 ${obj.status}`, 409);
   // 服务器取证：按目标类型检查事件日志 / 数据库状态
-  const expected = OBJECTIVE_EVENT_MAP[obj.type];
   let odef = {};
   try {
     odef = JSON.parse(obj.obj_def || '{}');
   } catch { /* ignore */ }
+  // （与 objectiveMatches 一致：类型映射缺失时用定义中的 event_type，如阶段13 DECISION_SELECTED）
+  const expected = OBJECTIVE_EVENT_MAP[obj.type] || odef.event_type;
   let evidence = [];
   if (expected) {
     evidence = gameEvents.findEvents({

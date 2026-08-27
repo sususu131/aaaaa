@@ -67,9 +67,9 @@ module.exports = {
   AGENT_MAX_DURATION_MS: Number(process.env.AGENT_MAX_DURATION_MS || 60000),
   AGENT_MAX_OUTPUT_TOKENS: Number(process.env.AGENT_MAX_OUTPUT_TOKENS || 1500),
   AI_STREAM: process.env.AI_STREAM !== 'off',
-  // 限时抉择（QTE）：超时未选择即承受失败后果
-  TIMED_EVENT_MIN_MS: 3000,
-  TIMED_EVENT_MAX_MS: 60000,
+  // 限时抉择（QTE）：超时未选择即承受失败后果（可经环境变量覆盖，便于测试加速）
+  TIMED_EVENT_MIN_MS: Number(process.env.TIMED_EVENT_MIN_MS || 3000),
+  TIMED_EVENT_MAX_MS: Number(process.env.TIMED_EVENT_MAX_MS || 60000),
 
   // ── 阶段12：World Simulation & Dynamic Event System ──
   WORLD_TICK_INTERVAL_MS: Number(process.env.WORLD_TICK_INTERVAL_MS || 30000), // World Tick 周期（默认30秒）
