@@ -85,9 +85,73 @@
     <div class="msg" id="ctxMsg"></div>
   </div>
 
-  <h2>状态</h2>
+  <h2>Vision API（图像分析）</h2>
+  <div class="card">
+    <div class="chips">
+      <button class="preset" onclick="fillVision('https://api.deepseek.com/v1','deepseek-vl2-model')">一键填入：DeepSeek</button>
+      <button class="preset" onclick="fillVision('https://api.openai.com/v1','gpt-4o-mini')">一键填入：OpenAI 兼容</button>
+    </div>
+    <label>Base URL（OpenAI 兼容 /chat/completions · image_url）</label>
+    <input id="vBaseUrl" placeholder="https://api.deepseek.com/v1" />
+    <label>API Key</label>
+    <input id="vApiKey" type="password" placeholder="sk-…（留空 = 保留已保存的 Key）" />
+    <div class="hint" id="vKeyHint"></div>
+    <div class="row">
+      <div>
+        <label>模型（须支持图像输入）</label>
+        <input id="vModel" placeholder="deepseek-v4-flash-vision-exp" />
+      </div>
+      <div>
+        <label>超时（毫秒）</label>
+        <input id="vTimeout" type="number" min="5000" step="1000" />
+      </div>
+    </div>
+    <div class="btns">
+      <button class="primary" onclick="saveVision()">保存 Vision 配置</button>
+      <button onclick="testVision()">测试连接</button>
+    </div>
+    <div class="msg" id="vMsg"></div>
+  </div>
+
+  <h2>Web 搜索（AI 联网）</h2>
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>搜索 Provider</label>
+        <select id="sProvider">
+          <option value="null">null（未配置：AI 不可搜索）</option>
+          <option value="serper">serper（Google 搜索 API）</option>
+        </select>
+      </div>
+      <div>
+        <label>Serper API Key（serper.dev）</label>
+        <input id="sSerperKey" type="password" placeholder="留空 = 保留已保存的 Key" />
+      </div>
+    </div>
+    <div class="hint" id="sKeyHint"></div>
+    <div class="btns">
+      <button class="primary" onclick="saveSearch()">保存搜索配置</button>
+      <button onclick="testSearch()">测试搜索（查询 "roblox"）</button>
+    </div>
+    <div class="msg" id="sMsg"></div>
+  </div>
+
+  <h2>服务器状态</h2>
   <div class="card">
     <div class="chips" id="statusChips"></div>
+    <div class="btns">
+      <button onclick="toggleWorld(true)">暂停世界模拟</button>
+      <button onclick="toggleWorld(false)">恢复世界模拟</button>
+      <button onclick="reimportPresets()">重导入官方预设</button>
+      <button onclick="loadStatus()">刷新状态</button>
+    </div>
+    <div class="msg" id="stMsg"></div>
+  </div>
+
+  <h2>最近游戏事件</h2>
+  <div class="card">
+    <div id="events" class="hint" style="max-height:220px;overflow:auto;line-height:1.7"></div>
+    <div class="btns"><button onclick="loadEvents()">刷新事件</button></div>
   </div>
 </div>
 
@@ -99,11 +163,27 @@ function flash(id, ok, text) {
   el.textContent = text;
 }
 
+function fillVision(base, model) {
+  $('vBaseUrl').value = base;
+  if (model) $('vModel').value = model;
+}
+
 async function load() {
   try {
     const r = await fetch('/api/admin/settings');
     if (!r.ok) throw new Error('读取失败 ' + r.status);
     const { view, presets } = await r.json();
+    // Vision / 搜索
+    $('vBaseUrl').value = view.vision.baseUrl || '';
+    $('vModel').value = view.vision.model || '';
+    $('vTimeout').value = view.vision.timeoutMs || 30000;
+    $('vKeyHint').innerHTML = view.vision.hasApiKey
+      ? '已保存 Key：<code>' + (view.vision.apiKeyMasked || '****') + '</code>（留空保留；输入新值覆盖）'
+      : '未配置 Vision API Key';
+    $('sProvider').value = view.search.provider || 'null';
+    $('sKeyHint').innerHTML = view.search.hasSerperKey
+      ? 'Serper Key：<code>' + view.search.serperKeyMasked + '</code>（留空保留；输入新值覆盖） · 状态：' + (view.search.available ? '可用' : '未激活')
+      : '未配置 Serper Key（搜索不可用）';
     $('baseUrl').value = view.ai.baseUrl || '';
     $('model').value = view.ai.model || '';
     $('format').value = view.ai.format || 'openai';
@@ -171,6 +251,100 @@ async function saveBudget() {
   load();
 }
 
+async function saveVision() {
+  const body = { vision: {
+    base_url: $('vBaseUrl').value.trim(),
+    model: $('vModel').value.trim(),
+    timeout_ms: Number($('vTimeout').value) || undefined,
+  }};
+  if ($('vApiKey').value.trim()) body.vision.api_key = $('vApiKey').value.trim();
+  const r = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json();
+  flash('vMsg', r.ok, r.ok ? 'Vision 配置已保存 ✓' : data.error || '保存失败');
+  $('vApiKey').value = '';
+  load();
+}
+
+async function testVision() {
+  flash('vMsg', true, '测试中…（GET {base}/models，8s 超时）');
+  const r = await fetch('/api/admin/vision/test', { method: 'POST' });
+  const data = await r.json();
+  flash('vMsg', data.ok, data.ok ? '连接成功 ✓（HTTP ' + data.status + '）' : '连接失败：' + (data.reason || 'HTTP ' + data.status));
+}
+
+async function saveSearch() {
+  const body = { search: { provider: $('sProvider').value }};
+  if ($('sSerperKey').value.trim()) body.search.serper_api_key = $('sSerperKey').value.trim();
+  const r = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json();
+  flash('sMsg', r.ok, r.ok ? '搜索配置已保存 ✓' : data.error || '保存失败');
+  $('sSerperKey').value = '';
+  load();
+}
+
+async function testSearch() {
+  flash('sMsg', true, '测试中…（真实查询 "roblox"）');
+  const r = await fetch('/api/admin/search/test', { method: 'POST' });
+  const data = await r.json();
+  flash('sMsg', data.ok, data.ok ? '搜索可用 ✓（' + data.provider + '，' + data.resultCount + ' 条结果）' : '不可用：' + data.reason + '（' + data.provider + '）');
+}
+
+async function loadStatus() {
+  try {
+    const r = await fetch('/api/admin/status');
+    const st = await r.json();
+    const chips = $('statusChips');
+    chips.innerHTML = '';
+    const mb = st.db.sizeBytes ? Math.round(st.db.sizeBytes / 1024) + ' KB' : '—';
+    const items = [
+      '运行：' + Math.floor(st.uptimeSec / 60) + ' 分 ' + (st.uptimeSec % 60) + ' 秒',
+      'Node ' + st.node,
+      '内存 ' + st.memoryMb + ' MB',
+      'DB ' + mb,
+      '玩家 ' + st.db.players,
+      '房间 ' + st.db.rooms,
+      '运行中实例 ' + st.db.runningInstances,
+      '事件 ' + st.db.events,
+      '技能 ' + st.db.skills,
+      '世界模拟：' + (st.worldScheduler.paused ? '已暂停' : '运行中（每 ' + Math.round(st.worldScheduler.intervalMs / 1000) + 's）'),
+      'AI Key：' + (st.config.ai.hasApiKey ? '已配置' : '未配置'),
+      'Vision：' + (st.config.vision.hasApiKey ? '已配置' : '未配置'),
+      '搜索：' + (st.config.search.available ? '可用' : '不可用'),
+    ];
+    for (const t of items) {
+      const c = document.createElement('span');
+      c.className = 'chip';
+      c.textContent = t;
+      chips.appendChild(c);
+    }
+  } catch (e) { flash('stMsg', false, e.message); }
+}
+
+async function toggleWorld(pause) {
+  const r = await fetch('/api/admin/world/' + (pause ? 'pause' : 'resume'), { method: 'POST' });
+  const data = await r.json();
+  flash('stMsg', r.ok, r.ok ? (pause ? '世界模拟已暂停 ⏸' : '世界模拟已恢复 ▶') : data.error || '失败');
+  loadStatus();
+}
+
+async function reimportPresets() {
+  flash('stMsg', true, '重导入中…');
+  const r = await fetch('/api/admin/presets/reimport', { method: 'POST' });
+  const data = await r.json();
+  const errs = (data.results || []).filter((x) => x.error);
+  flash('stMsg', r.ok && errs.length === 0, errs.length ? '部分失败：' + errs.map((e) => e.key + ' ' + e.error).join('；') : '预设重导入完成 ✓（' + (data.results || []).map((x) => x.key).join(', ') + '）');
+}
+
+async function loadEvents() {
+  try {
+    const r = await fetch('/api/admin/events?limit=20');
+    const { events } = await r.json();
+    $('events').innerHTML = (events || []).length
+      ? events.map((e) => '<div><code>' + (e.created_at || '') + '</code> [' + e.type + '] ' + (e.actor || '') + ' ' + String(e.data || '').slice(0, 120) + '</div>').join('')
+      : '（暂无事件）';
+  } catch (e) { $('events').textContent = '读取失败：' + e.message; }
+}
+
 async function testConn() {
   flash('aiMsg', true, '测试中…（GET {base}/models，8s 超时）');
   const r = await fetch('/api/admin/ai/test', { method: 'POST' });
@@ -178,7 +352,7 @@ async function testConn() {
   flash('aiMsg', data.ok, data.ok ? '连接成功 ✓（HTTP ' + data.status + '）' : '连接失败：' + (data.reason || 'HTTP ' + data.status));
 }
 
-load();
+load(); loadStatus(); loadEvents();
 </script>
 </body>
 </html>

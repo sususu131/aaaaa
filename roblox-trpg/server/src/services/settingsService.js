@@ -15,6 +15,13 @@ const SETTING_KEYS = [
   'ai.timeout_ms',
   'ai.stream',
   'ai.context_budget',
+  // 阶段26：Vision（多模态图像分析）与 Web 搜索
+  'vision.base_url',
+  'vision.api_key',
+  'vision.model',
+  'vision.timeout_ms',
+  'search.provider',
+  'search.serper_api_key',
 ];
 
 function isValidKey(key) {
@@ -69,19 +76,37 @@ function aiRuntimeConfig() {
 /** Admin 展示视图（密钥打码）。 */
 function adminView() {
   const cfg = aiRuntimeConfig();
-  const masked = cfg.apiKey ? `${cfg.apiKey.slice(0, 6)}…${cfg.apiKey.slice(-4)}` : '';
+  const mask = (k) => (k ? `${String(k).slice(0, 6)}…${String(k).slice(-4)}` : '');
   const dbKeys = Object.fromEntries(
     getDb().prepare('SELECT key FROM system_settings').all().map((r) => [r.key, true])
   );
+  // 阶段26：Vision 配置（DB > env）
+  const { getVisionRuntimeConfig } = require('./vision/visionProvider');
+  const vcfg = getVisionRuntimeConfig();
+  const searchProvider = getSetting('search.provider', process.env.SEARCH_PROVIDER || 'null');
+  const serperKey = getSetting('search.serper_api_key', process.env.SERPER_API_KEY || '');
   return {
     ai: {
       baseUrl: cfg.baseUrl,
       model: cfg.model,
       format: cfg.format,
       timeoutMs: cfg.timeoutMs,
-      apiKeyMasked: masked,
+      apiKeyMasked: mask(cfg.apiKey),
       hasApiKey: Boolean(cfg.apiKey),
       stream: getSetting('ai.stream', process.env.AI_STREAM || 'on'),
+    },
+    vision: {
+      baseUrl: vcfg.baseUrl,
+      model: vcfg.model,
+      timeoutMs: vcfg.timeoutMs,
+      apiKeyMasked: mask(vcfg.apiKey),
+      hasApiKey: Boolean(vcfg.apiKey),
+    },
+    search: {
+      provider: searchProvider,
+      serperKeyMasked: mask(serperKey),
+      hasSerperKey: Boolean(serperKey),
+      available: searchProvider === 'serper' && Boolean(serperKey),
     },
     context: {
       budget: Number(

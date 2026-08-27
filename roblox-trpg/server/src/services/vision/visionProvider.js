@@ -16,13 +16,20 @@ class VisionError extends Error {
 
 /** 调用时读取 Vision 专属环境变量（与 AI 配置互不影响）。 */
 function getVisionRuntimeConfig() {
-  return {
-    baseUrl: (process.env.VISION_BASE_URL || '').replace(/\/$/, ''),
-    apiKey: process.env.VISION_API_KEY || '',
-    model: process.env.VISION_MODEL || 'deepseek-v4-flash-vision-exp',
-    timeoutMs: Number(process.env.VISION_TIMEOUT_MS || Math.max(AI_TIMEOUT_MS, 30000)),
-    providerName: 'deepseek_vision',
-  };
+  // 阶段26：DB 设置（Admin Web UI）> 环境变量 > 默认值
+  let baseUrl = process.env.VISION_BASE_URL || '';
+  let apiKey = process.env.VISION_API_KEY || '';
+  let model = process.env.VISION_MODEL || 'deepseek-v4-flash-vision-exp';
+  let timeoutMs = Number(process.env.VISION_TIMEOUT_MS || Math.max(AI_TIMEOUT_MS, 30000));
+  try {
+    const settings = require('../settingsService');
+    baseUrl = settings.getSetting('vision.base_url', baseUrl) || baseUrl;
+    apiKey = settings.getSetting('vision.api_key', apiKey) || apiKey;
+    model = settings.getSetting('vision.model', model) || model;
+    timeoutMs = Number(settings.getSetting('vision.timeout_ms', timeoutMs) || timeoutMs);
+  } catch { /* 设置层不可用 → 纯 env */
+  }
+  return { baseUrl: String(baseUrl).replace(/\/$/, ''), apiKey, model, timeoutMs, providerName: 'deepseek_vision' };
 }
 
 /** Vision HTTP 状态码 → 错误分类（覆盖 400/401/402/403/408/429/5xx）。 */

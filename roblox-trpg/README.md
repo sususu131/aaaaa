@@ -1038,3 +1038,37 @@ Synergy 预留（候选保存、逻辑未新增、Loveshot 不触发）/ 边界�
 - 新增阶段25（56 项：Admin UI/设置优先级与白名单/连接测试、政府与五杀手 Lore、威胁互动与
   Flashlight×Pursuer 特殊效果、全技能化、商店修复）
 - 全套 **1625 项**通过
+
+---
+
+# 阶段26：Admin Web UI 扩展（Vision 配置 UI + 服务器管理）
+
+## Vision API 配置 UI（此前只能改环境变量）
+
+- **Vision 卡片**：Base URL / API Key / 模型 / 超时（DeepSeek、OpenAI 兼容一键填入）+ 测试连接
+  （GET `{base}/models`）；`getVisionRuntimeConfig` 读取顺序 DB 设置 > env
+- 设置键：`vision.base_url / vision.api_key / vision.model / vision.timeout_ms`
+
+## Web 搜索配置 UI
+
+- **搜索卡片**：Provider（null/serper）+ Serper API Key + 测试搜索（真实查询 "roblox"）；
+  `getSearchProvider` 调用时读取 DB 设置（配置即时生效，无需重启）；设置键 `search.provider /
+  search.serper_api_key`；null provider 明确 SEARCH_UNAVAILABLE，不编造结果
+
+## 服务器管理卡片
+
+- **GET /api/admin/status**：uptime / Node 版本 / 内存 / DB 大小 / 玩家·房间·副本·事件·技能计数 /
+  世界调度器状态 / 配置概览（AI·Vision·搜索 Key 是否已配置）
+- **世界模拟开关**：`POST /api/admin/world/pause|resume`（对应 worldSim 调度器）
+- **预设重导入**：`POST /api/admin/presets/reimport`（幂等；5 个官方预设）
+- **最近游戏事件**：`GET /api/admin/events?limit=`（Live 日志面板，自动展示最近 20 条）
+
+## 修复
+
+- `visionProvider`/`SearchProvider` 的设置层 require 路径深度错误（`../../` → `../`，此前静默回落 env）
+
+## 测试
+
+- 新增阶段26（34 项：Vision/搜索 DB>env 与回落、REST 保存与测试、status/events、世界开关、
+  预设重导入幂等、UI 卡片、白名单与打码）
+- 全套 **1659 项**通过

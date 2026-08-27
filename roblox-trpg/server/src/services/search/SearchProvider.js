@@ -21,12 +21,17 @@ class NullSearchProvider extends SearchProvider {
   }
 }
 
-/** Serper.dev（Google 搜索 API）适配。 */
+/** Serper.dev（Google 搜索 API）适配。Key 调用时读取（DB 设置 > env，Admin UI 可改）。 */
 class SerperSearchProvider extends SearchProvider {
+  constructor(apiKey = null) {
+    super();
+    this.apiKey = apiKey;
+  }
   async search(query) {
+    const key = this.apiKey || resolveSerperKey();
     const res = await fetch('https://google.serper.dev/search', {
       method: 'POST',
-      headers: { 'X-API-KEY': SERPER_API_KEY, 'Content-Type': 'application/json' },
+      headers: { 'X-API-KEY': key, 'Content-Type': 'application/json' },
       body: JSON.stringify({ q: query, gl: 'cn', hl: 'zh-cn', num: 5 }),
     });
     if (!res.ok) {
@@ -44,9 +49,31 @@ class SerperSearchProvider extends SearchProvider {
   }
 }
 
+/** Serper Key 解析：DB 设置（Admin UI）> env。 */
+function resolveSerperKey() {
+  try {
+    const settings = require('../settingsService');
+    return settings.getSetting('search.serper_api_key', SERPER_API_KEY) || SERPER_API_KEY;
+  } catch {
+    return SERPER_API_KEY;
+  }
+}
+
+/** 搜索 Provider 解析：DB 设置 > env；serper 需要可用 Key。 */
+function resolveSearchProviderName() {
+  try {
+    const settings = require('../settingsService');
+    return String(settings.getSetting('search.provider', SEARCH_PROVIDER) || SEARCH_PROVIDER);
+  } catch {
+    return SEARCH_PROVIDER;
+  }
+}
+
 function getSearchProvider() {
-  if (SEARCH_PROVIDER === 'serper' && SERPER_API_KEY) return new SerperSearchProvider();
+  const provider = resolveSearchProviderName();
+  const key = resolveSerperKey();
+  if (provider === 'serper' && key) return new SerperSearchProvider(key);
   return new NullSearchProvider();
 }
 
-module.exports = { SearchProvider, NullSearchProvider, SerperSearchProvider, getSearchProvider };
+module.exports = { SearchProvider, NullSearchProvider, SerperSearchProvider, getSearchProvider, resolveSerperKey, resolveSearchProviderName };
