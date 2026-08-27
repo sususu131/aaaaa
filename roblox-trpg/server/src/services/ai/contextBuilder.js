@@ -471,6 +471,38 @@ function worldLoreContextContent(room) {
   }
 }
 
+/**
+ * 阶段23：SYNERGY_LORE_CONTEXT —— Civilian Ability Relationship System。
+ * 让 GM 理解为什么某些能力组合会形成特殊状态：Synergy 是"对自身经验的极致结合"，
+ * 改变既有 Ability 的使用方式——不是新职业/超能力/等级提升/技能树，不发放新能力。
+ */
+function synergyLoreContextContent(room) {
+  try {
+    const db = getDb();
+    const dodSynergy = require('../presets/dodSynergy');
+    const parts = [];
+    for (const pl of room.players || []) {
+      const row = db.prepare('SELECT id FROM players WHERE socket_id = ?').get(pl.socketId);
+      if (!row) continue;
+      for (const s of dodSynergy.synergyView(row.id)) {
+        parts.push(
+          `${pl.name}｜${s.name}（${s.sourceAbilities.join('+')} → 改变 ${s.changedAbility} 的使用方式）：${s.loreExplanation}` +
+            `\n  GM 描述示例："${s.aiDescription}"`
+        );
+      }
+    }
+    const rules =
+      'Synergy 规则：Synergy 是 Civilian 对自身经验的极致结合，产生特殊使用方式；不是新职业、不是超能力、不是等级提升、不是技能树（无解锁链）。' +
+      '禁止"你升级成X/你获得了X"句式——按经验结合描述（如"你的医疗知识和工程经验结合，让你的设备拥有了新的用途。"）。' +
+      '只能使用数据库已有 Synergy（CarePad/Loveshot），不得创造新 Synergy，不得把组合之外的 Ability 说成 Synergy。';
+    return parts.length
+      ? `${rules}\n${parts.join('\n')}`
+      : `${rules}\n（当前房间没有已形成的 Synergy。）`;
+  } catch (err) {
+    return `（Synergy Lore 上下文不可用：${err.message}）`;
+  }
+}
+
 /** 构建完整 Context。返回 { sections, totalTokens }。 */
 function buildContext(room) {
   const exp = room.currentExperience || null;
@@ -525,6 +557,7 @@ function buildContext(room) {
     { key: 'civilian_profile', label: 'CIVILIAN_PROFILE_CONTEXT', content: civilianProfileContextContent(room) },
     { key: 'civilian_identity', label: 'CIVILIAN_IDENTITY_CONTEXT', content: civilianIdentityContextContent(room) },
     { key: 'world_lore', label: 'WORLD_LORE_CONTEXT', content: worldLoreContextContent(room) },
+    { key: 'synergy_lore', label: 'SYNERGY_LORE_CONTEXT', content: synergyLoreContextContent(room) },
     { key: 'avatar', label: 'Avatar / Initial State', content: avatarContext(room) },
     { key: 'roblox', label: 'Roblox Source Data', content: robloxBlock },
   ];

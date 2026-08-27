@@ -307,6 +307,46 @@
     ],
     "lore_source": "CANON"
   },
+  "synergy_lore": {
+    "table": "ability_synergies",
+    "definition": "Civilian拥有多个高度相关能力时，这些能力会产生特殊使用方式；Synergy不是新职业/超能力/等级提升，代表一个Civilian对自身经验的极致结合。",
+    "rule": "只使用数据库已有组合，不创造新Synergy；不是技能树；GM描述按经验结合，禁止'你升级成X'句式。",
+    "entries": [
+      {
+        "id": "carepad",
+        "name": "CarePad",
+        "source_abilities": [
+          "BonusPad",
+          "Caretaker"
+        ],
+        "changed_ability": "BonusPad",
+        "lore_explanation": "一个同时拥有工程经验和医疗经验的Civilian。他不只是建造辅助设施，而是将设施改造成帮助幸存者恢复的工具。",
+        "trait_requirements": [
+          "Medical Knowledge",
+          "Engineering Experience"
+        ],
+        "ai_description": "你的医疗知识和工程经验结合，让你的设备拥有了新的用途。",
+        "lore_source": "CANON"
+      },
+      {
+        "id": "loveshot",
+        "name": "Loveshot",
+        "source_abilities": [
+          "Revolver",
+          "Caretaker"
+        ],
+        "changed_ability": "Revolver",
+        "lore_explanation": "一个同时拥有枪械经验和医疗经验的Civilian。他的攻击方式不再只是伤害，而是结合保护和救援理念。",
+        "trait_requirements": [
+          "Medical Knowledge",
+          "Firearms Training"
+        ],
+        "ai_description": "你的医疗知识和枪械经验结合，让你的攻击方式带上了保护和救援的意义。",
+        "lore_source": "CANON"
+      }
+    ],
+    "lore_source": "CANON"
+  },
   "civilian": {
     "definition": "Robloxia 中的普通居民；没有固定身份，不是角色模板/英雄/特殊人物，代表一类居民。",
     "backgrounds": [

@@ -9,6 +9,30 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '021_stage23_ability_synergies',
+    up(db) {
+      // ── 阶段23：Civilian Ability Relationship System（Synergy Lore）──
+      // 纪律：Synergy = 对自身经验的极致结合（Lore 层）；不是新职业/超能力/等级提升，
+      // 不是技能树，无任何数值字段；只登记官方组合，AI 不得创造新 Synergy。
+      db.exec(`CREATE TABLE IF NOT EXISTS ability_synergies (
+        id                    TEXT PRIMARY KEY,             -- 语义 id（carepad）
+        name                  TEXT NOT NULL UNIQUE,          -- CarePad
+        source_abilities_json TEXT NOT NULL,                 -- ["BonusPad","Caretaker"]
+        changed_ability       TEXT NOT NULL,                 -- BonusPad（被改变用法的能力）
+        lore_explanation      TEXT NOT NULL,                 -- 为什么组合会形成特殊状态
+        trait_requirements_json TEXT NOT NULL DEFAULT '[]',  -- ["Medical Knowledge","Engineering Experience"]
+        lore_source           TEXT NOT NULL DEFAULT 'CANON',
+        source                TEXT NOT NULL DEFAULT 'DIE_OF_DEATH',
+        created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      // 每玩家已形成的 Synergy（Lore 状态：仅记录"经验结合"的事实，不发技能、不解锁链）
+      const civCols = db.prepare('PRAGMA table_info(civilian_instance)').all().map((c) => c.name);
+      if (!civCols.includes('synergies')) {
+        db.exec("ALTER TABLE civilian_instance ADD COLUMN synergies TEXT NOT NULL DEFAULT '[]'");
+      }
+    },
+  },
+  {
     name: '020_stage22_dod_world_lore',
     up(db) {
       // ── 阶段22：Die of Death World Lore Foundation（只实现世界背景数据库）──

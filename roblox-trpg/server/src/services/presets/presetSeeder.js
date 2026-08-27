@@ -297,6 +297,10 @@ function importPreset(io, preset) {
     try {
       require('./dodWorldLore').ensureWorldProfileSeeded();
     } catch { /* 播种失败不阻塞导入 */ }
+    // 阶段23：官方 Synergy 目录随导入播种（幂等；Lore 级组合，非技能系统）
+    try {
+      require('./dodSynergy').ensureSynergySeeded();
+    } catch { /* 播种失败不阻塞导入 */ }
   }
   const npcs = ensureNpcs(preset, dungeon.id);
   const quest = ensureQuest(preset, dungeon.id);

@@ -246,7 +246,11 @@ function generateCivilianLore(io, playerId, { rng = null, background = null } = 
   });
 
   const synergy = dodCivilian.checkSynergy(io, playerId);
-  return { created: true, civilian: dodCivilian.getCivilian(playerId), grants, synergy };
+  // 阶段23：Background → Traits → Abilities → 检查 Synergy（Lore 级：
+  // 能力组合形成特殊使用方式，改变既有 Ability 的用途；不发新技能、不是升级）
+  const synergySvc = require('./dodSynergy');
+  const synergies = synergySvc.checkAndSaveSynergies(playerId);
+  return { created: true, civilian: dodCivilian.getCivilian(playerId), grants, synergy, synergies };
 }
 
 /**
@@ -316,6 +320,8 @@ function loreView(playerId, experienceName = null) {
       };
     }),
     synergyState: civ.synergy_state,
+    // 阶段23：已形成的 Synergy（Lore：经验的极致结合；改变既有 Ability 的使用方式）
+    synergies: require('./dodSynergy').synergyView(playerId),
     source: civ.source,
     world: WORLD_SETTING,
     abilityExplanationRule: abilityLore.ABILITY_EXPLANATION_RULE,

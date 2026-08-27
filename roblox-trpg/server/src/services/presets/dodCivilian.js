@@ -284,6 +284,8 @@ function civilianView(playerId, experienceName = null) {
     traits: parseJson(civ.traits, []),
     abilities,
     synergyState: civ.synergy_state,
+    // 阶段23：已形成的 Synergy（Lore 级：经验的极致结合，改变既有 Ability 的使用方式）
+    synergies: require('./dodSynergy').synergyView(playerId),
     source: civ.source,
     experience: experienceName || null,
     balanceMultiplier: mult,

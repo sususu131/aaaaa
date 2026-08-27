@@ -102,6 +102,23 @@ router.get('/api/dod/abilities/lore', (req, res) => {
       abilities: dodAbilityLore.listAbilityLore(),
     });
   } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'DOD_ERROR' });  }
+});
+
+// ── 阶段23：Civilian Ability Relationship System（Synergy Lore；只读，非技能组合/装备/升级系统）──
+
+/** GET /api/dod/synergies —— 官方 Synergy 目录（组合来源/改变的能力/Lore 解释/描述示例）。 */
+router.get('/api/dod/synergies', (req, res) => {
+  const sess = authPlayer(req, res);
+  if (!sess) return;
+  try {
+    const dodSynergy = require('../services/presets/dodSynergy');
+    res.json({
+      rule: 'Synergy 是 Civilian 对自身经验的极致结合（改变既有 Ability 的使用方式）：不是新职业/超能力/等级提升/技能树；只使用数据库已有组合，不创造新 Synergy。',
+      synergies: dodSynergy.listSynergies(),
+      mine: dodSynergy.synergyView(sess.playerRowId),
+    });
+  } catch (err) {
     res.status(err.status || 500).json({ error: err.message, code: err.code || 'DOD_ERROR' });
   }
 });

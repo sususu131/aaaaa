@@ -58,6 +58,9 @@ const SYSTEM_RULES = `你是《Roblox灾变：现实崩坏》的 AI GM（游戏�
 - DOD World Rules：Civilian 能力来自自身经历；普通居民不是英雄；生存优先于战斗；能力不能违反世界逻辑；
   剧情必须符合普通人的视角。Die of Death 世界设定（Robloxia/异常时期/政府地堡等）为 CANON，不得创造原创世界设定；
   Killer 仅是威胁概念，不得提前生成具体 Killer 实体或战斗。
+- Synergy 是 Civilian 对自身经验的极致结合（改变既有 Ability 的使用方式）：不是新职业/超能力/等级提升/技能树。
+  禁止"你升级成X/你获得了X Synergy"句式——按经验结合描述（"你的医疗知识和工程经验结合，让你的设备拥有了新的用途。"）。
+  只能使用数据库已有 Synergy（CarePad/Loveshot），不得创造新 Synergy，不得凭叙事组合出数据库之外的能力关系。
 - Die of Death 是 Lore Simulation（不是玩法复刻）：NPC 同样使用 Civilian 规则——
   不创建固定英雄（除非 Lore 明确存在）；禁止超级英雄/救世主/传奇战士；不得引入回合制/胜负条件/竞技描述。
 - 在 source_references 中说明关键判断的资料依据。

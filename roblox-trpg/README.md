@@ -957,3 +957,35 @@ Synergy 预留（候选保存、逻辑未新增、Loveshot 不触发）/ 边界�
 - 新增阶段22（68 项：World 加载/官方 Lore 内容/Government 预留/World Rules/Context/
   Civilian 关联/不原创设定/不提前生成 Killer/关系作用域与 AI 工具/停止副本/websearch 全覆盖）
 - 全套 **1447 项**通过
+
+---
+
+# 阶段23：Civilian Ability Relationship System（Synergy Lore System）
+
+## Synergy Lore（不是技能组合/装备/升级系统）
+
+- **定义**：Civilian 拥有多个高度相关能力时，这些能力会产生特殊使用方式——
+  Synergy 是"对自身经验的极致结合"，不是新职业/超能力/等级提升，更不是技能树
+- **`ability_synergies` 表**（迁移 021）：id / name / source_abilities / changed_ability /
+  lore_explanation / trait_requirements（无任何数值/等级/解锁字段）；
+  `civilian_instance.synergies` 保存每玩家已形成的 Synergy（Lore 状态）
+- **官方 Canon 目录**（只此 2 条，不创造新 Synergy）：
+  - **CarePad** = BonusPad + Caretaker → 改变 **BonusPad**：同时拥有工程经验与医疗经验的
+    Civilian，不只建造辅助设施，而是将设施改造成帮助幸存者恢复的工具
+  - **Loveshot** = Revolver + Caretaker → 改变 **Revolver**：同时拥有枪械经验与医疗经验的
+    Civilian，攻击方式不再只是伤害，而是结合保护和救援理念
+- **生成流**：Background → Traits → Abilities → **检查 Synergy**
+  （`generateCivilianLore` 内置第 4 步；`checkAndSaveSynergies` 幂等；组合 ≥2 项来源能力才可命中）
+- **AI 描述规则**：禁止"你升级成CarePad/你获得了X"——按经验结合描述：
+  "你的医疗知识和工程经验结合，让你的设备拥有了新的用途。"（每条 Synergy 附 GM 描述示例）
+- **`SYNERGY_LORE_CONTEXT`** 新分区：定义 + 规则 + 房间内每位已形成 Synergy 居民
+  （组合来源 → 改变的能力 + Lore 解释 + 描述示例）；未形成者不出现
+- **不发技能**：检测不写 player_skills、不发新能力——只"改变"既有 Ability 的使用方式
+- **REST**：`GET /api/dod/synergies`（官方目录 + mine）；`/api/dod/civilian` 视图携带 synergies
+- 预设 `dod.json` 新增 `synergy_lore` 块；导入自动播种（幂等，lore_source=CANON）
+
+## 测试
+
+- 新增阶段23（62 项：表结构与官方目录/组合检测/不会生成不存在组合（含脏数据加固）/
+  生成流第4步/Lore 解释/描述规则/SYNERGY_LORE_CONTEXT/REST/限制边界）
+- 全套 **1509 项**通过
