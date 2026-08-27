@@ -6,6 +6,7 @@
 const path = require('path');
 const fs = require('fs');
 const { DatabaseSync } = require('node:sqlite');
+const { runMigrations } = require('./migrations');
 
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'roblox_trpg.db');
@@ -23,6 +24,9 @@ function initDb() {
 
   const seed = fs.readFileSync(path.join(__dirname, 'seed.sql'), 'utf8');
   db.exec(seed);
+
+  // 迁移（阶段4+），幂等
+  runMigrations(db);
 
   return db;
 }

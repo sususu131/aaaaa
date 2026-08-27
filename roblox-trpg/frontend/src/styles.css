@@ -523,3 +523,20 @@ body {
   flex-direction: column;
   gap: 4px;
 }
+
+/* ── 阶段4：Dungeon Designer ── */
+.modal.wide { max-width: 860px; }
+.dd-section {
+  border: 1px solid #2c3242;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.dd-section h4 { font-size: 13px; color: #9aa3b8; margin-bottom: 6px; }
+.dd-section.canon { border-color: #2e5d3f; background: #16211b; }
+.dd-section.canon h4 { color: #7fd18b; }
+.dd-section.orig { border-color: #4a3f6e; background: #1b1826; }
+.dd-section.orig h4 { color: #c9b8ff; }
+.dd-section ul { margin-left: 18px; font-size: 13px; }
+.dd-item { padding: 4px 0; border-bottom: 1px dashed #2c3242; font-size: 13px; }
+.dd-item:last-child { border-bottom: none; }
+.dd-versions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12px; color: #9aa3b8; }

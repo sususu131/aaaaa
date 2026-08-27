@@ -28,4 +28,21 @@ export const api = {
     request('/api/roblox/experiences/resolve', { method: 'POST', body: JSON.stringify({ input }) }),
   searchExperiences: (query) =>
     request('/api/roblox/experiences/search', { method: 'POST', body: JSON.stringify({ query }) }),
+  // ── 阶段4：Dungeon Design Pipeline ──
+  designDungeon: (source, opts = {}) =>
+    request('/api/dungeons/design', { method: 'POST', body: JSON.stringify({ source, ...opts }) }),
+  getDungeon: (id) => request(`/api/dungeons/${encodeURIComponent(id)}`),
+  getVersions: (id) => request(`/api/dungeons/${encodeURIComponent(id)}/versions`),
+  getVersion: (id, version) => request(`/api/dungeons/${encodeURIComponent(id)}/versions/${version}`),
+  getVersionDiff: (id, from, to) => request(`/api/dungeons/${encodeURIComponent(id)}/diff?from=${from}&to=${to}`),
+  getDesignRun: (id) => request(`/api/dungeon-design-runs/${id}`),
+  submitReview: (versionId) =>
+    request(`/api/dungeon-versions/${versionId}/submit-review`, { method: 'POST', body: '{}' }),
+  reviewVersion: (versionId, status, reason) =>
+    request(`/api/dungeon-versions/${versionId}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ status, reason }),
+    }),
+  publishVersion: (versionId) =>
+    request(`/api/dungeon-versions/${versionId}/publish`, { method: 'POST', body: '{}' }),
 };

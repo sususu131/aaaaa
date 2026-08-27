@@ -29,7 +29,7 @@ module.exports = {
   ROBLOX_TTL_EXPERIENCE: 30 * 60 * 1000,   // 体验资料 30 分钟
   ROBLOX_TTL_USER: 6 * 60 * 60 * 1000,     // 用户资料 6 小时
   ROBLOX_TTL_THUMBNAIL: 12 * 60 * 60 * 1000, // 缩略图 12 小时
-  ROBLOX_TIMEOUT_MS: 8000,
+  ROBLOX_TIMEOUT_MS: Number(process.env.ROBLOX_TIMEOUT_MS || 8000),
 
   // 会话（临时身份）
   SESSION_TTL_DAYS: 30,

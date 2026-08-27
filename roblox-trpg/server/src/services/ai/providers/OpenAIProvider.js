@@ -52,7 +52,12 @@ class OpenAIProvider extends AiProvider {
       : [];
 
     session.messages.push(msg); // 保留原生 assistant 消息
-    return { content: msg.content || '', toolCalls, finish: toolCalls.length ? 'tool_calls' : 'stop' };
+    return {
+      content: msg.content || '',
+      toolCalls,
+      finish: toolCalls.length ? 'tool_calls' : 'stop',
+      usage: data.usage || null, // prompt_tokens / completion_tokens / total_tokens
+    };
   }
 
   appendToolResults(session, results) {

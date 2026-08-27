@@ -288,3 +288,65 @@ npm run test:stage3b   # 仅 Vision（本地 mock Vision/AI 双端点）
 玩家注入 / 未知标签 / 未知技能 / GOD / ADMIN / INFINITE / STR=999 伪造 /
 10+技能限额 / 重复初始化 / 培根头(0次Vision) / 401·429·503·超时错误 /
 AI↔Vision 配置隔离与互相独立故障 / Key 不泄露 / 属性限额 / 事务一致性。
+
+---
+
+# 阶段4：Roblox Dungeon Design Pipeline（副本设计流水线）
+
+Roblox Experience → Canonical Snapshot → **Dungeon Designer AI**（独立于 GM 的 Prompt）→
+Schema/Semantic/Rules/Canonical 四层验证 → DRAFT → REVIEW → APPROVED → **PUBLISHED（immutable）**。
+
+**复用（零重写）**：阶段2 Roblox Information Service（HTTP/缓存/体验解析）、
+阶段3 Provider 抽象与 structuredOutput、既有 dungeons/skills/dungeon_rewards 表、
+阶段3b Vision Provider（图标分析可选，输出仅为 CANONICAL_FACT_CANDIDATE）。
+
+## 核心纪律
+
+- **Canonical vs Original**：canonical_facts 只接受快照中真实字段（伪造 → `INVALID_CANONICAL_FACT`）；
+  场景/NPC/敌人/事件/Boss 全部盖 `TRPG_ORIGINAL`；奖励候选 `DUNGEON_GENERATED`
+- **AI 永不自动发布**；PUBLISHED 后修改 = 新 version（旧版本可复现）
+- **幂等**：同 source + snapshotHash + prompt_version + model 复用成功 Draft（`force` 可强制重生成）
+- **Snapshot/Prompt/Model/Token 全记录**：`dungeon_design_runs`（input_snapshot 含 Roblox 资料快照）
+- **声明式事件**：仅允许 MODIFY_WORLD_FLAG / SET_SCENE / SPAWN_ENCOUNTER / ADD_MEMORY（禁止代码执行）
+- **限额**：Scenes≤50 / Encounters≤100 / NPC≤50 / Enemies≤100 / Events≤200 / Rewards≤50 / 描述≤5000
+- **数值规则**：difficulty 1~10、party 1~3、enemy hp 1~1000 / damage 0~500；无限金币/无敌/权限类 → `OVERPOWERED_REWARD`
+- 错误码：`INVALID_SOURCE / ROBLOX_DATA_UNAVAILABLE / DUNGEON_DESIGN_AI_FAILED /
+  DUNGEON_VALIDATION_FAILED / INVALID_TRANSITION / IMMUTABLE_VERSION`（无 500 Unknown）
+
+## 新增文件
+
+```
+server/src/services/dungeon/   dungeonDesigner.js / dungeonValidation.js / dungeonPipeline.js
+server/src/routes/             dungeonRoutes.js
+server/test/                   stage4-pipeline.test.js（42 项）
+database/                      migrations.js（迁移框架）
+frontend/src/components/       DungeonDesigner.jsx
+```
+
+## 数据库迁移（database/migrations.js，幂等）
+
+- `dungeons` + `uid`（内部主键，不用 placeId；唯一索引）
+- 新表：`dungeon_versions`（版本 + 状态机 + immutable）、`dungeon_design_runs`
+  （snapshot/provider/model/prompt_version/token usage）、`dungeon_reviews`
+
+## 新增 API
+
+| 方法/路径 | 说明 |
+|---|---|
+| `POST /api/dungeons/design` | 生成设计（{source:{type,url/placeId/universeId}, force?, includeVisionIcon?}） |
+| `GET /api/dungeons/:id` / `.../versions` / `.../versions/:v` / `.../diff?from&to` | 查询与差异 |
+| `GET /api/dungeon-design-runs/:id` | 生成记录（snapshot/model/tokens） |
+| `POST /api/dungeon-versions/:id/submit-review` | DRAFT → REVIEW |
+| `POST /api/dungeon-versions/:id/review` | REVIEW → APPROVED/REJECTED（含原因） |
+| `POST /api/dungeon-versions/:id/publish` | 仅 APPROVED → PUBLISHED |
+
+## 使用
+
+房间内点击「副本设计」→ 粘贴 Roblox URL（如 `https://www.roblox.com/games/6516141723/DOORS`）→
+解析显示官方信息 → 生成副本设计 → 预览（Canonical 与 TRPG Original 分区展示）→
+提交审核 → 批准 → 发布；多版本时可查看版本差异。
+
+```
+npm run test:stage4    # 42 项（mock AI/Vision + 脚本化 Roblox stub，无需外网）
+npm test               # 129 项全套件
+```

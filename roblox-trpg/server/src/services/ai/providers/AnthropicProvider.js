@@ -45,7 +45,10 @@ class AnthropicProvider extends AiProvider {
 
     // 保留完整 assistant content（含 thinking 块，API 多轮需要）
     session.messages.push({ role: 'assistant', content: blocks });
-    return { content: text, toolCalls, finish: data.stop_reason === 'tool_use' || toolCalls.length ? 'tool_calls' : 'stop' };
+    const usage = data.usage
+      ? { prompt_tokens: data.usage.input_tokens, completion_tokens: data.usage.output_tokens, total_tokens: (data.usage.input_tokens || 0) + (data.usage.output_tokens || 0) }
+      : null;
+    return { content: text, toolCalls, finish: data.stop_reason === 'tool_use' || toolCalls.length ? 'tool_calls' : 'stop', usage };
   }
 
   appendToolResults(session, results) {

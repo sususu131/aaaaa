@@ -3,6 +3,7 @@ import PlayerList from './PlayerList.jsx';
 import ChatPanel from './ChatPanel.jsx';
 import ContextViewer from './ContextViewer.jsx';
 import DungeonPanel from './DungeonPanel.jsx';
+import DungeonDesigner from './DungeonDesigner.jsx';
 import RobloxBindPanel from './RobloxBindPanel.jsx';
 
 /**
@@ -54,6 +55,9 @@ export default function RoomScreen({
         <button className="btn small" onClick={() => onOpenModal(modal === 'dungeon' ? null : 'dungeon')}>
           副本
         </button>
+        <button className="btn small" onClick={() => onOpenModal(modal === 'designer' ? null : 'designer')}>
+          副本设计
+        </button>
         <button className="btn small" onClick={() => onOpenModal(modal === 'avatar' ? null : 'avatar')}>
           Roblox形象
         </button>
@@ -101,6 +105,7 @@ export default function RoomScreen({
       </div>
 
       {modal === 'context' && <ContextViewer onClose={() => onOpenModal(null)} />}
+      {modal === 'designer' && <DungeonDesigner onClose={() => onOpenModal(null)} />}
       {modal === 'dungeon' && (
         <DungeonPanel current={room.experience} currentDungeon={room.dungeon} onClose={() => onOpenModal(null)} />
       )}
