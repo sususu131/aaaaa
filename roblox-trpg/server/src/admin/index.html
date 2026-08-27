@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Roblox TRPG · 后端管理</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; background: #0f1216; color: #e6e9ee; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 20px; } h2 { font-size: 15px; margin: 28px 0 10px; color: #9fc3ff; }
+  .card { background: #171c23; border: 1px solid #262e39; border-radius: 10px; padding: 16px; margin-top: 8px; }
+  label { display: block; font-size: 12px; color: #9aa4b2; margin: 10px 0 4px; }
+  input, select { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #2c3644; background: #0f1216; color: #e6e9ee; font-size: 13px; }
+  .row { display: flex; gap: 10px; } .row > div { flex: 1; }
+  .btns { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  button { padding: 8px 14px; border-radius: 8px; border: 1px solid #2c3644; background: #202836; color: #e6e9ee; cursor: pointer; font-size: 13px; }
+  button.primary { background: #2f6fed; border-color: #2f6fed; }
+  button.preset { font-size: 12px; padding: 5px 10px; }
+  .msg { margin-top: 10px; font-size: 13px; padding: 8px 12px; border-radius: 8px; display: none; }
+  .msg.ok { display: block; background: #10331d; color: #7fe0a2; }
+  .msg.err { display: block; background: #3a1520; color: #ff9aa8; }
+  .hint { font-size: 12px; color: #77828f; margin-top: 6px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .chip { font-size: 11px; background: #10202f; color: #9fc3ff; border-radius: 999px; padding: 2px 10px; }
+  code { background:#10151c; padding: 2px 6px; border-radius: 6px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Roblox TRPG · 后端管理</h1>
+  <p class="hint">设置保存到数据库（system_settings），优先级：数据库设置 &gt; 环境变量 &gt; 默认值。留空保存即清除、回落到环境变量。</p>
+
+  <h2>AI API 一键配置</h2>
+  <div class="card">
+    <div class="chips" id="presetChips"></div>
+    <label>Base URL（OpenAI 兼容 /chat/completions）</label>
+    <input id="baseUrl" placeholder="https://api.openai.com/v1" />
+    <label>API Key</label>
+    <input id="apiKey" type="password" placeholder="sk-…（留空 = 保留已保存的 Key）" />
+    <div class="hint" id="keyHint"></div>
+    <div class="row">
+      <div>
+        <label>模型</label>
+        <input id="model" placeholder="gpt-4o-mini" />
+      </div>
+      <div>
+        <label>API 格式</label>
+        <select id="format">
+          <option value="openai">openai（OpenAI/DeepSeek 兼容）</option>
+          <option value="anthropic">anthropic</option>
+          <option value="responses">responses</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>超时（毫秒）</label>
+        <input id="timeout" type="number" min="3000" step="1000" />
+      </div>
+      <div>
+        <label>流式输出</label>
+        <select id="stream">
+          <option value="on">开启（SSE）</option>
+          <option value="off">关闭</option>
+        </select>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="primary" onclick="save()">保存配置</button>
+      <button onclick="testConn()">测试连接</button>
+    </div>
+    <div class="msg" id="aiMsg"></div>
+  </div>
+
+  <h2>Context 上限（tokens）</h2>
+  <div class="card">
+    <label>AI_CONTEXT_BUDGET —— 超过该比例触发历史压缩</label>
+    <input id="budget" type="number" min="2000" step="1000" />
+    <div class="hint" id="budgetHint"></div>
+    <div class="btns">
+      <button class="primary" onclick="saveBudget()">保存上限</button>
+    </div>
+    <div class="msg" id="ctxMsg"></div>
+  </div>
+
+  <h2>状态</h2>
+  <div class="card">
+    <div class="chips" id="statusChips"></div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+function flash(id, ok, text) {
+  const el = $(id);
+  el.className = 'msg ' + (ok ? 'ok' : 'err');
+  el.textContent = text;
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/admin/settings');
+    if (!r.ok) throw new Error('读取失败 ' + r.status);
+    const { view, presets } = await r.json();
+    $('baseUrl').value = view.ai.baseUrl || '';
+    $('model').value = view.ai.model || '';
+    $('format').value = view.ai.format || 'openai';
+    $('timeout').value = view.ai.timeoutMs || 60000;
+    $('stream').value = view.ai.stream || 'on';
+    $('keyHint').innerHTML = view.ai.hasApiKey
+      ? '已保存 Key：<code>' + (view.ai.apiKeyMasked || '****') + '</code>（留空保存保留；输入新值覆盖）'
+      : '未配置 API Key（使用环境变量或此处输入）';
+    $('budget').value = view.context.budget;
+    $('budgetHint').textContent = '当前生效：' + view.context.budget + ' tokens（env 默认 100000）';
+    const chips = $('presetChips');
+    chips.innerHTML = '';
+    for (const [name, p] of Object.entries(presets || {})) {
+      const b = document.createElement('button');
+      b.className = 'preset';
+      b.textContent = '一键填入：' + name;
+      b.onclick = () => {
+        $('baseUrl').value = p.baseUrl;
+        if (p.model) $('model').value = p.model;
+        if (p.format) $('format').value = p.format;
+      };
+      chips.appendChild(b);
+    }
+    const st = $('statusChips');
+    st.innerHTML = '';
+    const items = [
+      'Base URL：' + (view.ai.baseUrl || '（未配置）'),
+      '模型：' + view.ai.model,
+      '格式：' + view.ai.format,
+      'Key：' + (view.ai.hasApiKey ? '已配置' : '未配置'),
+      'Context 上限：' + view.context.budget,
+    ];
+    for (const t of items) {
+      const c = document.createElement('span');
+      c.className = 'chip';
+      c.textContent = t;
+      st.appendChild(c);
+    }
+  } catch (e) {
+    flash('aiMsg', false, e.message);
+  }
+}
+
+async function save() {
+  const body = { ai: {
+    base_url: $('baseUrl').value.trim(),
+    model: $('model').value.trim(),
+    api_format: $('format').value,
+    timeout_ms: Number($('timeout').value) || undefined,
+    stream: $('stream').value,
+  }};
+  if ($('apiKey').value.trim()) body.ai.api_key = $('apiKey').value.trim();
+  const r = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json();
+  flash('aiMsg', r.ok, r.ok ? '已保存 ✓（数据库设置即时生效）' : data.error || '保存失败');
+  $('apiKey').value = '';
+  load();
+}
+
+async function saveBudget() {
+  const body = { context: { budget: Number($('budget').value) || 100000 } };
+  const r = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await r.json();
+  flash('ctxMsg', r.ok, r.ok ? 'Context 上限已保存 ✓：' + $('budget').value + ' tokens' : data.error || '保存失败');
+  load();
+}
+
+async function testConn() {
+  flash('aiMsg', true, '测试中…（GET {base}/models，8s 超时）');
+  const r = await fetch('/api/admin/ai/test', { method: 'POST' });
+  const data = await r.json();
+  flash('aiMsg', data.ok, data.ok ? '连接成功 ✓（HTTP ' + data.status + '）' : '连接失败：' + (data.reason || 'HTTP ' + data.status));
+}
+
+load();
+</script>
+</body>
+</html>

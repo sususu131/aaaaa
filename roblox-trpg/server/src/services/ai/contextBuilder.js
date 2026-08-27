@@ -503,6 +503,70 @@ function synergyLoreContextContent(room) {
   }
 }
 
+/**
+ * 阶段25：THREAT_INTERACTION_CONTEXT —— 居民能力 × 杀手威胁 的官方对策。
+ * 房间内居民持有的 Ability 所对应的互动（如 Flashlight × Pursuer：隐身中现形并僵直）。
+ * GM 必须按此叙述特殊效果；不得发明数据库之外的互动。
+ */
+function threatInteractionContextContent(room) {
+  try {
+    const db = getDb();
+    const interactions = require('../presets/dodThreatInteractions');
+    const lines = [];
+    for (const pl of room.players || []) {
+      const row = db.prepare('SELECT id FROM players WHERE socket_id = ?').get(pl.socketId);
+      if (!row) continue;
+      const civ = db.prepare('SELECT abilities FROM civilian_instance WHERE player_id = ?').get(row.id);
+      if (!civ) continue;
+      let keys = [];
+      try {
+        keys = JSON.parse(civ.abilities || '[]');
+      } catch { keys = []; }
+      const brief = interactions.interactionBrief(keys);
+      if (brief.length) lines.push(`${pl.name} 持有：\n  ${brief.join('\n  ')}`);
+    }
+    const rules =
+      '威胁互动规则（官方 CANON）：当居民用对应能力应对杀手时，必须按数据库登记的特殊效果叙述——' +
+      '如强光（Flashlight）直照隐行中的 Pursuer：立即现形并僵直；水可让 Pursuer 放弃追猎；' +
+      '噪音会吸引并激怒 Harken；Artful 的召唤物不耐用、可被持续压力破解；远离机械以免被 Badware 夺控。' +
+      '不得发明数据库之外的互动效果。';
+    return lines.length ? `${rules}\n${lines.join('\n')}` : `${rules}\n（当前房间没有持有对策能力的居民。）`;
+  } catch (err) {
+    return `（威胁互动上下文不可用：${err.message}）`;
+  }
+}
+
+/**
+ * 阶段24：FATE_LORE_CONTEXT —— Civilian Fate Selection System（Deck of Death Lore）。
+ * 让 GM 理解：进入危险环境后出现的能力是"潜能被激发、经历成为优势"，不是魔法、不是系统发放。
+ */
+function fateLoreContextContent(room) {
+  try {
+    const db = getDb();
+    const dodFate = require('../presets/dodFate');
+    const fs = dodFate.getFateSystem();
+    const parts = [];
+    for (const pl of room.players || []) {
+      const row = db.prepare('SELECT id FROM players WHERE socket_id = ?').get(pl.socketId);
+      if (!row) continue;
+      const c = dodFate.fateView(row.id);
+      if (c) {
+        parts.push(`${pl.name}｜Fate：${c.optionName}（${(c.abilities || []).join('+')}）——${c.loreReason}`);
+      }
+    }
+    const lore =
+      `${fs.name}：${fs.description}\n` +
+      fs.concepts.map((c) => `- ${c}`).join('\n') +
+      `\n生成流：${fs.flow.join(' → ')}`;
+    return (
+      `${lore}\nAI 描述规则：${fs.aiRule}\n` +
+      (parts.length ? parts.join('\n') : '（当前房间没有已做出的 Fate 选择。）')
+    );
+  } catch (err) {
+    return `（Fate Lore 上下文不可用：${err.message}）`;
+  }
+}
+
 /** 构建完整 Context。返回 { sections, totalTokens }。 */
 function buildContext(room) {
   const exp = room.currentExperience || null;
@@ -558,6 +622,8 @@ function buildContext(room) {
     { key: 'civilian_identity', label: 'CIVILIAN_IDENTITY_CONTEXT', content: civilianIdentityContextContent(room) },
     { key: 'world_lore', label: 'WORLD_LORE_CONTEXT', content: worldLoreContextContent(room) },
     { key: 'synergy_lore', label: 'SYNERGY_LORE_CONTEXT', content: synergyLoreContextContent(room) },
+    { key: 'fate_lore', label: 'FATE_LORE_CONTEXT', content: fateLoreContextContent(room) },
+    { key: 'threat_interactions', label: 'THREAT_INTERACTION_CONTEXT', content: threatInteractionContextContent(room) },
     { key: 'avatar', label: 'Avatar / Initial State', content: avatarContext(room) },
     { key: 'roblox', label: 'Roblox Source Data', content: robloxBlock },
   ];

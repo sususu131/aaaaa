@@ -16,9 +16,14 @@ const {
   RECENT_EVENTS_KEEP,
 } = require('../../config');
 
-/** 调用时读取预算（便于测试覆盖）。 */
+/** 调用时读取预算（便于测试覆盖）。阶段25：DB 设置（Admin UI）> env > 默认。 */
 function budget() {
-  return Number(process.env.AI_CONTEXT_BUDGET || AI_CONTEXT_BUDGET);
+  try {
+    const settings = require('../settingsService');
+    return Number(settings.getSetting('ai.context_budget', process.env.AI_CONTEXT_BUDGET || AI_CONTEXT_BUDGET));
+  } catch {
+    return Number(process.env.AI_CONTEXT_BUDGET || AI_CONTEXT_BUDGET);
+  }
 }
 
 /** 规则式兜底摘要（AI 不可用时）：保留系统事件与 GM 叙事，截断普通聊天。 */
@@ -87,4 +92,4 @@ async function maybeCompress(room, io, summarizeFn) {
   return null;
 }
 
-module.exports = { maybeCompress, ruleBasedSummary };
+module.exports = { maybeCompress, ruleBasedSummary, budget };

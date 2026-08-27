@@ -123,6 +123,69 @@ router.get('/api/dod/synergies', (req, res) => {
   }
 });
 
+// ── 阶段24：Civilian Fate Selection System（Deck of Death Lore；非卡牌玩法、非游戏 UI 复刻）──
+
+/** GET /api/dod/fate —— Deck of Death Lore + 我的 Fate 选择。 */
+router.get('/api/dod/fate', (req, res) => {
+  const sess = authPlayer(req, res);
+  if (!sess) return;
+  try {
+    const dodFate = require('../services/presets/dodFate');
+    res.json({
+      note: 'Lore 层模拟：不是复刻游戏 UI，不是卡牌玩法。能力不是魔法——潜能被激发、经历成为优势。',
+      fateSystem: dodFate.getFateSystem(),
+      mine: dodFate.fateView(sess.playerRowId),
+    });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'DOD_ERROR' });
+  }
+});
+
+/** GET /api/dod/fate/offer —— 生成 3 个 Fate Options（按 Background/Traits/Personality 加权；服务器随机）。 */
+router.get('/api/dod/fate/offer', (req, res) => {
+  const sess = authPlayer(req, res);
+  if (!sess) return;
+  try {
+    const dodFate = require('../services/presets/dodFate');
+    res.json(dodFate.offerFate(sess.playerRowId, { background: req.query.background || null }));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'DOD_ERROR' });
+  }
+});
+
+/** POST /api/dod/fate/select { optionIndex } —— 选择 Fate Option → Final Abilities（入 character_skills）。 */
+router.post('/api/dod/fate/select', (req, res) => {
+  const sess = authPlayer(req, res);
+  if (!sess) return;
+  try {
+    const dodFate = require('../services/presets/dodFate');
+    const { io } = require('../index.js');
+    res.json(dodFate.selectFate(io, sess.playerRowId, req.body.optionIndex, { rng: null }));
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'DOD_ERROR' });
+  }
+});
+
+// ── 阶段25：威胁互动（居民能力 × 杀手威胁 官方对策；只读 Lore 数据）──
+
+/** GET /api/dod/interactions —— 官方互动目录（可按 ability/threat 过滤；含 Flashlight×Pursuer 现形僵直）。 */
+router.get('/api/dod/interactions', (req, res) => {
+  const sess = authPlayer(req, res);
+  if (!sess) return;
+  try {
+    const interactions = require('../services/presets/dodThreatInteractions');
+    res.json({
+      note: '官方 CANON 对策（Lore 层）：特殊效果由 GM 按此叙述；不发明数据库之外的互动。',
+      interactions: interactions.findInteractions({
+        ability: req.query.ability || null,
+        threat: req.query.threat || null,
+      }),
+    });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code || 'DOD_ERROR' });
+  }
+});
+
 // ── 阶段20：Civilian Background & Personality Simulation（只读；非职业系统）──
 
 /** GET /api/dod/civilian/profile —— 我的 Civilian 档案（背景/特点/人格/经历/Ability 解释/背景推断）。 */

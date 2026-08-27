@@ -32,6 +32,7 @@ const io = new Server(server, {
 app.use(express.json({ limit: '2mb' }));
 app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 16 }));
 app.use('/api', apiRoutes);
+app.use(require('./routes/adminRoutes')); // 阶段25：/admin 管理页 + /api/admin/*
 app.use(visionRoutes); // /api/vision/avatar/analyze、/vision-test 等
 app.use(dungeonRoutes); // 阶段4：Dungeon Design Pipeline
 app.use(runtimeRoutes); // 阶段5：Dungeon Runtime

@@ -301,8 +301,10 @@ async function main() {
   assert.ok(fl.library_excerpt && /tour guides/.test(fl.library_excerpt) && /navigators/.test(fl.library_excerpt) && /organizers/.test(fl.library_excerpt));
   assert.ok(!/\d+(\.\d+)?\s*(s\b|HP|stud|Points)|damage|slowness|cooldown/i.test(fl.library_excerpt));
   ok('70. library_excerpt 保存官方 Library 文本（CANON；无任何战斗数值/机制数值）');
-  assert.ok(!dodCivilian.ABILITY_CATALOG.some((a) => a.key === 'Flashlight') && !db.prepare("SELECT 1 FROM skills WHERE name = 'Flashlight'").get());
-  ok('71. Flashlight 不入发放目录、不播种技能（Lore 项，非游戏技能系统）');
+  // 阶段25 更新（用户指令）：Flashlight 等所有 Ability 都算技能 → 经 Fate 池播种（dod_fate_ability 标记）
+  assert.ok(!dodCivilian.ABILITY_CATALOG.some((a) => a.key === 'Flashlight'));
+  assert.ok(db.prepare("SELECT 1 FROM skills WHERE name = 'Flashlight' AND json_extract(effect_data, '$.dod_fate_ability') = 1").get());
+  ok('71. Flashlight 不入旧目录（ABILITY_CATALOG），但已作为 Fate 技能播种（阶段25：所有都算技能）');
   const pFl = mkPlayerDb('向导居民', 'LORE9');
   mkCivilianDb(pFl.id, 'Artist', ['Outdoor Experience', 'Navigation'], ['Flashlight']);
   const ctxFl = contextBuilder.buildContext({ id: 'LORE9', players: [{ name: '向导居民', socketId: pFl.socket_id }], currentExperience: null, currentDungeon: null });
@@ -355,8 +357,9 @@ async function main() {
   ok('81. Cloak = 实验性政府科技 + 野生动物研究（科技来源解释，非魔法）');
   const loreOnly = ['Adrenaline', 'Banana Peel', 'Cloak', 'Taunt', 'Bugle'];
   assert.ok(!loreOnly.some((n) => dodCivilian.ABILITY_CATALOG.some((a) => a.key === n)));
-  assert.ok(!db.prepare("SELECT 1 FROM skills WHERE name IN ('Adrenaline','Banana Peel','Cloak','Taunt','Bugle')").get());
-  ok('82. 新增五项均为 Lore 项：不入 ABILITY_CATALOG、不播种技能（非游戏技能系统）');
+  // 阶段25 更新（用户指令）：所有 Ability 都算技能 → 五项均经 Fate 池播种（dod_fate_ability 标记）
+  assert.ok(loreOnly.every((n) => db.prepare("SELECT 1 FROM skills WHERE name = ? AND json_extract(effect_data, '$.dod_fate_ability') = 1").get(n)));
+  ok('82. 新增五项均不入 ABILITY_CATALOG，但都已作为 Fate 技能播种（阶段25：所有都算技能）');
   assert.strictEqual(dodLore.TRAIT_POOL.length, 9);
   assert.ok(['Adrenaline', 'Banana Peel', 'Cloak', 'Taunt', 'Bugle'].every((n) => dodLore.TRAIT_POOL.includes(dodAbilityLore.getAbilityLore(n).core_trait)));
   ok('83. Trait 池仍 9 项（未新增）；新增 Ability 的 core_trait 全部来自官方池');

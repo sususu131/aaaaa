@@ -989,3 +989,52 @@ Synergy 预留（候选保存、逻辑未新增、Loveshot 不触发）/ 边界�
 - 新增阶段23（62 项：表结构与官方目录/组合检测/不会生成不存在组合（含脏数据加固）/
   生成流第4步/Lore 解释/描述规则/SYNERGY_LORE_CONTEXT/REST/限制边界）
 - 全套 **1509 项**通过
+
+---
+
+# 阶段25：后端 Admin Web UI + Lore 补全（政府/杀手）+ 威胁互动 + 全技能化 + 传奇商店修复
+
+## 后端管理 Web UI（/admin）
+
+- **`GET /admin`**：纯 HTML 管理页（无构建步骤）：AI API 一键配置（Base URL/Key/模型/格式/超时/流式，
+  含 OpenAI/DeepSeek/Anthropic/OpenRouter/Gemini 一键填入预设与"测试连接"）+ **Context 上限**（tokens）
+- **`system_settings` 表**（迁移 025）：白名单键值持久化；优先级 DB 设置 > 环境变量 > 默认值；
+  `ai.context_budget` 即时改变 `contextCompressor.budget()`；`ai.base_url/ai.model/ai.api_key/ai.api_format/
+  ai.timeout_ms/ai.stream` 即时改变 `getAiRuntimeConfig()` 与流式开关
+- **REST**：`GET/POST /api/admin/settings`（密钥打码）、`POST /api/admin/ai/test`（GET {base}/models 连通性）；
+  可选 `ADMIN_TOKEN` 环境变量鉴权
+
+## Lore 补全（官方 Wiki 输入；无数值入库）
+
+- **政府**：现任总统 Cobalt / 前任 Sulfur（Killdroid 设计者）；地堡（管理员 Blackiron、剧院/花园/餐厅/
+  街机厅/中央传送门、备用发电机、员工名录）；外部世界为废土（Wrenchboy）；Toolbox（能创造生命的机器）
+  与 T.A.S.F 设施；对 Harken 监视+音频诱饵、对 Pursuer 追踪芯片失败+拟态研究意向
+- **五杀手详细 Lore**（known_entities：origin/appearance/behavior/government_response/counter_hint）：
+  Pursuer（Lily Meadow 迷宫森林/锯齿剑/骨骼重组拟态/厌恶水）、Badware（蜂巢意识/夺控机械）、
+  Artful（Jean "Degaré" Fromage/墙/音乐盒/傀儡不耐用）、Killdroid（Sulfur 设计/量产搁置）、
+  Harken（噪音=死亡的异次元构造体/父母与挚友/回声定位）+ 杀手动向与官方代词备注
+
+## 威胁互动（Ability × Threat 官方对策；`ability_threat_interactions` 表）
+
+- **Flashlight × Pursuer**：强光直照隐行中的 Pursuer → **立即现形并僵直**（拟态被锁定；flags:
+  reveal_stealth/stun/requires_stealth）
+- 水 × Pursuer：驱退（为避水放弃追猎）；噪音（Bugle/Taunt 别名）× Harken：吸引+加速激怒；
+  持续压力 × Artful：召唤物碎裂；远离机械 × Badware：避免设备倒戈
+- **`THREAT_INTERACTION_CONTEXT`** 新分区：按房间居民持有能力列出对策；SYSTEM_RULES 要求 GM
+  按登记效果叙述、不得发明库外互动；`GET /api/dod/interactions?ability=&threat=`
+
+## 所有 Ability 都算技能（阶段25 指令）
+
+- Fate 池恢复为**全部 14 项基础 Ability**（Flashlight/Adrenaline/Banana Peel/Cloak/Taunt/Bugle 全部
+  可发放、播种 `dod_fate_ability` 标记）；Artist 高概率恢复 Banana Peel/Bugle；effect_data 仍无任何数值
+
+## 传奇商店修复
+
+- 前端 LegendPanel 此前读取 `s.item/s.rarity`（后端返回 `item_name/item_rarity`）→ 商品名为空、
+  只剩价格与购买按钮；已改为渲染 `item_name/item_rarity`，购买携带正确 `itemName`
+
+## 测试
+
+- 新增阶段25（56 项：Admin UI/设置优先级与白名单/连接测试、政府与五杀手 Lore、威胁互动与
+  Flashlight×Pursuer 特殊效果、全技能化、商店修复）
+- 全套 **1625 项**通过

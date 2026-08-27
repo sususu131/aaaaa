@@ -296,11 +296,15 @@ function importPreset(io, preset) {
   if (preset.key === 'dod') {
     try {
       require('./dodWorldLore').ensureWorldProfileSeeded();
-    } catch { /* 播种失败不阻塞导入 */ }
+    } catch (e) { console.error('[seeder] worldLore 播种失败:', e.message); }
     // 阶段23：官方 Synergy 目录随导入播种（幂等；Lore 级组合，非技能系统）
     try {
       require('./dodSynergy').ensureSynergySeeded();
-    } catch { /* 播种失败不阻塞导入 */ }
+    } catch (e) { console.error('[seeder] synergy 播种失败:', e.message); }
+    // 阶段25：官方 威胁互动（能力×杀手对策）随导入播种（幂等）
+    try {
+      require('./dodThreatInteractions').ensureInteractionSeeded();
+    } catch (e) { console.error('[seeder] interactions 播种失败:', e.message); }
   }
   const npcs = ensureNpcs(preset, dungeon.id);
   const quest = ensureQuest(preset, dungeon.id);
@@ -315,6 +319,13 @@ function importPreset(io, preset) {
   // 配置内容随导入更新（幂等；保证预设迭代生效）
   db.prepare('UPDATE preset_dungeon_configs SET config_json = ?, dungeon_id = ? WHERE preset_id = ?').run(JSON.stringify(preset), dungeon.id, presetRow.id);
   db.prepare("UPDATE preset_dungeon_configs SET status = 'PUBLISHED', published_at = datetime('now') WHERE preset_id = ?").run(presetRow.id);
+  // 阶段25：Fate 技能池（全部基础 Ability）随导入播种（幂等；需 preset_dungeon_configs 已物化，
+  // dodFate→dodCivilian.ensureSeeded 会反查 DOD 副本行，故置于 importPreset 末尾）
+  if (preset.key === 'dod') {
+    try {
+      require('./dodFate').ensureFateSeeded();
+    } catch (e) { console.error('[seeder] fate 播种失败:', e.message); }
+  }
   return {
     key: preset.key,
     presetId: presetRow.id,

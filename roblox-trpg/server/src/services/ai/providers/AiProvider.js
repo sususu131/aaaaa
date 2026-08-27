@@ -22,13 +22,33 @@ class AiError extends Error {
 
 /** 调用时读取环境变量（测试可改），绝不把 Key 传出服务端。 */
 function getAiRuntimeConfig() {
-  return {
-    baseUrl: (process.env.AI_BASE_URL || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, ''),
-    apiKey: process.env.AI_API_KEY || process.env.OPENAI_API_KEY || '',
-    model: process.env.AI_MODEL || 'gpt-4o-mini',
-    format: process.env.AI_API_FORMAT || 'openai',
-    timeoutMs: Number(process.env.AI_TIMEOUT_MS || AI_TIMEOUT_MS),
-  };
+  // 阶段25：DB 设置（Admin Web UI）> 环境变量 > 默认值
+  let baseUrl = process.env.AI_BASE_URL || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
+  let apiKey = process.env.AI_API_KEY || process.env.OPENAI_API_KEY || '';
+  let model = process.env.AI_MODEL || 'gpt-4o-mini';
+  let format = process.env.AI_API_FORMAT || 'openai';
+  let timeoutMs = Number(process.env.AI_TIMEOUT_MS || AI_TIMEOUT_MS);
+  try {
+    const settings = require('../../settingsService');
+    baseUrl = settings.getSetting('ai.base_url', baseUrl) || baseUrl;
+    apiKey = settings.getSetting('ai.api_key', apiKey) || apiKey;
+    model = settings.getSetting('ai.model', model) || model;
+    format = settings.getSetting('ai.api_format', format) || format;
+    timeoutMs = Number(settings.getSetting('ai.timeout_ms', timeoutMs) || timeoutMs);
+  } catch { /* 设置层不可用（如初始化前）→ 纯 env */
+  }
+  return { baseUrl: String(baseUrl).replace(/\/$/, ''), apiKey, model, format, timeoutMs };
+}
+
+/** 阶段25：AI 流式开关（DB 设置 > env；默认开）。 */
+function aiStreamEnabled() {
+  try {
+    const settings = require('../../settingsService');
+    const v = settings.getSetting('ai.stream', process.env.AI_STREAM || 'on');
+    return String(v) !== 'off';
+  } catch {
+    return process.env.AI_STREAM !== 'off';
+  }
 }
 
 /** HTTP 状态码 → 统一错误分类。 */
@@ -85,4 +105,4 @@ class AiProvider {
   }
 }
 
-module.exports = { AiProvider, AiError, getAiRuntimeConfig, classifyStatus, postJson, safeParseArgs };
+module.exports = { AiProvider, AiError, getAiRuntimeConfig, aiStreamEnabled, classifyStatus, postJson, safeParseArgs };

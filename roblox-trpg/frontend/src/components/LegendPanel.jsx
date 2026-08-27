@@ -96,13 +96,14 @@ export default function LegendPanel({ onClose, getSessionToken }) {
                 <div style={{ marginTop: 8 }}>
                   {shop.length === 0 && <p className="muted small">（无商品）</p>}
                   {shop.map((s) => (
-                    <div key={s.item} className="shop-item">
+                    <div key={s.item_id} className="shop-item">
                       <span style={{ flex: 1 }}>
-                        {s.item} <span className="muted small">{s.rarity}</span>
+                        {/* 阶段25 修复：后端返回 item_name/item_rarity（此前用 s.item/s.rarity 导致商品名为空） */}
+                        {s.item_name} <span className="muted small">{s.item_rarity}</span>
                       </span>
                       <span className="muted small">{s.price} {s.currency}</span>
                       <span className={`shop-req ${s.eligible ? 'met' : ''}`}>{s.eligible ? '可购买' : '条件未满足'}</span>
-                      <button className="btn tiny" disabled={!s.eligible} onClick={() => buy(lg.legendId, s.item)}>
+                      <button className="btn tiny" disabled={!s.eligible} onClick={() => buy(lg.legendId, s.item_name)}>
                         购买
                       </button>
                     </div>

@@ -9,6 +9,53 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '025_stage25_settings_threats',
+    up(db) {
+      // ── 阶段25：后端管理（系统设置持久化）+ 威胁互动（Ability↔Threat 官方对策）──
+      db.exec(`CREATE TABLE IF NOT EXISTS system_settings (
+        key         TEXT PRIMARY KEY,
+        value       TEXT,
+        updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      // 威胁互动：官方设定中的"居民能力 × 杀手"特殊效果（Lore + 结构化标记；无战斗数值表）
+      db.exec(`CREATE TABLE IF NOT EXISTS ability_threat_interactions (
+        id                TEXT PRIMARY KEY,
+        ability_key       TEXT NOT NULL,             -- flashlight / water / noise / sustained_pressure ...
+        threat_key        TEXT NOT NULL,             -- pursuer / harken / artful / badware ...
+        effect            TEXT NOT NULL,             -- 现形并僵直 / 驱退 / 吸引+激怒 ...
+        lore_explanation  TEXT NOT NULL,
+        flags_json        TEXT NOT NULL DEFAULT '{}',-- {reveal_stealth:true,stun:true} 等结构化标记
+        lore_source       TEXT NOT NULL DEFAULT 'CANON',
+        source            TEXT NOT NULL DEFAULT 'DIE_OF_DEATH',
+        created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+    },
+  },
+  {
+    name: '024_stage24_dod_fate_system',
+    up(db) {
+      // ── 阶段24：Civilian Fate Selection System（Deck of Death Lore）──
+      // 纪律：Lore 层模拟，不是复刻游戏 UI、不是卡牌玩法；能力不是魔法——
+      // 自身潜能被激发、过去经历成为生存优势；禁止"系统给你技能"式描述。
+      db.exec(`CREATE TABLE IF NOT EXISTS dod_fate_system (
+        id                TEXT PRIMARY KEY,             -- deck_of_death
+        name              TEXT NOT NULL,                 -- Deck of Death
+        description       TEXT NOT NULL,                 -- 不是普通卡牌：未知力量给予的生存机会
+        concepts_json     TEXT NOT NULL DEFAULT '[]',    -- 核心概念（潜能激发/经历成为优势）
+        flow_json         TEXT NOT NULL DEFAULT '[]',    -- 六步生成流
+        weight_tiers_json TEXT NOT NULL DEFAULT '{}',    -- Background 权重分层（高/中/低）
+        ai_rule           TEXT NOT NULL,                 -- AI 描述规则（禁止"系统给你技能"）
+        lore_source       TEXT NOT NULL DEFAULT 'CANON',
+        source            TEXT NOT NULL DEFAULT 'DIE_OF_DEATH',
+        created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      const civCols = db.prepare('PRAGMA table_info(civilian_instance)').all().map((c) => c.name);
+      if (!civCols.includes('fate_choice')) {
+        db.exec("ALTER TABLE civilian_instance ADD COLUMN fate_choice TEXT");
+      }
+    },
+  },
+  {
     name: '021_stage23_ability_synergies',
     up(db) {
       // ── 阶段23：Civilian Ability Relationship System（Synergy Lore）──
