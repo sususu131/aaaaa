@@ -292,6 +292,12 @@ function importPreset(io, preset) {
   const locations = ensureLocations(preset);
   const factions = ensureFactions(preset, dungeon.id);
   const factionRelationsSeeded = ensureFactionRelations(preset, dungeon);
+  // 阶段22：DOD 世界档案随导入播种（幂等；只读 Lore 数据）
+  if (preset.key === 'dod') {
+    try {
+      require('./dodWorldLore').ensureWorldProfileSeeded();
+    } catch { /* 播种失败不阻塞导入 */ }
+  }
   const npcs = ensureNpcs(preset, dungeon.id);
   const quest = ensureQuest(preset, dungeon.id);
   const version = ensureDefinitionVersion(preset, dungeon);

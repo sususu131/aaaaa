@@ -914,3 +914,46 @@ Synergy 预留（候选保存、逻辑未新增、Loveshot 不触发）/ 边界�
   NPC 两项修复/REST/确定性映射）
 - 阶段18 红线正则收窄为"竞技玩法"实现语义（人格形容词 Competitive 不再误伤）
 - 全套 **1379 项**通过
+
+---
+
+# 阶段22：Die of Death World Lore Foundation + 四项修复
+
+## 世界背景数据库（只做 Lore，不做玩法）
+
+- **`experience_world_profiles` 表**（迁移 020）：name/description/setting/era/factions/
+  known_threats/civilian_life/world_rules/government（全部为 Lore 数据，无玩法字段）
+- **Die of Death World**：Robloxia——一个由普通居民组成的世界（普通市民/工作人员/研究人员/
+  建设者/商人），大多数人没有战斗能力
+- **Civilian Society**：城市/住宅区/商业区域/公共设施/工作场所；Civilian 不是战士，
+  只是拥有不同人生经验的人
+- **Threat Concept**：Killer 只作世界威胁概念（某些异常存在会攻击居民；居民需逃离/隐藏/
+  合作/利用自身能力生存）；登记官方已知威胁存在（Pursuer/Badware/Artful/Killdroid/Harken）
+  仅概念与动机——**不实现 Killer AI/战斗/副本流程/地图/任务**，无任何数值
+- **Government 预留 Lore 接口**：name/description/public_information（建造安全地堡等公开事实）/
+  secret_information（`reserved`，本阶段不创建具体剧情）
+- **DOD World Rules 五条**：能力来自自身经历；普通居民不是英雄；生存优先于战斗；
+  能力不能违反世界逻辑；AI 剧情必须符合普通人视角（入 SYSTEM_RULES，禁止原创世界设定）
+- **`WORLD_LORE_CONTEXT`** 新分区：World:/Setting:/Era:/Civilian Society:/Threat:/Government:/
+  World Rules + Active Civilians（背景→生活场所关联）；非 DOD 世界不输出
+- 预设 `dod.json` 新增 `world_lore` 块；导入自动播种（幂等，lore_source=CANON）
+
+## 修复
+
+1. **阵营关系跨世界泄露**：`worldSnapshot` 按"房间当前副本"过滤关系
+   （`roomFactionScope`：当前副本阵营 + 世界级阵营；未进副本→仅世界级）——
+   DOORS 的 幸存者↔实体/旅馆管理员 不再出现在 DOD 房间（反之亦然）
+2. **关系不再写死**：新 AI 工具 `request_faction_relation_change`（HOSTILE/NEUTRAL/ALLIED）——
+   服务器三重验证（阵营存在/属当前世界/必填剧情理由）→ 走唯一写入口
+   `setFactionRelation`（Event Bus + 审计）；AI 不能直接写库、不能凭空创建阵营、不能跨世界操作
+3. **副本可停止**：`POST /api/dungeon-instances/:id/stop`（队伍成员；ABORTED + 实例事件 +
+   DUNGEON_ABORTED 广播；幂等）；前端 Dungeon Runtime 新增"停止副本"按钮
+4. **所有 LLM 调用点具备 websearch**：GM 聊天/副本运行时/Agent 循环（原有）+
+   `summarizeHistory` 与 Dungeon Designer 经 `searchEnabledChat`（仅放行 web_search/roblox_search，
+   预算内搜索轮；无工具调用时行为与从前一致）；视觉图像路径显式 `LLM_NO_TOOLS` 标注
+
+## 测试
+
+- 新增阶段22（68 项：World 加载/官方 Lore 内容/Government 预留/World Rules/Context/
+  Civilian 关联/不原创设定/不提前生成 Killer/关系作用域与 AI 工具/停止副本/websearch 全覆盖）
+- 全套 **1447 项**通过

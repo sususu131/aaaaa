@@ -266,3 +266,5 @@ require('./worldTools');
 require('./partyTools');
 // 阶段14 新增
 require('./inventoryTools');
+// 阶段22 新增
+require('./factionRelationTools');

@@ -71,6 +71,8 @@ export const api = {
   getInstanceEvents: (id) => request(`/api/dungeon-instances/${id}/events`),
   leaveInstance: (id, sessionToken) =>
     request(`/api/dungeon-instances/${id}/leave`, { method: 'POST', body: JSON.stringify({ sessionToken }) }),
+  stopInstance: (id, sessionToken) =>
+    request(`/api/dungeon-instances/${id}/stop`, { method: 'POST', body: JSON.stringify({ sessionToken }) }),
   // ── 阶段6：Persistent Character ──
   getCharacter: () => request('/api/character'),
   getCharacterStats: () => request('/api/character/stats'),

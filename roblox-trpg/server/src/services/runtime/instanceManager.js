@@ -255,6 +255,27 @@ function applySceneEntryEvents(io, instance, definition, sceneId) {
   }
 }
 
+/**
+ * 阶段22：停止副本运行（玩家可主动结束；状态 → ABORTED）。
+ * - 广播实例更新（前端立即反映）+ 结束事件日志；
+ * - 幂等：已结束实例直接返回。
+ */
+function stopInstance(io, instance, { byPlayerId = null, reason = '' } = {}) {
+  if (['COMPLETED', 'FAILED', 'ABORTED'].includes(instance.status)) return getInstance(instance.id);
+  const stopped = setStatus(instance, 'ABORTED');
+  logEvent(stopped, 'ABORT', byPlayerId ? `player:${byPlayerId}` : 'server', { reason });
+  try {
+    broadcastUpdate(io, stopped);
+  } catch { /* 广播失败不影响停止 */ }
+  const gameEvents = require('../quests/gameEvents');
+  gameEvents.emit(io, instance.room_id, {
+    type: 'DUNGEON_ABORTED',
+    actor: byPlayerId ? (getDb().prepare('SELECT name FROM players WHERE id = ?').get(byPlayerId) || {}).name : '系统',
+    data: { instanceId: instance.id, reason: reason || '玩家手动停止' },
+  });
+  return stopped;
+}
+
 /** 更新状态（内部）。 */
 function setStatus(instance, status) {
   const ended = ['COMPLETED', 'FAILED', 'ABORTED'].includes(status);
@@ -327,6 +348,7 @@ module.exports = {
   joinInstance,
   leaveInstance,
   startInstance,
+  stopInstance,
   cleanupRoomNpcs,
   setStatus,
   setCurrentScene,

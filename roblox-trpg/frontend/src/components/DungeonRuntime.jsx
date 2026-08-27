@@ -157,12 +157,22 @@ export default function DungeonRuntime({ onClose, getSessionToken, onPickOption 
     setSnapshot(null);
   };
 
+  // 阶段22：停止副本运行（服务器置 ABORTED；此后世界调度不再推进该实例）
+  const stop = async () => {
+    if (!window.confirm('确定停止当前副本运行？')) return;
+    setBusy(true); setError('');
+    try { await api.stopInstance(instanceUid, token()); await refresh(); }
+    catch (e) { setError(`${e.code ? `[${e.code}] ` : ''}${e.message}`); }
+    finally { setBusy(false); }
+  };
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>副本运行（Dungeon Runtime）</h2>
           <div>
+            {instanceUid && <button className="btn small" onClick={stop} disabled={busy}>停止副本</button>}
             {instanceUid && <button className="btn small" onClick={leave}>离开实例</button>}
             <button className="btn small" onClick={onClose}>关闭</button>
           </div>

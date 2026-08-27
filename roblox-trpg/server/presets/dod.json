@@ -277,6 +277,36 @@
     "player_role": "普通Civilian（不是英雄）",
     "lore_source": "CANON"
   },
+  "world_lore": {
+    "table": "experience_world_profiles",
+    "name": "Die of Death World",
+    "description": "Robloxia：一个由普通居民组成的世界。居民包括普通市民、工作人员、研究人员、建设者、商人——大多数人没有战斗能力。",
+    "setting": "Robloxia（普通城市世界：依靠居民各自的生活技能运转）",
+    "era": "Killers出现后的异常时期",
+    "civilian_life": {
+      "城市": "Robloxia 的城市由普通居民共同维持运转",
+      "住宅区": "居民居住的街区，灾变后成为互助据点",
+      "商业区域": "商店与市集，物资交换的中心",
+      "公共设施": "政府建造的避难所（如安全地堡）等公共空间",
+      "工作场所": "居民各自凭借职业与生活技能工作",
+      "note": "Civilian 不是战士。他们只是拥有不同人生经验的人。"
+    },
+    "threat_concept": "Killer 当前只作为世界威胁概念（居民需要逃离/隐藏/合作/利用自身能力生存）；不实现具体 Killer。",
+    "government_interface": {
+      "name": "Robloxian Government",
+      "description": "Robloxia 的统治者，积极保护平民",
+      "public_information": "建造并维护安全地堡；制造过机器人保镖原型；追踪异常存在信号并警告居民",
+      "secret_information": "reserved（本阶段只创建 Lore 接口，不实现具体剧情）"
+    },
+    "world_rules": [
+      "Civilian 能力来自自身经历。",
+      "普通居民不是英雄。",
+      "生存优先于战斗。",
+      "能力不能违反世界逻辑。",
+      "AI 生成剧情必须符合普通人的视角。"
+    ],
+    "lore_source": "CANON"
+  },
   "civilian": {
     "definition": "Robloxia 中的普通居民；没有固定身份，不是角色模板/英雄/特殊人物，代表一类居民。",
     "backgrounds": [

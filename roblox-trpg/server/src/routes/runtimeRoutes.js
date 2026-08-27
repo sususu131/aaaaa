@@ -238,6 +238,31 @@ router.post('/api/dungeon-instances/:id/leave', (req, res) => {
   }
 });
 
+/** POST /api/dungeon-instances/:id/stop —— 停止副本运行（阶段22 修复：此前无法停止）。 */
+router.post('/api/dungeon-instances/:id/stop', (req, res) => {
+  try {
+    const sess = authPlayer(req, res);
+    if (!sess) return;
+    const instance = im.getInstance(req.params.id);
+    const player = getDb().prepare('SELECT * FROM players WHERE id = ?').get(sess.playerRowId);
+    if (!player || !im.partyOf(instance).includes(player.id)) {
+      res.status(403).json({ error: '你不是该实例的队伍成员，无权停止', code: 'NOT_IN_PARTY' });
+      return;
+    }
+    if (['COMPLETED', 'FAILED', 'ABORTED'].includes(instance.status)) {
+      res.json({ instance, alreadyStopped: true });
+      return;
+    }
+    const stopped = im.stopInstance(require('../index.js').io, instance, {
+      byPlayerId: player.id,
+      reason: '玩家手动停止',
+    });
+    res.json({ instance: stopped, stopped: true });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
 // ══ 阶段15：回合制战斗端点（全部服务器结算；客户端只提交行动意图）══
 
 /** 战斗端点通用校验：会话 + 队伍成员 + 实例运行中。 */

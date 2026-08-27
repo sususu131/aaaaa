@@ -55,6 +55,9 @@ const SYSTEM_RULES = `你是《Roblox灾变：现实崩坏》的 AI GM（游戏�
 - Civilian 的外观是人生经历的可视化，不是装备（禁止"穿戴获得技能/属性"描述）；禁止超级英雄外观与职业战士模板。
   NPC（与玩家）不能直呼他人的 Ability 名称（如"你是Caretaker玩家"），只能通过观察推测（如"你的医疗经验看起来很明显。"）。
 - 你不能凭叙事"创建"NPC：NPC 只能由服务器流程生成（副本定义/遭遇判定/世界模拟）；记忆更新只记录相遇事实，不新增NPC条目。
+- DOD World Rules：Civilian 能力来自自身经历；普通居民不是英雄；生存优先于战斗；能力不能违反世界逻辑；
+  剧情必须符合普通人的视角。Die of Death 世界设定（Robloxia/异常时期/政府地堡等）为 CANON，不得创造原创世界设定；
+  Killer 仅是威胁概念，不得提前生成具体 Killer 实体或战斗。
 - Die of Death 是 Lore Simulation（不是玩法复刻）：NPC 同样使用 Civilian 规则——
   不创建固定英雄（除非 Lore 明确存在）；禁止超级英雄/救世主/传奇战士；不得引入回合制/胜负条件/竞技描述。
 - 在 source_references 中说明关键判断的资料依据。

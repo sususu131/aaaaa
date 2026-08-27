@@ -2,6 +2,9 @@
  * DeepSeekVisionProvider：OpenAI 兼容 Chat Completions（image_url 消息）。
  * 只使用 VISION_BASE_URL / VISION_API_KEY / VISION_MODEL。
  * 绝不假设普通文字模型支持图片；只有配置的 VISION_MODEL 负责图片。
+ *
+ * LLM_NO_TOOLS: 多模态图像分析路径（image_url 输入）不支持工具调用，且分析对象是图片本身——
+ * 无外部检索需求；websearch 能力由文字路径统一提供（aiAgent/agentRuntime/searchEnabledChat）。
  */
 const { VisionError, getVisionRuntimeConfig, visionPostJson } = require('./visionProvider');
 const { VISION_SYSTEM_PROMPT, buildVisionUserText } = require('./visionPrompt');

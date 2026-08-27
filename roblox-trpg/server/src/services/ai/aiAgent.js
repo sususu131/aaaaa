@@ -57,6 +57,9 @@ function broadcastStatus(io, room, status) {
   io.to(room.id).emit('gm:status', { status, at: new Date().toISOString() });
 }
 
+// 阶段22：所有单轮 LLM 调用点统一走"带 websearch"的助手
+const { chatWithWebSearch } = require('./searchEnabledChat');
+
 /** 把 tool 结果压成给 AI 的文本（截断防爆上下文）。 */
 function toolResultText(result) {
   const text = JSON.stringify(result);
@@ -169,10 +172,12 @@ async function summarizeHistory(roomId, messages) {
   const provider = getProvider();
   const session = provider.startSession({
     system:
-      '你是跑团记录员。把给定历史记录压缩成不超过300字的中文摘要。必须保留：关键剧情、NPC关系、任务、地点、骰子结果、技能获得、死亡与永久世界变化；忽略寒暄与重复。只输出摘要文本。',
+      '你是跑团记录员。把给定历史记录压缩成不超过300字的中文摘要。必须保留：关键剧情、NPC关系、任务、地点、骰子结果、技能获得、死亡与永久世界变化；忽略寒暄与重复。只输出摘要文本。' +
+      '（如需核实历史中提到的公开资料，可用 web_search；不得把搜索到的外部信息写成剧情事实。）',
     userContent: text.slice(0, 12000),
   });
-  const res = await provider.chat(session, []);
+  // 阶段22：摘要路径同样具备 websearch（仅搜索工具；行为与无工具时一致）
+  const res = await chatWithWebSearch(session, { toolCtx: { room: { id: roomId } }, maxSearches: 1 });
   return String(res.content || '').trim().slice(0, 600);
 }
 

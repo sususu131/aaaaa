@@ -89,7 +89,12 @@ async function generateDraft(canonicalSnapshot) {
     system: DESIGNER_SYSTEM_PROMPT,
     userContent: buildDesignerInput(canonicalSnapshot),
   });
-  const res = await provider.chat(session, []); // 纯 Structured Output，不用工具
+  // 阶段22：设计路径也具备 websearch（仅搜索工具，用于补全公开资料；最终仍是 Structured Output）
+  const { chatWithWebSearch } = require('../ai/searchEnabledChat');
+  const res = await chatWithWebSearch(session, {
+    toolCtx: { broadcast: () => {} },
+    maxSearches: 2,
+  });
   const draft = extractJson(res.content);
   if (!draft || typeof draft !== 'object') {
     throw new AiError('bad_format', 'Dungeon Designer 输出不是合法 JSON');

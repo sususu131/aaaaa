@@ -429,6 +429,48 @@ function civilianIdentityContextContent(room) {
   }
 }
 
+/**
+ * 阶段22：WORLD_LORE_CONTEXT —— Die of Death 世界背景（World/Civilian Society/Threat/Government
+ * + World Rules）。只读 Lore 数据；不实现 Killer AI/战斗/副本流程/地图/任务。
+ */
+function worldLoreContextContent(room) {
+  try {
+    const db = getDb();
+    const dodWorldLore = require('../presets/dodWorldLore');
+    const expName = room.currentDungeon ? room.currentDungeon.name : null;
+    const isDod = expName && String(expName).toLowerCase() === 'die of death';
+    if (!isDod) return '（当前不在 Die of Death 世界：无 WORLD_LORE_CONTEXT）';
+    const p = dodWorldLore.getWorldProfile();
+    if (!p) return '（世界档案未加载）';
+    const life = Object.entries(p.civilianLife)
+      .filter(([k]) => k !== 'note')
+      .map(([k, v]) => `${k}：${v}`)
+      .join('；');
+    const threat = p.knownThreats[0] || {};
+    const gov = p.government || {};
+    // Civilian 与世界关联：房间内每位居民的背景 → 生活场所
+    const dodLore = require('../presets/dodLore');
+    const ties = [];
+    for (const pl of room.players) {
+      const row = db.prepare('SELECT id FROM players WHERE socket_id = ?').get(pl.socketId);
+      if (!row) continue;
+      const view = dodLore.loreView(row.id);
+      if (view) ties.push(`${pl.name}（${view.background}→${dodWorldLore.civilianWorldTie(view.background).lifeTie}）`);
+    }
+    return (
+      `World: ${p.description}\nSetting: ${p.setting}\nEra: ${p.era}\n` +
+      `Civilian Society: ${life}${p.civilianLife.note ? `（${p.civilianLife.note}）` : ''}\n` +
+      `Threat: ${threat.description || ''}（居民应对：${(threat.resident_response || []).join('、')}；Killer 仅威胁概念，未实现具体个体/AI/战斗）\n` +
+      `Government: ${gov.name || ''}——${(gov.public_information || '').slice(0, 120)}${gov.secret_information ? `（机密：${gov.secret_information}）` : ''}\n` +
+      `World Rules（DOD）:\n${dodWorldLore.worldRulesText()}\n` +
+      (ties.length ? `Active Civilians: ${ties.join('、')}` : 'Active Civilians: （房间内暂无 Civilian）') +
+      `\n（lore_source=CANON：以上为官方世界设定，不得创造原创世界设定。）`
+    );
+  } catch (err) {
+    return `（世界 Lore 上下文不可用：${err.message}）`;
+  }
+}
+
 /** 构建完整 Context。返回 { sections, totalTokens }。 */
 function buildContext(room) {
   const exp = room.currentExperience || null;
@@ -482,6 +524,7 @@ function buildContext(room) {
     { key: 'civilian', label: 'DOD_CIVILIAN_CONTEXT (Die of Death Lore Simulation)', content: civilianContextContent(room) },
     { key: 'civilian_profile', label: 'CIVILIAN_PROFILE_CONTEXT', content: civilianProfileContextContent(room) },
     { key: 'civilian_identity', label: 'CIVILIAN_IDENTITY_CONTEXT', content: civilianIdentityContextContent(room) },
+    { key: 'world_lore', label: 'WORLD_LORE_CONTEXT', content: worldLoreContextContent(room) },
     { key: 'avatar', label: 'Avatar / Initial State', content: avatarContext(room) },
     { key: 'roblox', label: 'Roblox Source Data', content: robloxBlock },
   ];

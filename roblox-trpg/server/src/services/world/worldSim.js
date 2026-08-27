@@ -247,6 +247,27 @@ function legendWorldCheck(io, roomId, { rng = null } = {}) {
 }
 
 // ── 世界快照（UI / Context / get_world_simulation 工具共用）──
+
+/**
+ * 阶段22 修复：房间当前世界的阵营范围。
+ * 进入某副本 → 只含该副本的阵营 + 世界级阵营（dungeon_id IS NULL）；
+ * 未进入副本 → 仅世界级阵营。跨世界关系（如 DOORS 关系出现在 DOD 房间）不再显示。
+ */
+function roomFactionScope(roomId) {
+  const db = getDb();
+  const inst = db
+    .prepare("SELECT * FROM dungeon_instances WHERE room_id = ? AND status IN ('WAITING','RUNNING','PAUSED') ORDER BY id DESC LIMIT 1")
+    .get(roomId);
+  if (!inst) {
+    return { dungeonId: null, factionIds: db.prepare('SELECT id FROM factions WHERE dungeon_id IS NULL').all().map((r) => r.id) };
+  }
+  const dungeonId = (db.prepare('SELECT dungeon_id FROM dungeon_versions WHERE id = ?').get(inst.dungeon_version_id) || {}).dungeon_id;
+  const factionIds = dungeonId
+    ? db.prepare('SELECT id FROM factions WHERE dungeon_id = ? OR dungeon_id IS NULL').all(dungeonId).map((r) => r.id)
+    : db.prepare('SELECT id FROM factions WHERE dungeon_id IS NULL').all().map((r) => r.id);
+  return { dungeonId, factionIds };
+}
+
 function worldSnapshot(roomId) {
   const db = getDb();
   const sched = getSchedulerState();
@@ -260,7 +281,10 @@ function worldSnapshot(roomId) {
     expiresAt: e.expires_at,
     data: parseJson(e.data_json, {}),
   }));
-  const relations = factionRelations.allRelations().map((r) => ({
+  // 阶段22 修复：关系按房间当前世界过滤（跨副本关系不再混入）
+  const scope = roomFactionScope(roomId);
+  const inScope = (r) => scope.factionIds.includes(r.faction_a) && scope.factionIds.includes(r.faction_b);
+  const relations = factionRelations.allRelations().filter(inScope).map((r) => ({
     factionA: r.faction_a_name,
     factionB: r.faction_b_name,
     relation: r.relation,
@@ -306,5 +330,6 @@ module.exports = {
   simulationRooms,
   checkLegendConditions,
   legendWorldCheck,
+  roomFactionScope,
   worldSnapshot,
 };

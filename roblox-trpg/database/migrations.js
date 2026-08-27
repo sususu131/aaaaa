@@ -9,6 +9,29 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '020_stage22_dod_world_lore',
+    up(db) {
+      // ── 阶段22：Die of Death World Lore Foundation（只实现世界背景数据库）──
+      // 红线：不实现 Killer AI / 战斗 / 副本流程 / 地图 / 任务；全部为 Lore 数据。
+      db.exec(`CREATE TABLE IF NOT EXISTS experience_world_profiles (
+        id                TEXT PRIMARY KEY,             -- 语义 id（dod）
+        experience_key    TEXT NOT NULL UNIQUE,          -- dod
+        name              TEXT NOT NULL,                 -- Die of Death World
+        description       TEXT NOT NULL,                 -- Robloxia：由普通居民组成的世界
+        setting           TEXT NOT NULL,                 -- 世界/地点设定
+        era               TEXT NOT NULL,                 -- Killers出现后的异常时期
+        factions_json     TEXT NOT NULL DEFAULT '[]',    -- JSON：世界阵营（Lore 层；Government 预留）
+        known_threats_json TEXT NOT NULL DEFAULT '[]',   -- JSON：威胁概念（Killer 仅概念，未实现）
+        civilian_life_json TEXT NOT NULL DEFAULT '{}',   -- JSON：普通居民生活（城市/住宅/商业/公共/工作）
+        world_rules_json  TEXT NOT NULL DEFAULT '[]',    -- JSON：DOD World Rules（5 条）
+        government_json   TEXT NOT NULL DEFAULT '{}',    -- JSON：Government Lore 接口（public/secret 预留）
+        lore_source       TEXT NOT NULL DEFAULT 'CANON',
+        source            TEXT NOT NULL DEFAULT 'DIE_OF_DEATH',
+        created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+    },
+  },
+  {
     name: '019_stage21_civilian_identity',
     up(db) {
       // ── 阶段21：Civilian Identity Presentation System ──
