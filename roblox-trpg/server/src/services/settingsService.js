@@ -22,6 +22,9 @@ const SETTING_KEYS = [
   'vision.timeout_ms',
   'search.provider',
   'search.serper_api_key',
+  'search.bing_api_key',
+  'search.brave_api_key',
+  'search.tavily_api_key',
 ];
 
 function isValidKey(key) {
@@ -84,7 +87,13 @@ function adminView() {
   const { getVisionRuntimeConfig } = require('./vision/visionProvider');
   const vcfg = getVisionRuntimeConfig();
   const searchProvider = getSetting('search.provider', process.env.SEARCH_PROVIDER || 'null');
-  const serperKey = getSetting('search.serper_api_key', process.env.SERPER_API_KEY || '');
+  const providers = {};
+  for (const pname of ['serper', 'bing', 'brave', 'tavily']) {
+    const envKey = { serper: process.env.SERPER_API_KEY, bing: process.env.BING_API_KEY, brave: process.env.BRAVE_API_KEY, tavily: process.env.TAVILY_API_KEY }[pname] || '';
+    const k = getSetting(`search.${pname}_api_key`, envKey);
+    providers[pname] = { hasKey: Boolean(k), masked: mask(k) };
+  }
+  const searchAvailable = searchProvider === 'duckduckgo' || (providers[searchProvider] && providers[searchProvider].hasKey);
   return {
     ai: {
       baseUrl: cfg.baseUrl,
@@ -104,9 +113,10 @@ function adminView() {
     },
     search: {
       provider: searchProvider,
-      serperKeyMasked: mask(serperKey),
-      hasSerperKey: Boolean(serperKey),
-      available: searchProvider === 'serper' && Boolean(serperKey),
+      providers,
+      serperKeyMasked: providers.serper ? providers.serper.masked : '',
+      hasSerperKey: providers.serper ? providers.serper.hasKey : false,
+      available: Boolean(searchAvailable),
     },
     context: {
       budget: Number(

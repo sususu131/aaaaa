@@ -1072,3 +1072,26 @@ Synergy 预留（候选保存、逻辑未新增、Loveshot 不触发）/ 边界�
 - 新增阶段26（34 项：Vision/搜索 DB>env 与回落、REST 保存与测试、status/events、世界开关、
   预设重导入幂等、UI 卡片、白名单与打码）
 - 全套 **1659 项**通过
+
+---
+
+# 阶段27：Web 搜索多 Provider（bing/brave/tavily/duckduckgo 等）
+
+- **6 种 Provider**：`null`（默认，明确 SEARCH_UNAVAILABLE 不编造）/ `serper`（Google 搜索 API）/
+  **`bing`**（Microsoft Bing Web Search v7，Ocp-Apim-Subscription-Key）/
+  **`brave`**（Brave Search API，X-Subscription-Token）/
+  **`tavily`**（Tavily Search API，LLM 友好搜索）/
+  **`duckduckgo`**（**免 Key**，HTML 端点解析：uddg 重定向解码 + 实体/标签清理）
+- 结果统一归一化为 `{title, link, snippet, source:'web_search'}`——`web_search` 工具与既有
+  UNTRUSTED_EXTERNAL_DATA 围栏零改动兼容；来源 URL 全部来自 Provider（编号引用，AI 不得伪造）
+- **配置即时生效**（调用时读取：DB 设置 > env `BING_API_KEY/BRAVE_API_KEY/TAVILY_API_KEY`）；
+  缺 Key 的 Provider 回落 NullSearchProvider（不产生半可用状态）
+- **Admin UI**：下拉列出全部 Provider；按选择动态切换 Key 输入标签（含各 Provider 鉴权头说明），
+  免 Key Provider 自动隐藏 Key 框；状态卡片显示各 Provider Key 配置概览（打码）
+- 各 Provider 支持构造器注入 BaseUrl（本地 mock 测试请求构造与响应解析）
+
+## 测试
+
+- 新增阶段27（36 项：Provider 解析与 Key 优先级、adminView 概览、六个 Provider 的请求头/body
+  构造与结果归一化（mock 服务）、DDG 解析单元、web_search 工具链路、REST/UI）
+- 全套 **1695 项**通过

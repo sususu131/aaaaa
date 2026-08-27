@@ -118,14 +118,19 @@
     <div class="row">
       <div>
         <label>搜索 Provider</label>
-        <select id="sProvider">
+        <select id="sProvider" onchange="onProviderChange()">
           <option value="null">null（未配置：AI 不可搜索）</option>
-          <option value="serper">serper（Google 搜索 API）</option>
+          <option value="serper">serper（Google 搜索 API，需 Key）</option>
+          <option value="bing">bing（Microsoft Bing Web Search v7，需 Key）</option>
+          <option value="brave">brave（Brave Search API，需 Key）</option>
+          <option value="tavily">tavily（Tavily Search API，需 Key）</option>
+          <option value="duckduckgo">duckduckgo（免 Key，HTML 端点）</option>
         </select>
       </div>
-      <div>
-        <label>Serper API Key（serper.dev）</label>
+      <div id="sKeyBox">
+        <label id="sKeyLabel">API Key</label>
         <input id="sSerperKey" type="password" placeholder="留空 = 保留已保存的 Key" />
+        <div class="hint" id="sKeyHint"></div>
       </div>
     </div>
     <div class="hint" id="sKeyHint"></div>
@@ -181,9 +186,7 @@ async function load() {
       ? '已保存 Key：<code>' + (view.vision.apiKeyMasked || '****') + '</code>（留空保留；输入新值覆盖）'
       : '未配置 Vision API Key';
     $('sProvider').value = view.search.provider || 'null';
-    $('sKeyHint').innerHTML = view.search.hasSerperKey
-      ? 'Serper Key：<code>' + view.search.serperKeyMasked + '</code>（留空保留；输入新值覆盖） · 状态：' + (view.search.available ? '可用' : '未激活')
-      : '未配置 Serper Key（搜索不可用）';
+    onProviderChange(view);
     $('baseUrl').value = view.ai.baseUrl || '';
     $('model').value = view.ai.model || '';
     $('format').value = view.ai.format || 'openai';
@@ -272,9 +275,31 @@ async function testVision() {
   flash('vMsg', data.ok, data.ok ? '连接成功 ✓（HTTP ' + data.status + '）' : '连接失败：' + (data.reason || 'HTTP ' + data.status));
 }
 
+const SEARCH_KEY_FIELDS = { serper: 'serper_api_key', bing: 'bing_api_key', brave: 'brave_api_key', tavily: 'tavily_api_key', duckduckgo: null, null: null };
+const SEARCH_KEY_LABELS = {
+  serper: 'Serper API Key（serper.dev · X-API-KEY）',
+  bing: 'Bing API Key（Azure · Ocp-Apim-Subscription-Key）',
+  brave: 'Brave API Key（X-Subscription-Token）',
+  tavily: 'Tavily API Key（api.tavily.com）',
+};
+
+function onProviderChange(view) {
+  const p = $('sProvider').value;
+  const field = SEARCH_KEY_FIELDS[p] || null;
+  $('sKeyBox').style.display = field ? '' : 'none';
+  if (field) $('sKeyLabel').textContent = SEARCH_KEY_LABELS[p] || 'API Key';
+  if (view) {
+    const info = (view.search.providers || {})[p];
+    $('sKeyHint').innerHTML = info && info.hasKey
+      ? '已保存 Key：<code>' + info.masked + '</code>（留空保留；输入新值覆盖） · 状态：' + (view.search.available ? '可用' : '未激活')
+      : (p === 'duckduckgo' ? '免 Key Provider' : '未配置 Key（该 Provider 未激活）');
+  }
+}
+
 async function saveSearch() {
   const body = { search: { provider: $('sProvider').value }};
-  if ($('sSerperKey').value.trim()) body.search.serper_api_key = $('sSerperKey').value.trim();
+  const field = SEARCH_KEY_FIELDS[$('sProvider').value];
+  if (field && $('sSerperKey').value.trim()) body.search[field] = $('sSerperKey').value.trim();
   const r = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await r.json();
   flash('sMsg', r.ok, r.ok ? '搜索配置已保存 ✓' : data.error || '保存失败');

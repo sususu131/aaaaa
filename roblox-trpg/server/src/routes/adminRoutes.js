@@ -96,6 +96,9 @@ const FIELD_MAP_EXTRA = {
   search: {
     provider: 'search.provider',
     serper_api_key: 'search.serper_api_key',
+    bing_api_key: 'search.bing_api_key',
+    brave_api_key: 'search.brave_api_key',
+    tavily_api_key: 'search.tavily_api_key',
   },
 };
 
