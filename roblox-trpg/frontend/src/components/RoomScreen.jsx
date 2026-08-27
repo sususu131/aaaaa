@@ -21,6 +21,7 @@ export default function RoomScreen({
   gmStatus,
   modal,
   onOpenModal,
+  getSessionToken,
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -104,7 +105,12 @@ export default function RoomScreen({
         <DungeonPanel current={room.experience} currentDungeon={room.dungeon} onClose={() => onOpenModal(null)} />
       )}
       {modal === 'avatar' && (
-        <RobloxBindPanel players={players} myName={myName} onClose={() => onOpenModal(null)} />
+        <RobloxBindPanel
+          players={players}
+          myName={myName}
+          onClose={() => onOpenModal(null)}
+          getSessionToken={getSessionToken}
+        />
       )}
     </main>
   );

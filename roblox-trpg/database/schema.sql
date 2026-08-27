@@ -124,18 +124,18 @@ CREATE TABLE IF NOT EXISTS dungeons (
 );
 
 -- ── 技能表 ──
--- 技能不是数据库初始化时臆造的，而是"副本设计阶段"的产物：
--- AI 搜索真实 Roblox Experience 资料 → 分析玩法 → 设计候选技能 → 规则/人工审核 → approved
+-- 技能不是数据库初始化时臆造的，而是"副本设计阶段"或"Avatar初始化规则"的产物。
+-- source_type 双轴：来源渠道（INITIAL_AVATAR / DUNGEON）与资料出处（official/inspired/original）。
 CREATE TABLE IF NOT EXISTS skills (
   id                INTEGER PRIMARY KEY AUTOINCREMENT,
   name              TEXT NOT NULL,                  -- 技能名（设计产出，非预写结论）
   description       TEXT,                           -- 技能效果描述
-  source_dungeon_id INTEGER REFERENCES dungeons(id),-- 技能来源副本
+  source_dungeon_id INTEGER REFERENCES dungeons(id),-- 技能来源副本（INITIAL_AVATAR 技能为 NULL）
   source_type       TEXT NOT NULL DEFAULT 'original'
-                    CHECK (source_type IN ('official', 'inspired', 'original')),
-                    -- official: Roblox 原作中真实存在的机制/能力
-                    -- inspired: 受原作机制启发的 TRPG 再创作（不得声称为原作内容）
-                    -- original: 本 TRPG 完全原创
+                    CHECK (source_type IN ('official', 'inspired', 'original', 'INITIAL_AVATAR', 'DUNGEON')),
+                    -- INITIAL_AVATAR: Avatar Vision 初始化技能（与副本技能严格区分）
+                    -- DUNGEON: 副本通关奖励技能
+                    -- official/inspired/original: 资料出处标注
   skill_type        TEXT NOT NULL DEFAULT 'passive'
                     CHECK (skill_type IN ('passive', 'active', 'reaction')),
   rarity            TEXT NOT NULL DEFAULT 'common'
@@ -229,13 +229,14 @@ CREATE TABLE IF NOT EXISTS world_events (
 
 CREATE INDEX IF NOT EXISTS idx_world_events_room ON world_events(room_id);
 
--- ── 玩家状态（HP/状态效果/位置；技能物品在各自关联表）──
+-- ── 玩家状态（HP/状态效果/位置/属性；技能物品在各自关联表）──
 CREATE TABLE IF NOT EXISTS player_states (
   player_id      INTEGER PRIMARY KEY REFERENCES players(id),
   hp             INTEGER NOT NULL DEFAULT 10,
   max_hp         INTEGER NOT NULL DEFAULT 10,
   status_effects TEXT NOT NULL DEFAULT '[]',  -- JSON 数组
   location       TEXT NOT NULL DEFAULT 'start',
+  attributes     TEXT,                        -- JSON：Avatar 初始属性（阶段3b，Rules Engine 计算）
   updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -283,4 +284,51 @@ CREATE TABLE IF NOT EXISTS player_dungeon_progress (
   status       TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed')),
   completed_at TEXT,
   UNIQUE (player_id, dungeon_id)
+);
+
+-- ============================================================
+-- 阶段3b：Avatar Vision + 初始属性 + 初始技能
+-- Vision 只观察（UNTRUSTED_MODEL_OUTPUT），服务器 Rules Engine 决定最终结果。
+-- ============================================================
+
+-- ── Avatar 初始化快照（防重复初始化 + 审计）──
+CREATE TABLE IF NOT EXISTS avatar_initialization (
+  id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id             INTEGER NOT NULL UNIQUE REFERENCES players(id),
+  roblox_user_id        TEXT NOT NULL,
+  avatar_image_url      TEXT,
+  avatar_snapshot_hash  TEXT NOT NULL,        -- hash(userId|imageUrl)：重复初始化防线
+  vision_provider       TEXT,
+  vision_model          TEXT,
+  vision_result         TEXT,                 -- Vision 原始输出 JSON（仅存库，不进 Context）
+  accepted_tags         TEXT,                 -- JSON
+  rejected_tags         TEXT,                 -- JSON：[{tag, reason}]
+  accepted_skills       TEXT,                 -- JSON
+  rejected_skills       TEXT,                 -- JSON：[{skill, reason}]
+  final_attributes      TEXT,                 -- JSON：STR/DEX/CON/PER/INT/LUK（INITIALIZED 才有）
+  final_skill_ids       TEXT,                 -- JSON：skills 表 ID 列表
+  status                TEXT NOT NULL DEFAULT 'NOT_INITIALIZED'
+                        CHECK (status IN ('NOT_INITIALIZED', 'ANALYZING', 'INITIALIZED', 'FAILED')),
+  error                 TEXT,
+  created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ── Vision 分析日志（禁止记录 API Key / Cookie / Token）──
+CREATE TABLE IF NOT EXISTS vision_analysis_log (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  player_id          INTEGER,
+  roblox_user_id     TEXT,
+  vision_provider    TEXT,
+  vision_model       TEXT,
+  candidate_tags     TEXT,
+  accepted_tags      TEXT,
+  rejected_tags      TEXT,
+  candidate_skills   TEXT,
+  accepted_skills    TEXT,
+  rejected_skills    TEXT,
+  final_attributes   TEXT,
+  final_skills       TEXT,
+  status             TEXT,
+  error              TEXT,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now'))
 );

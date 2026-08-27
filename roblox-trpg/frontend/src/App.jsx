@@ -140,6 +140,7 @@ export default function App() {
           gmStatus={gmStatus}
           modal={modal}
           onOpenModal={setModal}
+          getSessionToken={() => sessionTokenRef.current}
         />
       )}
     </div>

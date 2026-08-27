@@ -233,3 +233,58 @@ Roblox工具/共享状态/并发一致性/版本冲突/Context集成/压缩保�
 - 预览沙箱无外网：Roblox/Web Search/AI 均走各自的"不可用"错误分支（规范行为）
 - `dungeon_rewards` 的 currency 类型奖励尚未接入发放工具（表结构已预留）
 - Anthropic Provider 已实现但未在真实 Anthropic 端点回归（沙箱无外网）
+
+---
+
+# 阶段3b：Avatar Vision + 初始属性 + 初始技能
+
+绑定 Roblox 用户后：公开资料 → Avatar 图片（全身优先、headshot 兜底）→ **独立 Vision Provider**
+→ 候选标签 → **服务器 Rules Engine**（白名单/置信度/限额/冲突）→ 初始属性 + 初始技能 → Player State。
+没有 Roblox 账号 = 培根头：全属性 5、0 技能、**Vision 调用次数 = 0**。
+
+## 关键架构：文字 AI 与 Vision 完全分离
+
+| | 文字 AI（跑团） | Vision（看图） |
+|---|---|---|
+| 配置 | `AI_API_KEY` / `AI_BASE_URL` / `AI_MODEL` | `VISION_API_KEY` / `VISION_BASE_URL` / `VISION_MODEL` |
+| 默认模型 | deepseek-v4-flash | deepseek-v4-flash-vision-exp |
+| 代码 | `services/ai/` | `services/vision/` |
+| 职责 | GM/NPC/叙事/骰子/选项 | 仅视觉观察，输出 UNTRUSTED 候选 |
+
+两套配置互不复用；任一 Provider 故障不影响另一个（已测试）。
+
+## 规则（服务器权威，Vision 不可修改）
+
+- 属性：STR/DEX/CON/PER/INT/LUK，base 5；Clamp 1~10；单次总正加成 ≤6
+- 标签白名单 23 个（`ALLOWED_AVATAR_TAGS`），未知标签 REJECTED_UNKNOWN_TAG
+- 置信度 < 0.70 → REJECTED_LOW_CONFIDENCE
+- 技能：标签 → `avatar_skill_rules` → skills 表（approved）→ 最多 2 个；
+  god_mode/admin/infinite_power 等一律 REJECTED_UNKNOWN_SKILL
+- 初始技能 `source_type=INITIAL_AVATAR`，与副本技能 `DUNGEON` 严格区分（不能靠长相拿副本技能）
+- 状态机：NOT_INITIALIZED → ANALYZING → INITIALIZED / FAILED（可重试）；
+  `avatar_snapshot_hash` + UNIQUE 防重复（刷新/重连不重复发放）
+- 最终写入使用事务（snapshot/属性/技能/状态 原子提交，失败回滚）
+
+## API 与页面
+
+- `POST /api/vision/avatar/analyze`：服务端自查会话→资料→头像→Vision（玩家不能提交属性/技能/图片）
+- `POST /api/vision/avatar/status`：初始化状态回显
+- `GET /vision-test`：仅开发环境的调试页（Request/Raw/Parsed/Validation/Final，不显示 Key）
+
+## 数据库
+
+新增 `avatar_initialization`（快照+结果+状态）、`vision_analysis_log`（审计，禁记 Key）；
+`player_states` 增加 `attributes`；`skills.source_type` 扩展 `INITIAL_AVATAR`/`DUNGEON`；
+种子新增 14 个初始技能（approved 测试夹具）。
+
+## 测试（共 87 项）
+
+```
+npm test               # 16（阶段1/2）+ 30（阶段3）+ 41（阶段3b）
+npm run test:stage3b   # 仅 Vision（本地 mock Vision/AI 双端点）
+```
+
+阶段3b 覆盖：15 类 Avatar 原型 / 低清 / 黑暗 / 遮挡 / 无特征 / 图片文字注入 /
+玩家注入 / 未知标签 / 未知技能 / GOD / ADMIN / INFINITE / STR=999 伪造 /
+10+技能限额 / 重复初始化 / 培根头(0次Vision) / 401·429·503·超时错误 /
+AI↔Vision 配置隔离与互相独立故障 / Key 不泄露 / 属性限额 / 事务一致性。

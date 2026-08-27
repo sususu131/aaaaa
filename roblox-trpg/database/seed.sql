@@ -30,14 +30,31 @@ INSERT OR IGNORE INTO currencies (name, description) VALUES
 UPDATE dungeons SET roblox_universe_id = '2753915549', roblox_place_id = '6516141723'
   WHERE roblox_experience_name = 'Doors' AND roblox_universe_id IS NULL;
 
--- 测试技能（approved，source_type 按流水线规则标注）
+-- 测试技能（approved，source_type=DUNGEON：副本渠道，与 INITIAL_AVATAR 严格区分）
 INSERT OR IGNORE INTO skills (name, description, source_dungeon_id, source_type, skill_type, rarity, status) VALUES
-  ('危险感知', '在威胁临近时获得直觉预警；可做一次骰子判定感知敌人位置。',
-    (SELECT id FROM dungeons WHERE roblox_experience_name = 'Doors'), 'inspired', 'passive', 'rare', 'approved'),
-  ('开锁能力', '可以撬开大多数机械锁。',
-    (SELECT id FROM dungeons WHERE roblox_experience_name = 'Jailbreak'), 'inspired', 'active', 'common', 'approved'),
-  ('果实能力', '获得一颗恶魔果实的力量（具体果实由规则系统决定）。',
-    (SELECT id FROM dungeons WHERE roblox_experience_name = 'Blox Fruits'), 'inspired', 'active', 'legendary', 'approved');
+  ('危险感知', '在威胁临近时获得直觉预警；可做一次骰子判定感知敌人位置。（资料出处：inspired）',
+    (SELECT id FROM dungeons WHERE roblox_experience_name = 'Doors'), 'DUNGEON', 'passive', 'rare', 'approved'),
+  ('开锁能力', '可以撬开大多数机械锁。（资料出处：inspired）',
+    (SELECT id FROM dungeons WHERE roblox_experience_name = 'Jailbreak'), 'DUNGEON', 'active', 'common', 'approved'),
+  ('果实能力', '获得一颗恶魔果实的力量（具体果实由规则系统决定）。（资料出处：inspired）',
+    (SELECT id FROM dungeons WHERE roblox_experience_name = 'Blox Fruits'), 'DUNGEON', 'active', 'legendary', 'approved');
+
+-- 阶段3b：Avatar 初始技能（INITIAL_AVATAR，approved 测试夹具；由服务器 avatar_skill_rules 映射发放）
+INSERT OR IGNORE INTO skills (name, description, source_dungeon_id, source_type, skill_type, rarity, status) VALUES
+  ('fire_affinity',      '火焰亲和：与火焰相关的检定获得情境加成。',        NULL, 'INITIAL_AVATAR', 'passive', 'rare', 'approved'),
+  ('ice_affinity',       '寒冰亲和：与寒冰相关的检定获得情境加成。',        NULL, 'INITIAL_AVATAR', 'passive', 'rare', 'approved'),
+  ('electric_affinity',  '雷电亲和：与电流相关的检定获得情境加成。',        NULL, 'INITIAL_AVATAR', 'passive', 'rare', 'approved'),
+  ('water_affinity',     '流水亲和：与水域相关的检定获得情境加成。',        NULL, 'INITIAL_AVATAR', 'passive', 'rare', 'approved'),
+  ('heavy_combat',       '重装战斗：穿戴重甲作战时更加得心应手。',          NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('ninja_mobility',     '忍者身法：攀爬、潜行与闪避动作更为敏捷。',       NULL, 'INITIAL_AVATAR', 'passive', 'rare', 'approved'),
+  ('aerial_adaptation',  '空中适应：拥有飞行或滑翔相关的行动能力。',        NULL, 'INITIAL_AVATAR', 'passive', 'epic', 'approved'),
+  ('mechanical_affinity','机械亲和：操作与修理机械装置更加高效。',          NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('pirate_instinct',    '海盗直觉：航行、掠夺与海上生存嗅觉敏锐。',        NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('magic_affinity',     '魔法亲和：感知与运用魔力的天赋。',                NULL, 'INITIAL_AVATAR', 'passive', 'epic', 'approved'),
+  ('marksman',           '神射手：远程射击检定获得情境加成。',              NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('royal_command',      '王室威仪：说服与指挥检定时更具影响力。',          NULL, 'INITIAL_AVATAR', 'passive', 'rare', 'approved'),
+  ('beast_sense',        '野兽感知：动物的直觉，察觉危险更早。',            NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('military_drill',     '军事训练：纪律化的战斗动作，稳定可靠。',          NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved');
 
 -- 测试物品（approved）
 INSERT OR IGNORE INTO items (name, description, source_dungeon_id, source_type, rarity, status) VALUES

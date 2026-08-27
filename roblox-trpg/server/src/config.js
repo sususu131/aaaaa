@@ -53,4 +53,8 @@ module.exports = {
   PLAYER_MAX_HP: 999,           // modify_player_state 数值范围上限
   SEARCH_PROVIDER: process.env.SEARCH_PROVIDER || 'null', // null | serper
   SERPER_API_KEY: process.env.SERPER_API_KEY || '',
+
+  // ── 阶段3b：Vision（与文字 AI 配置完全独立，绝不复用 AI_*）──
+  // VISION_API_KEY / VISION_BASE_URL / VISION_MODEL 在调用时读取环境变量
+  VISION_DEFAULT_MODEL: 'deepseek-v4-flash-vision-exp',
 };

@@ -83,13 +83,47 @@ function playerStateContent(room) {
     if (!row) continue;
     const st = playerStates.getPlayerState(row.id);
     const avatar = row.avatar_type === 'roblox' ? 'Roblox形象' : '培根头';
-    const skills = st.skills.length ? st.skills.map((s) => s.name).join('、') : '无';
+    const skills = st.skills.length ? st.skills.map((s) => `${s.name}(${s.grantChannel})`).join('、') : '无';
     const items = st.items.length ? st.items.map((i) => `${i.name}×${i.quantity}`).join('、') : '无';
+    const attrs = st.attributes
+      ? `，属性：${Object.entries(st.attributes).map(([k, v]) => `${k}${v}`).join(' ')}`
+      : '';
     lines.push(
-      `- ${p.name}（${row.uid || '未分配ID'}，${avatar}）HP ${st.hp}/${st.maxHp}，位置：${st.location}，技能：${skills}，物品：${items}`
+      `- ${p.name}（${row.uid || '未分配ID'}，${avatar}）HP ${st.hp}/${st.maxHp}，位置：${st.location}${attrs}，技能：${skills}，物品：${items}`
     );
   }
   return lines.join('\n') || '（房间内没有玩家）';
+}
+
+/**
+ * Avatar / Initial State 分区（Context Viewer 可见；Context 只含最终结果，
+ * 完整 Vision Raw Output 仅存数据库）。区分 AVATAR_DERIVED 与 DUNGEON_REWARD。
+ */
+function avatarContext(room) {
+  const db = getDb();
+  const lines = [];
+  for (const p of room.players) {
+    const row = db.prepare('SELECT * FROM players WHERE socket_id = ?').get(p.socketId);
+    if (!row) continue;
+    const init = db.prepare('SELECT * FROM avatar_initialization WHERE player_id = ?').get(row.id);
+    if (!init) {
+      lines.push(`${p.name}: NOT_INITIALIZED`);
+      continue;
+    }
+    if (init.status === 'INITIALIZED' && init.roblox_user_id === 'bacon') {
+      lines.push(`${p.name}: Bacon Head（无Roblox账号）→ 默认属性全5，初始技能：无 [AVATAR_DERIVED]`);
+      continue;
+    }
+    const attrs = init.final_attributes ? JSON.parse(init.final_attributes) : {};
+    const skills = init.accepted_skills ? JSON.parse(init.accepted_skills) : [];
+    lines.push(
+      `${p.name}: Avatar Source=roblox_api(user:${init.roblox_user_id}) | Vision Model=${init.vision_model || '-'} | ` +
+        `Accepted Tags=[${JSON.parse(init.accepted_tags || '[]').join(',')}] | ` +
+        `属性：${Object.entries(attrs).map(([k, v]) => `${k}${v}`).join(' ')} | ` +
+        `初始技能：${skills.join('、') || '无'} [AVATAR_DERIVED]`
+    );
+  }
+  return lines.join('\n') || '（无）';
 }
 
 function npcStateContent(roomId) {
@@ -177,6 +211,7 @@ function buildContext(room) {
     { key: 'dice_tools', label: 'Dice & Tool Results', content: diceAndToolsContent(room.id) },
     { key: 'memories', label: 'Important Memories', content: memoriesContent(room.id) },
     { key: 'world_vars', label: 'World State (versioned)', content: worldVarsContent(room.id) },
+    { key: 'avatar', label: 'Avatar / Initial State', content: avatarContext(room) },
     { key: 'roblox', label: 'Roblox Source Data', content: robloxBlock },
   ];
 

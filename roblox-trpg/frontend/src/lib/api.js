@@ -19,6 +19,8 @@ async function request(path, options = {}) {
 export const api = {
   registerSessionCookie: (token) =>
     request('/api/session/cookie', { method: 'POST', body: JSON.stringify({ token }) }),
+  visionAnalyze: (sessionToken) =>
+    request('/api/vision/avatar/analyze', { method: 'POST', body: JSON.stringify({ sessionToken }) }),
   robloxUserById: (userId) => request(`/api/roblox/users/${encodeURIComponent(userId)}`),
   robloxUserByUsername: (username) =>
     request('/api/roblox/users/by-username', { method: 'POST', body: JSON.stringify({ username }) }),

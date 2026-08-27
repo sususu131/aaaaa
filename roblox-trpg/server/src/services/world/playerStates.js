@@ -20,14 +20,16 @@ function getPlayerState(playerRowId) {
 
   const skills = db
     .prepare(
-      `SELECT s.name, s.description, s.skill_type, s.rarity, ps.obtained_at,
+      `SELECT s.name, s.description, s.skill_type, s.rarity, s.source_type, ps.obtained_at,
               d.roblox_experience_name AS obtained_from
        FROM player_skills ps
        JOIN skills s ON s.id = ps.skill_id
        LEFT JOIN dungeons d ON d.id = ps.obtained_from_dungeon_id
        WHERE ps.player_id = ?`
     )
-    .all(playerRowId);
+    .all(playerRowId)
+    // AVATAR_DERIVED（初始）与 DUNGEON_REWARD（副本）严格区分
+    .map((sk) => ({ ...sk, grantChannel: sk.source_type === 'INITIAL_AVATAR' ? 'AVATAR_DERIVED' : 'DUNGEON_REWARD' }));
 
   const items = db
     .prepare(
@@ -50,6 +52,7 @@ function getPlayerState(playerRowId) {
     maxHp: s.max_hp,
     statusEffects: JSON.parse(s.status_effects || '[]'),
     location: s.location,
+    attributes: s.attributes ? JSON.parse(s.attributes) : null, // 阶段3b：Avatar 初始属性
     skills,
     items,
     dungeonProgress: progress,

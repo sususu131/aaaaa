@@ -19,6 +19,31 @@ const robloxUsers = require('../services/roblox/robloxUsers');
 const robloxThumbnails = require('../services/roblox/robloxThumbnails');
 const robloxExperiences = require('../services/roblox/robloxExperiences');
 const robloxSearch = require('../services/roblox/robloxSearch');
+const { initializeAvatar } = require('../services/vision/initializeAvatar');
+
+/**
+ * Bacon Head 默认初始化（阶段3b）：无 Roblox 账号 → 全属性5 + 0技能，
+ * 完全不调用 Vision API。入房时异步执行，不阻塞。
+ */
+function maybeBaconInit(io, room, socket) {
+  const row = getDb()
+    .prepare('SELECT id, roblox_profile_id FROM players WHERE socket_id = ?')
+    .get(socket.id);
+  if (!row || row.roblox_profile_id) return;
+  initializeAvatar({ playerRowId: row.id, forceBacon: true })
+    .then((result) => {
+      if (result.status === 'INITIALIZED' && !result.duplicate) {
+        const player = room.players.find((p) => p.socketId === socket.id);
+        io.to(room.id).emit('avatar:initialized', {
+          playerName: player ? player.name : '',
+          bacon: true,
+          attributes: result.attributes,
+          skills: [],
+        });
+      }
+    })
+    .catch(() => {});
+}
 
 /** Tool 广播事件 → 持久化消息类型映射（关键事件可追溯、可进 Context）。 */
 const EVENT_MSG_TYPE = {
@@ -191,6 +216,7 @@ module.exports = function registerSocketHandlers(io) {
       const payload = roomPayload(room, session);
       if (typeof ack === 'function') ack({ ok: true, ...payload });
       socket.emit('room:joined', payload);
+      maybeBaconInit(io, room, socket); // 阶段3b：无 Roblox 账号 → 默认属性，不调用 Vision
     });
 
     /** 加入房间。 */
@@ -221,6 +247,7 @@ module.exports = function registerSocketHandlers(io) {
 
       socket.to(room.id).emit('player:joined', { playerName: name, players: payload.players });
       broadcastSystem(io, room, `${name} 加入了房间`);
+      maybeBaconInit(io, room, socket); // 阶段3b
     });
 
     /** 主动离开房间。 */

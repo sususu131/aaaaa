@@ -9,6 +9,7 @@ const { initDb } = require('@roblox-trpg/database');
 const { PORT } = require('./config');
 const registerSocketHandlers = require('./sockets/handlers');
 const apiRoutes = require('./routes/apiRoutes');
+const visionRoutes = require('./routes/visionRoutes');
 
 // 启动即建表（幂等）
 initDb();
@@ -19,9 +20,10 @@ const io = new Server(server, {
   cors: { origin: '*' },
 });
 
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 3 }));
 app.use('/api', apiRoutes);
+app.use(visionRoutes); // /api/vision/avatar/analyze、/vision-test 等
 
 registerSocketHandlers(io);
 
