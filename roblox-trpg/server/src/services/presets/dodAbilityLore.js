@@ -25,8 +25,9 @@ const ABILITY_EXPLANATION_RULE =
 const LINKED_BACKGROUND_WEIGHT = 3;
 const BASE_ABILITY_WEIGHT = 1;
 
-// ── Ability Lore 目录（阶段19 设定输入）──
+// ── Ability Lore 目录（阶段19 设定输入 + 官方 Flashlight Library）──
 // 字段与 dod_abilities_lore 表一致；synergy 条目仅为结果登记（不实现逻辑）。
+// 共 11 条：8 基础 + 2 Synergy 结果登记 + Flashlight（官方 Library：徒步/探索/向导）。
 const ABILITY_LORE_ENTRIES = [
   {
     id: 'punch',
@@ -140,6 +141,33 @@ const ABILITY_LORE_ENTRIES = [
     synergy_candidates: [],
     synergy_result_of: [],
   },
+  {
+    // 官方 Library（CANON）：Flashlight 居民来自各种背景，多数热爱徒步与探索；
+    // 不少是向导或从事户外工作，偶有技工/水管工；方向感极佳，是导航者与组织者（不是战斗人员）。
+    // 红线：使用机制（光锥/减速/闪光/治疗数值等）属于游戏玩法 —— 不存入 Lore，不实现。
+    id: 'flashlight',
+    name: 'Flashlight',
+    source: SOURCE,
+    category: 'exploration',
+    core_trait: 'Outdoor Experience',
+    explaining_traits: ['Outdoor Experience', 'Navigation'],
+    possible_background: [], // 官方 Library："wide variety, from lots of different backgrounds" —— 无背景锁定
+    lore_description:
+      '该Civilian拥有徒步与户外探索的经历（远足/露营/向导/野外工作），习惯随身携带手电等装备；方向感极佳，熟悉黑暗与野外环境，是队伍中的向导与探路人。',
+    personality_connection:
+      '热爱冒险与探索，向往最深的丛林与最高的山峰；不是战斗人员，习惯走最熟悉的路线，善于用闲聊与趣闻安抚、组织同伴——是导航者与组织者，而非领袖或战士。',
+    synergy_candidates: [], // 无官方 Synergy 数据，不虚构
+    synergy_result_of: [],
+    library_excerpt:
+      'Flashlight civilians come in a wide variety, from lots of different backgrounds, though most simply, they enjoy hiking and general exploration. ' +
+      'Many have a keen sense of adventure and wonder throughout their world, and wish to see into the darkest jungles and tallest peaks of the region. ' +
+      'Though none of them are exactly fighters, they tend to stick to the road most traveled, rarely traveling off course unless they see something cool. ' +
+      'While typically unhelpful during scuffles, they are always nice to have around as navigators. ' +
+      'A good amount of Flashlight civilians are tour guides or otherwise work in nature to some extent, though there is the occasional mechanic or plumber amongst them as well. ' +
+      'They are typically very skilled with their sense of direction, and are good at directing people on where to go to get to their destination. ' +
+      'They have a decent understanding on how to manage other civilians with talking or fun facts, though ultimately are not considered a leader role; ' +
+      'they are best suited as organizers or preparation, and are more or less required for parties of civilians exploring outside of a bunker.',
+  },
   // ── Synergy 结果登记（Lore 预留：只解释设定，不实现任何组合逻辑）──
   {
     id: 'carepad',
@@ -216,26 +244,29 @@ function rowToLore(row) {
     synergy_candidates: parseJson(row.synergy_candidates, []),
     possible_synergy: parseJson(row.synergy_candidates, []), // 别名（Synergy 预留命名）
     synergy_result_of: parseJson(row.synergy_result_of, []),
+    library_excerpt: row.library_excerpt || null, // 官方 Library 文本（CANON；无战斗数值）
   };
 }
 
 /** 幂等播种 dod_abilities_lore（内容可随设定输入更新，按 id 覆盖）。 */
 function ensureAbilityLoreSeeded() {
   const db = getDb();
+  const hasCol = (col) => db.prepare('PRAGMA table_info(dod_abilities_lore)').all().some((c) => c.name === col);
+  const withLibrary = hasCol('library_excerpt');
   const ins = db.prepare(
     `INSERT INTO dod_abilities_lore
        (id, name, source, category, core_trait, explaining_traits, possible_background,
-        lore_description, personality_connection, synergy_candidates, synergy_result_of)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        lore_description, personality_connection, synergy_candidates, synergy_result_of${withLibrary ? ', library_excerpt' : ''})
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${withLibrary ? ', ?' : ''})
      ON CONFLICT(id) DO UPDATE SET
        name = excluded.name, source = excluded.source, category = excluded.category,
        core_trait = excluded.core_trait, explaining_traits = excluded.explaining_traits,
        possible_background = excluded.possible_background, lore_description = excluded.lore_description,
        personality_connection = excluded.personality_connection,
-       synergy_candidates = excluded.synergy_candidates, synergy_result_of = excluded.synergy_result_of`
+       synergy_candidates = excluded.synergy_candidates, synergy_result_of = excluded.synergy_result_of${withLibrary ? ', library_excerpt = excluded.library_excerpt' : ''}`
   );
   for (const e of ABILITY_LORE_ENTRIES) {
-    ins.run(
+    const base = [
       e.id,
       e.name,
       e.source,
@@ -246,8 +277,10 @@ function ensureAbilityLoreSeeded() {
       e.lore_description,
       e.personality_connection,
       JSON.stringify(e.synergy_candidates || []),
-      JSON.stringify(e.synergy_result_of || [])
-    );
+      JSON.stringify(e.synergy_result_of || []),
+    ];
+    if (withLibrary) base.push(e.library_excerpt || null);
+    ins.run(...base);
   }
   return ABILITY_LORE_ENTRIES.length;
 }

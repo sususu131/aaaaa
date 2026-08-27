@@ -281,7 +281,9 @@
       "Weapon Familiarity",
       "Cooking Skill",
       "Special Habit",
-      "Support Facility"
+      "Support Facility",
+      "Outdoor Experience",
+      "Navigation"
     ],
     "trait_note": "Trait 代表个人特点，决定 Ability 出现可能性。",
     "ability_note": "Ability 不是魔法/超能力/技能树，代表 Civilian 利用自身经历生存。",
@@ -298,16 +300,22 @@
         "Cook": ["Hotdog", "Pie"]
       },
       "background_weight_note": "只是概率提高（权重 3，其余 1），不是固定绑定；任何 Civilian 都可能获得任何 Ability（无职业锁定）。",
+      "background_agnostic": {
+        "Flashlight": "官方 Library：Flashlight 居民来自 wide variety of backgrounds（多为徒步/探索爱好者，不少是向导或户外工作者，偶有技工/水管工）——不设关联背景，所有背景权重相同。"
+      },
       "trait_examples": {
         "Caretaker": ["Medical Knowledge", "Empathy", "First Aid Experience"],
-        "Revolver": ["Weapon Familiarity", "Marksmanship"]
+        "Revolver": ["Weapon Familiarity", "Marksmanship"],
+        "Flashlight": ["Outdoor Experience", "Navigation"]
       },
       "trait_note": "Ability 的出现由 Trait 解释（该 Civilian 拥有的人生特点）。",
+      "library_note": "官方 Library 文本（CANON）保存于 dod_abilities_lore.library_excerpt：只含背景/性格设定（如 Flashlight=徒步/探索/向导/组织者，不是战斗人员），不含使用机制与战斗数值。",
       "possible_synergy": {
         "BonusPad": [{ "with": "Caretaker", "result": "CarePad" }],
         "Revolver": [{ "with": "Caretaker", "result": "Loveshot" }]
       },
-      "synergy_note": "只保存 possible_synergy 候选（预留），不实现 Synergy 逻辑。"
+      "synergy_note": "只保存 possible_synergy 候选（预留），不实现 Synergy 逻辑。",
+      "flashlight_note": "Flashlight 为 Lore 项（官方 Library 集成）：解释为徒步/户外探索/向导经历，随身携带手电是生活习惯；使用机制（光锥/减速/闪光/数值）不实现、不入库。"
     },
     "synergy_note": "Synergy 代表能力组合达到大师级水平（不是升级/职业进化）。示例：Caretaker + BonusPad → CarePad。",
     "npc_rule": "NPC 也使用 Civilian 规则；不创建固定英雄，除非 Lore 明确存在。"

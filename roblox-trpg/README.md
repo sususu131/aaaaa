@@ -791,3 +791,20 @@ npm run test:stage19   # 仅阶段19（62 项）
 Background 关联（权重 3/1、同种子对比、统计 120 种子、Cook 也能获得 BonusPad）/
 Trait 解释（与阶段18 亲和一致）/ AI Context（格式四段 + 因果解释 + 无魔法 + 无锁定）/
 Synergy 预留（候选保存、逻辑未新增、Loveshot 不触发）/ 边界（无数值字段、无技能UI、REST 401）。
+
+## 阶段19 增补：Flashlight 官方 Library 集成
+
+- **新增 Ability**：`Flashlight`（category `exploration`）—— Lore 数据库第 11 条。
+  官方 Library：Flashlight 居民来自 wide variety of backgrounds，多数热爱徒步与探索（hiking/exploration），
+  不少是向导（tour guides）或户外工作者，偶有技工/水管工；方向感极佳、擅长指引他人，
+  是队伍中的**导航者与组织者**（not exactly fighters，不是战斗人员/领袖）。
+- **Trait 增补**（官方 Library）：`Outdoor Experience`（徒步/户外经历）、`Navigation`（方向感/引路）
+  —— Trait 池 7→9；Flashlight 的 core_trait = Outdoor Experience。
+- **背景关联**：`possible_background = []`（官方"wide variety of backgrounds"→ 所有背景权重 1，
+  彻底无职业锁定的典型样本）。
+- **library_excerpt 列**（迁移 017）：保存官方 Library 原文（CANON）——仅背景/性格设定；
+  **使用机制（光锥/减速/闪光/治疗/Points 等数值）不实现、不入库**（无 Cooldown/Damage/HP/SP 红线）。
+- **Lore 项边界**：Flashlight 不入 Ability 发放目录（`ABILITY_CATALOG`）、不播种为技能 ——
+  仅用于 AI GM 理解"居民为什么带手电"（徒步/探索/向导的生活习惯）。
+- 测试：62→72 项（新增 Flashlight 专节 63-72：读取/背景无关/Trait 解释/无数值/Context 渲染）；
+  全套 1221 项通过。

@@ -31,6 +31,7 @@ const WORLD_SETTING = {
 };
 
 // ── Trait 池（官方）：个人特点，决定 Ability 出现可能性 ──
+// 阶段19 增补（官方 Flashlight Library）：户外经验 / 方向导航（徒步/探索/向导背景）
 const TRAIT_POOL = [
   'Medical Knowledge',
   'Physical Training',
@@ -39,9 +40,11 @@ const TRAIT_POOL = [
   'Cooking Skill',
   'Special Habit',      // 阶段17 官方（Hotdog）
   'Support Facility',   // 阶段17 官方（BonusPad）
+  'Outdoor Experience', // 阶段19 官方 Library（Flashlight：hiking/exploration）
+  'Navigation',         // 阶段19 官方 Library（Flashlight：sense of direction/tour guide）
 ];
 
-// Trait → Ability 权重映射（官方示例 + 阶段17 官方组合）
+// Trait → Ability 权重映射（官方示例 + 阶段17 官方组合 + 阶段19 Flashlight Library）
 const TRAIT_ABILITY_AFFINITY = {
   'Medical Knowledge': ['Caretaker'],
   'Physical Training': ['Punch'],
@@ -50,6 +53,8 @@ const TRAIT_ABILITY_AFFINITY = {
   'Cooking Skill': ['Hotdog'],
   'Special Habit': ['Hotdog'],
   'Support Facility': ['BonusPad'],
+  'Outdoor Experience': ['Flashlight'], // Lore 登记（Flashlight 为 Lore 项，不在发放目录，权重仅信息性）
+  'Navigation': ['Flashlight'],
 };
 
 // Background → 倾向 Trait（官方：解释为什么拥有某种能力；不是职业系统）
@@ -63,7 +68,7 @@ const BACKGROUND_AFFINITY = {
 };
 
 // Ability 跨世界解释（官方示例：Caretaker 在 DOD=专业生存能力，普通世界=医疗经验）
-// 阶段19 补充 Lore 目录扩展项（Block/Dash/Pie/Loveshot：Lore 解释数据，非发放技能）
+// 阶段19 补充 Lore 目录扩展项（Block/Dash/Pie/Loveshot/Flashlight：Lore 解释数据，非发放技能）
 const ABILITY_INTERPRETATIONS = {
   Punch: { dod: '专业生存能力', default: '强大的身体训练' },
   Caretaker: { dod: '专业生存能力', default: '医疗经验' },
@@ -73,6 +78,7 @@ const ABILITY_INTERPRETATIONS = {
   Dash: { dod: '专业生存能力', default: '敏捷与移动经验' },
   Block: { dod: '专业生存能力', default: '防护与工事经验' },
   Pie: { dod: '专业生存能力', default: '烘焙与烹饪经验' },
+  Flashlight: { dod: '专业生存能力', default: '徒步与户外探索经验' },
   CarePad: { dod: '大师级能力组合', default: '医疗知识 + 工程能力的组合' },
   Loveshot: { dod: '大师级能力组合', default: '射击经验 + 关怀之心的组合（预留）' },
 };

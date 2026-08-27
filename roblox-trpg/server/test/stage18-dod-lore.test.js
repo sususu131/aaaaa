@@ -68,8 +68,8 @@ async function main() {
   ok('5. 未来扩展接口预留（Government/Bunker/Killer/WorldEvents/LoreLocations）');
   assert.ok(Object.values(cfg.future_hooks).every((v) => v === 'reserved'));
   ok('6. 预留接口全部为 reserved（当前不实现）');
-  assert.ok(cfg.civilian && cfg.civilian.backgrounds.length === 6 && cfg.civilian.traits.length === 7);
-  ok('7. 预设携带 Civilian 配置（官方背景/特点池）');
+  assert.ok(cfg.civilian && cfg.civilian.backgrounds.length === 6 && cfg.civilian.traits.length === 9);
+  ok('7. 预设携带 Civilian 配置（官方背景/特点池；阶段19 增补 Outdoor Experience/Navigation）');
   presetSeeder.runPresetSeeder(fakeIo);
   assert.strictEqual(dodCfg().mode, 'LORE_SIMULATION');
   ok('8. 重复导入：Lore 配置保持（幂等）');
@@ -133,8 +133,8 @@ async function main() {
   ok('26. 非法背景拒绝（不创造原创身份）');
 
   // ══ D. Trait 与 Ability 权重 ══
-  assert.ok(dodLore.TRAIT_POOL.length === 7);
-  ok('27. Trait 池（官方 7 项）');
+  assert.ok(dodLore.TRAIT_POOL.length === 9);
+  ok('27. Trait 池（官方 9 项：阶段18 的 7 项 + 阶段19 Flashlight Library 增补 2 项）');
   assert.ok(dodLore.abilityWeight('Caretaker', ['Medical Knowledge']) === 3 && dodLore.abilityWeight('Caretaker', []) === 1);
   ok('28. Trait 提升 Ability 权重（1 + 2×匹配）');
   assert.ok(dodLore.abilityWeight('Revolver', ['Weapon Familiarity']) === 3);

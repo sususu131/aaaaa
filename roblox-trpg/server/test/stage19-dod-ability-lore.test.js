@@ -1,8 +1,9 @@
 /**
- * 阶段19 测试：Civilian Ability Lore Integration（62 项）。
+ * 阶段19 测试：Civilian Ability Lore Integration（72 项）。
  * 覆盖：Ability Lore 数据库读取 / 解释规则（不是魔法）/ Background 权重关联（无职业锁定）/
  *       Trait 解释 / AI Context（DOD_CIVILIAN_CONTEXT + Lore Explanation）/ Synergy 预留 /
- *       边界（无战斗数值字段、无技能UI）。
+ *       边界（无战斗数值字段、无技能UI）/ Flashlight 官方 Library 集成（徒步/探索/向导，
+ *       使用机制与数值不入库）/ library_excerpt 无战斗数值。
  * 红线：不制作游戏技能系统 —— 不实现 Cooldown/Damage/HP/SP/战斗数值/技能UI；不实现 Synergy 逻辑。
  */
 const assert = require('assert');
@@ -57,7 +58,7 @@ const MAGIC_WORDS = /魔法|法术|超能力|召唤|咒语|mana/i;
 const NUMERIC_KEYS = /"(cooldown|damage|hp|sp|attack|crit|mana|combat_value|damage_value)"/i;
 
 async function main() {
-  console.log('[test] 阶段19 就绪（62 项）\n');
+  console.log('[test] 阶段19 就绪（72 项）\n');
 
   presetSeeder.runPresetSeeder(fakeIo);
 
@@ -73,8 +74,8 @@ async function main() {
   assert.strictEqual(db.prepare('SELECT COUNT(*) c FROM dod_abilities_lore').get().c, count1);
   ok('3. 播种幂等（重复运行不重复）');
   const allLore = dodAbilityLore.listAbilityLore();
-  assert.strictEqual(allLore.length, 10); // 8 基础 Ability + 2 Synergy 结果登记
-  ok('4. Lore 目录完整（Punch/Caretaker/Revolver/Hotdog/Pie/BonusPad/Dash/Block + CarePad/Loveshot）');
+  assert.strictEqual(allLore.length, 11); // 8 基础 Ability + 2 Synergy 结果登记 + Flashlight（官方 Library）
+  ok('4. Lore 目录完整（Punch/Caretaker/Revolver/Hotdog/Pie/BonusPad/Dash/Block + CarePad/Loveshot + Flashlight）');
   assert.ok(allLore.every((l) => l.source === 'DIE_OF_DEATH'));
   ok('5. 全部 source = DIE_OF_DEATH');
   assert.ok(allLore.every((l) => l.category && l.core_trait && l.lore_description && l.personality_connection));
@@ -275,12 +276,43 @@ async function main() {
   const res401 = await fetch(url('/api/dod/abilities/lore'));
   assert.strictEqual(res401.status, 401);
   const loreRes = await fetch(url(`/api/dod/abilities/lore?sessionToken=${encodeURIComponent(sess.token)}`)).then((r) => r.json());
-  assert.ok(loreRes.abilities.length === 10 && /不是魔法/.test(loreRes.rule) && /无战斗数值/.test(loreRes.note));
+  assert.ok(loreRes.abilities.length === 11 && /不是魔法/.test(loreRes.rule) && /无战斗数值/.test(loreRes.note));
   ok('62. GET /api/dod/abilities/lore（只读；401 保护；无数值说明）');
+
+  // ══ H. Flashlight（官方 Library 集成：徒步/探索/向导，非游戏机制）══
+  const fl = dodAbilityLore.getAbilityLore('Flashlight');
+  assert.ok(fl && fl.source === 'DIE_OF_DEATH' && fl.category === 'exploration' && dodAbilityLore.getAbilityLore('flashlight').name === 'Flashlight');
+  ok('63. Flashlight Lore 读取（source=DIE_OF_DEATH / category=exploration）');
+  assert.deepStrictEqual(fl.explaining_traits, ['Outdoor Experience', 'Navigation']);
+  ok('64. Flashlight Traits：Outdoor Experience / Navigation（hiking·exploration + sense of direction）');
+  assert.ok(dodLore.TRAIT_POOL.includes('Outdoor Experience') && dodLore.TRAIT_POOL.includes('Navigation'));
+  ok('65. Trait 池含官方增补项（Outdoor Experience / Navigation）');
+  assert.deepStrictEqual(fl.possible_background, []);
+  ok('66. Flashlight 无关联背景（官方 Library：wide variety of backgrounds）');
+  for (const bg of dodCivilian.BACKGROUNDS) {
+    assert.strictEqual(dodAbilityLore.backgroundAbilityWeight('Flashlight', bg), 1);
+  }
+  ok('67. 所有背景权重 = 1（彻底无职业锁定，任何居民都可能拥有）');
+  assert.ok(/徒步|户外|向导/.test(fl.lore_description) && !/光锥|减速|slowness|stud|闪光|Dazed/i.test(fl.lore_description));
+  ok('68. Flashlight 解释为徒步/户外/向导经历（不描述使用机制）');
+  assert.ok(/不是战斗人员|导航者|组织者/.test(fl.personality_connection) && !MAGIC_WORDS.test(fl.personality_connection));
+  ok('69. personality_connection：向导/组织者（官方 Library：not exactly fighters）');
+  assert.ok(fl.library_excerpt && /tour guides/.test(fl.library_excerpt) && /navigators/.test(fl.library_excerpt) && /organizers/.test(fl.library_excerpt));
+  assert.ok(!/\d+(\.\d+)?\s*(s\b|HP|stud|Points)|damage|slowness|cooldown/i.test(fl.library_excerpt));
+  ok('70. library_excerpt 保存官方 Library 文本（CANON；无任何战斗数值/机制数值）');
+  assert.ok(!dodCivilian.ABILITY_CATALOG.some((a) => a.key === 'Flashlight') && !db.prepare("SELECT 1 FROM skills WHERE name = 'Flashlight'").get());
+  ok('71. Flashlight 不入发放目录、不播种技能（Lore 项，非游戏技能系统）');
+  const pFl = mkPlayerDb('向导居民', 'LORE9');
+  mkCivilianDb(pFl.id, 'Artist', ['Outdoor Experience', 'Navigation'], ['Flashlight']);
+  const ctxFl = contextBuilder.buildContext({ id: 'LORE9', players: [{ name: '向导居民', socketId: pFl.socket_id }], currentExperience: null, currentDungeon: null });
+  const flSec = ctxFl.sections.find((s) => s.key === 'civilian').content;
+  assert.ok(/Background: Artist/.test(flSec) && /Abilities: .*Flashlight/.test(flSec) && /Lore Explanation: Flashlight —— .*徒步/.test(flSec) && /没有固定绑定/.test(flSec));
+  assert.ok(!MAGIC_WORDS.test(flSec.replace(/不是魔法/g, '')));
+  ok('72. AI Context 渲染 Flashlight（Lore Explanation=徒步经历 + 无绑定说明；非魔法）');
 
   server.close();
   console.log(`\n[阶段19] 通过 ${passed} 项测试`);
-  if (passed < 58) {
+  if (passed < 68) {
     console.error('测试数量不足！');
     process.exit(1);
   }
