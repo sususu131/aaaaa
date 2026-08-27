@@ -22,7 +22,7 @@ const io = new Server(server, {
 });
 
 app.use(express.json({ limit: '2mb' }));
-app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 3 }));
+app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 4 }));
 app.use('/api', apiRoutes);
 app.use(visionRoutes); // /api/vision/avatar/analyze、/vision-test 等
 app.use(dungeonRoutes); // 阶段4：Dungeon Design Pipeline
