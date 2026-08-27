@@ -79,4 +79,10 @@ export const api = {
     request(`/api/dungeon-instances/${instanceId}/timed-choice`, { method: 'POST', body: JSON.stringify({ choiceIndex, sessionToken }) }),
   getAgentRuns: (roomId) => request(`/api/agent-runs${roomId ? `?roomId=${encodeURIComponent(roomId)}` : ''}`),
   getAgentRun: (id) => request(`/api/agent-runs/${id}`),
+  // ── 阶段8：Quest System ──
+  getQuests: (sessionToken) => request(`/api/quests${sessionToken ? `?sessionToken=${encodeURIComponent(sessionToken)}` : ''}`),
+  getQuestInstance: (id, sessionToken) =>
+    request(`/api/quest-instances/${id}${sessionToken ? `?sessionToken=${encodeURIComponent(sessionToken)}` : ''}`),
+  submitQuestChoice: (id, choiceKey, optionId, sessionToken) =>
+    request(`/api/quest-instances/${id}/choice`, { method: 'POST', body: JSON.stringify({ choiceKey, optionId, sessionToken }) }),
 };

@@ -18,6 +18,7 @@ const tools = require('../ai/tools');
 const im = require('./instanceManager');
 const combatEngine = require('./combatEngine');
 const rewardEngine = require('./rewardEngine');
+const gameEvents = require('../quests/gameEvents');
 
 const RUNTIME_PROMPT_VERSION = 'dungeon-runtime-gm-v1';
 
@@ -103,6 +104,25 @@ function buildRuntimeContext(instance, definition, playerRows) {
     ? `进行中战斗：${combat.encounter_id}，敌方状态：${combat.enemy_states}，回合 ${combat.turn}`
     : '（无进行中战斗）';
 
+  // 阶段8：任务上下文分区（ACTIVE_QUESTS / QUEST_PROGRESS / QUEST_OBJECTIVES）
+  let questBlock = '（无进行中任务）';
+  try {
+    const questEngine = require('../quests/questEngine');
+    const actives = questEngine.activeInstancesInRoom(instance.room_id);
+    if (actives.length) {
+      questBlock = actives
+        .map((qi) => {
+          const full = questEngine.getInstanceFull(qi.id);
+          const objs = full.objectives
+            .map((o) => `  - [${o.status}] ${o.name}（${o.current_count}/${o.required_count}${o.is_optional ? '，可选' : ''}）`)
+            .join('\n');
+          const timer = qi.deadline_at ? `，截止：${qi.deadline_at}` : '';
+          return `任务「${full.quest.name}」（${qi.status}，范围:${qi.progress_scope}${timer}）\n${objs}`;
+        })
+        .join('\n');
+    }
+  } catch { /* Quest 系统不可用时不影响主流程 */ }
+
   const bossBlock = definition.boss
     ? `Boss：${definition.boss.name}（HP ${definition.boss.stats?.hp}）— 只能引用该定义，禁止临时增强。`
     : '（无 Boss）';
@@ -119,6 +139,8 @@ function buildRuntimeContext(instance, definition, playerRows) {
     partyLines.join('\n'),
     `## 战斗`,
     combatBlock,
+    `## 任务（ACTIVE_QUESTS / QUEST_OBJECTIVES）`,
+    questBlock,
     `## 世界状态（version=${world.version}，白名单标志）`,
     JSON.stringify(world.state),
     `## 最近行动日志`,
@@ -263,6 +285,7 @@ async function applyOutput(io, instance, definition, output, playerRows, gmCtx) 
         }
         applied.push({ type: 'SKILL_USED', skill: useRes.skillName, player: p.name, effects: useRes.effects.map((e) => e.type) });
         im.logEvent(instance, 'SKILL_USED', p.name, { skill: useRes.skillName, effects: useRes.effects });
+        gameEvents.emit(io, instance.room_id, { type: 'SKILL_USED', actor: p.name, data: { skill: useRes.skillName }, instanceId: instance.id });
       }
     }
   }
@@ -279,6 +302,12 @@ async function applyOutput(io, instance, definition, output, playerRows, gmCtx) 
       applied.push({ type: 'STATE_CHANGE', flag: sc.flag, value: sc.value, version: r.version });
       im.logEvent(instance, 'STATE_CHANGE', 'ai_gm', { flag: sc.flag, value: sc.value, version: r.version });
       io.to(instance.room_id).emit('world:changed', { field: sc.flag, value: sc.value, version: r.version, source: 'runtime' });
+      // 阶段8：世界状态事件驱动任务（OPEN_DOOR / WORLD_STATE_CHANGED）
+      const actorName = playerRows && playerRows[0] ? playerRows[0].name : null;
+      if (sc.flag === 'door_open' && sc.value === true) {
+        gameEvents.emit(io, instance.room_id, { type: 'DOOR_OPENED', actor: actorName, data: { flag: sc.flag }, instanceId: instance.id });
+      }
+      gameEvents.emit(io, instance.room_id, { type: 'WORLD_STATE_CHANGED', actor: actorName, data: { flag: sc.flag, value: sc.value }, instanceId: instance.id });
     } catch (err) {
       applied.push({ type: 'STATE_REJECTED', flag: sc.flag, reason: err.message });
     }
@@ -321,6 +350,9 @@ async function applyOutput(io, instance, definition, output, playerRows, gmCtx) 
       applied.push({ type: 'SCENE_TRANSITION', from, to: target.id });
       im.logEvent(instance, 'SCENE_TRANSITION', 'ai_gm', { from, to: target.id, reason: output.scene_transition.reason });
       io.to(instance.room_id).emit('instance:scene', { from, to: target.id, name: target.name });
+      // 阶段8：场景事件驱动任务目标（REACH_LOCATION）
+      const sceneActor = playerRows && playerRows[0] ? playerRows[0].name : null;
+      gameEvents.emit(io, instance.room_id, { type: 'PLAYER_ENTERED_SCENE', actor: sceneActor, data: { scene: target.id, sceneName: target.name }, instanceId: instance.id });
       im.applySceneEntryEvents(io, im.getInstance(instance.id), definition, target.id);
     }
   }
@@ -343,6 +375,10 @@ async function applyOutput(io, instance, definition, output, playerRows, gmCtx) 
       im.setStatus(fresh, 'COMPLETED');
       im.logEvent(fresh, 'COMPLETE', 'server', { rewards: rewards.grants.length, skipped: rewards.skipped.length });
       io.to(instance.room_id).emit('instance:completed', { uid: fresh.uid, grants: rewards.grants });
+      // 阶段8：副本完成事件驱动任务（COMPLETE_DUNGEON / SURVIVE / ESCAPE）
+      const doneActor = playerRows && playerRows[0] ? playerRows[0].name : null;
+      gameEvents.emit(io, instance.room_id, { type: 'DUNGEON_COMPLETED', actor: doneActor, data: {}, instanceId: instance.id });
+      gameEvents.emit(io, instance.room_id, { type: 'PLAYER_ESCAPED', actor: doneActor, data: {}, instanceId: instance.id });
       applied.push({ type: 'INSTANCE_COMPLETED', grants: rewards.grants.length });
     }
   }
@@ -434,6 +470,7 @@ async function processAction(io, room, instance, playerRow, text, clientActionId
       im.setStatus(im.getInstance(instance.id), 'FAILED');
       im.logEvent(instance, 'FAILED', 'server', { reason: '全队倒下' });
       io.to(instance.room_id).emit('instance:failed', { uid: instance.uid });
+      gameEvents.emit(io, instance.room_id, { type: 'DUNGEON_FAILED', actor: playerRow.name, data: { reason: '全队倒下' }, instanceId: instance.id });
     }
   }
 

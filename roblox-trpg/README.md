@@ -541,3 +541,55 @@ export AGENT_MAX_TOOL_ROUNDS=8 AGENT_MAX_TOOLS=16 AGENT_MAX_SEARCHES=4 AGENT_MAX
 npm test              # 327 项全套件（16+30+41+42+51+65+82）
 npm run test:stage7   # 仅阶段7
 ```
+
+---
+
+# 阶段8：Quest & Objective System（任务系统 + 目标系统 + 分支任务 + 世界状态联动）
+
+副本 / NPC / 世界事件 / AI GM / 战斗 / 探索 / 物品 / 技能 / 玩家选择，全部可驱动任务进度。
+任务系统只监听 **Game Event Bus** —— 战斗/物品/副本等系统不直接依赖 Quest（解耦）。
+
+## 核心机制
+
+- **状态机**：Quest `AVAILABLE→ACTIVE→COMPLETED/FAILED/ABANDONED`（COMPLETED→ACTIVE 等非法转换被拒；
+  ABANDONED→ACTIVE 明确允许）；Objective `LOCKED→ACTIVE→COMPLETED/FAILED/SKIPPED`
+- **顺序/并行目标**：同 `order_index` 并行；递增顺序解锁（前组完成才解锁下一组）
+- **作用域**：PERSONAL（逐玩家进度，全员完成才算）/ PARTY / ROOM / DUNGEON / WORLD
+- **事件驱动**：18 种游戏事件（PLAYER_ENTERED_DUNGEON/SCENE、ITEM_ACQUIRED、ENEMY_DEFEATED、
+  DOOR_OPENED、SKILL_USED/ACQUIRED、DUNGEON_COMPLETED/FAILED、PLAYER_ESCAPED、WORLD_STATE_CHANGED…）
+- **幂等**：`UNIQUE(quest_instance_id, event_id, objective_id)` —— 同一事件不重复推进
+- **并发**：Objective 计数乐观锁（version），10 事件打 5 计数恰好 5 不过冲
+- **分支任务 + Choice**：目标带 `branch` → 生成 PENDING 选择 → 玩家提交 → 服务器重验（参与者/状态/
+  Condition DSL）→ 激活/跳过分支目标
+- **Condition DSL**：stat_check / has_skill / has_item / has_equipment / quest_completed /
+  world_state / dice_result / dungeon_state / player_count（声明式，绝不执行 JS）
+- **隐藏任务**：事件阈值发现（如熄灯触发「不要回头」），未发现前不可见
+- **时间限制**：服务器时间判定（deadline_at），超时自动 FAILED
+- **AI 工具**：`get_active_quests / get_quest / get_quest_progress / start_quest / abandon_quest /
+  advance_quest / submit_quest_choice`（全部 Tool Registry 验证）；**advance_quest 服务器取证**——
+  AI 叙事不是事实，无事件证据即拒绝（EVIDENCE_INSUFFICIENT）
+- **任务奖励**：复用阶段6 characterService（XP/货币/物品/技能）+ `quest_reward_grants` 幂等；
+  验证拒绝无限 XP / 不存在的技能物品
+- **版本化**：运行中实例绑定 quest_version，发布新版本不影响进行中任务
+- **副本联动**：副本开始自动加载绑定的已发布任务；任务目标由副本事件驱动；通关结算奖励
+- **Context**：ACTIVE_QUESTS / QUEST_OBJECTIVES 分区进入 GM 上下文；压缩不影响当前目标（DB 新鲜构建）
+- **UI**：QuestPanel（任务/目标进度条/分支按钮/倒计时）+ 任务通知 Toast；Quest Designer/Publish REST
+
+## 数据库变更（005_stage8_quest_system）
+
+`quests` / `quest_versions`（DRAFT/REVIEW/PUBLISHED/ARCHIVED）/ `quest_instances`（+乐观锁 version）/
+`quest_participants` / `quest_objectives` / `quest_objective_instances`（+乐观锁）/ `quest_events`
+（审计+事件幂等唯一约束）/ `quest_choices` / `game_events`（Event Bus）/ `quest_reward_grants`（幂等）；
+种子新增 DOORS 主线任务「逃离多尔斯旅馆」+ 隐藏任务「不要回头」（PUBLISHED）。
+
+## 测试
+
+```
+npm test              # 397 项全套件（16+30+41+42+51+65+82+70）
+npm run test:stage8   # 仅阶段8（70 项）
+```
+
+阶段8 覆盖：生命周期/状态机守卫、单/多/顺序/并行/计数目标、4 种作用域、分支+条件+选择验证、
+隐藏任务、时间限制、失败条件、奖励（含幂等/非法奖励/不存在技能物品）、事件幂等、乐观锁并发、
+AI 工具全 7 个、AI 作弊拒绝、跨房间隔离、版本化、Context/压缩、3 人 DOORS 完整集成
+（进入→找钥匙→开门→隐藏任务→通关→奖励一次结算→断线恢复）。

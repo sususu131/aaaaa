@@ -104,3 +104,50 @@ UPDATE items SET kind = 'weapon', slot = 'weapon', stacking = 'NON_STACKABLE', s
 
 -- 阶段6：种子副本补齐 uid（迁移先于种子执行，故种子也需回填）
 UPDATE dungeons SET uid = 'dungeon_' || REPLACE(LOWER(roblox_experience_name), ' ', '_') WHERE uid IS NULL;
+
+-- ============================================================
+-- 阶段8：示例任务（DOORS 主线 + 隐藏任务），PUBLISHED，可立即被副本加载
+-- ============================================================
+INSERT OR IGNORE INTO quests (uid, name, description, type, status, source_type, dungeon_id, difficulty, max_players)
+VALUES ('quest_doors_main', '逃离多尔斯旅馆', '进入多尔斯旅馆，找到钥匙，打开门，活着逃离。', 'MAIN', 'ACTIVE', 'DESIGNER',
+        (SELECT id FROM dungeons WHERE roblox_experience_name = 'Doors'), 3, 3);
+
+INSERT OR IGNORE INTO quest_versions (quest_id, version, definition_json, status, published_at)
+SELECT q.id, 1, '{"scope":"PARTY","rewards":[{"type":"XP","amount":500},{"type":"CURRENCY","currency":"金币","amount":500},{"type":"SKILL","skill":"危险感知"}]}', 'PUBLISHED', datetime('now')
+FROM quests q WHERE q.uid = 'quest_doors_main'
+  AND NOT EXISTS (SELECT 1 FROM quest_versions qv WHERE qv.quest_id = q.id AND qv.version = 1);
+
+INSERT OR IGNORE INTO quest_objectives (quest_version_id, objective_key, name, description, type, required_count, order_index, is_optional, definition_json)
+SELECT qv.id, 'enter_dungeon', '进入旅馆', '进入多尔斯旅馆副本', 'ENTER_DUNGEON', 1, 1, 0, '{}'
+FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id
+WHERE q.uid = 'quest_doors_main' AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'enter_dungeon');
+
+INSERT OR IGNORE INTO quest_objectives (quest_version_id, objective_key, name, description, type, required_count, order_index, is_optional, definition_json)
+SELECT qv.id, 'find_key', '找到钥匙', '找到骨架钥匙', 'COLLECT_ITEM', 1, 2, 0, '{"event_type":"ITEM_ACQUIRED","match":{"item":"骨架钥匙"}}'
+FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id
+WHERE q.uid = 'quest_doors_main' AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'find_key');
+
+INSERT OR IGNORE INTO quest_objectives (quest_version_id, objective_key, name, description, type, required_count, order_index, is_optional, definition_json)
+SELECT qv.id, 'open_door', '打开房门', '打开那扇门', 'OPEN_DOOR', 1, 3, 0, '{"event_type":"DOOR_OPENED","match":{"flag":"door_open"}}'
+FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id
+WHERE q.uid = 'quest_doors_main' AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'open_door');
+
+INSERT OR IGNORE INTO quest_objectives (quest_version_id, objective_key, name, description, type, required_count, order_index, is_optional, definition_json)
+SELECT qv.id, 'escape', '逃离副本', '活着逃离多尔斯旅馆', 'ESCAPE', 1, 4, 0, '{}'
+FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id
+WHERE q.uid = 'quest_doors_main' AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'escape');
+
+-- 隐藏任务：熄灯事件后触发发现
+INSERT OR IGNORE INTO quests (uid, name, description, type, status, source_type, dungeon_id, difficulty, max_players)
+VALUES ('quest_doors_hidden', '不要回头', '它在看着你。别回头。', 'HIDDEN', 'ACTIVE', 'DESIGNER',
+        (SELECT id FROM dungeons WHERE roblox_experience_name = 'Doors'), 4, 3);
+
+INSERT OR IGNORE INTO quest_versions (quest_id, version, definition_json, status, published_at)
+SELECT q.id, 1, '{"scope":"PARTY","hidden":true,"discovery":{"event_type":"WORLD_STATE_CHANGED","match":{"flag":"lights_out"},"count":1},"rewards":[{"type":"XP","amount":200}]}', 'PUBLISHED', datetime('now')
+FROM quests q WHERE q.uid = 'quest_doors_hidden'
+  AND NOT EXISTS (SELECT 1 FROM quest_versions qv WHERE qv.quest_id = q.id AND qv.version = 1);
+
+INSERT OR IGNORE INTO quest_objectives (quest_version_id, objective_key, name, description, type, required_count, order_index, is_optional, definition_json)
+SELECT qv.id, 'reach_hall', '深入走廊', '不要回头，一直走到走廊深处', 'REACH_LOCATION', 1, 1, 0, '{"event_type":"PLAYER_ENTERED_SCENE","match":{"scene":"scene_hall"}}'
+FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id
+WHERE q.uid = 'quest_doors_hidden' AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'reach_hall');

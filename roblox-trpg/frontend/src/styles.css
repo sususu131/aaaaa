@@ -565,3 +565,22 @@ body {
 .timed-fill.danger { background: #f44336; }
 .option-btn.timed { background: #a33; }
 .option-btn.timed:hover { background: #c44; }
+
+/* ── 阶段8：Quest 面板 + Toast ── */
+.quest-card {
+  background: #1b1f2a;
+  border: 1px solid #2c3242;
+  border-radius: 10px;
+  padding: 12px;
+}
+.quest-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.quest-obj { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.quest-obj-status { width: 18px; text-align: center; color: #7fd18b; }
+.quest-obj-name { font-size: 13px; }
+.toast-stack { position: fixed; top: 16px; right: 16px; z-index: 99; display: flex; flex-direction: column; gap: 8px; }
+.quest-toast {
+  background: #232836; border: 1px solid #3f6ce0; border-radius: 10px;
+  padding: 10px 14px; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  animation: toast-in .2s ease-out;
+}
+@keyframes toast-in { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }

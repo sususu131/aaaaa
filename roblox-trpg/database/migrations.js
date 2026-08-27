@@ -9,6 +9,144 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '005_stage8_quest_system',
+    up(db) {
+      // 任务定义（版本化的父记录）
+      db.exec(`CREATE TABLE IF NOT EXISTS quests (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        uid           TEXT UNIQUE,
+        name          TEXT NOT NULL,
+        description   TEXT,
+        type          TEXT NOT NULL DEFAULT 'SIDE'
+                      CHECK (type IN ('MAIN','SIDE','DUNGEON','HIDDEN','EVENT','PERSONAL')),
+        status        TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','ACTIVE','ARCHIVED')),
+        source_type   TEXT,                              -- ROBLOX_EXPERIENCE / AI_GENERATED / DESIGNER
+        source_id     TEXT,
+        dungeon_id    INTEGER REFERENCES dungeons(id),   -- 关联副本（副本生命周期联动）
+        difficulty    INTEGER NOT NULL DEFAULT 1,
+        is_repeatable INTEGER NOT NULL DEFAULT 0,
+        max_players   INTEGER NOT NULL DEFAULT 3,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      // 任务版本（运行中任务绑定版本，设计修改不影响进行中实例）
+      db.exec(`CREATE TABLE IF NOT EXISTS quest_versions (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        quest_id        INTEGER NOT NULL REFERENCES quests(id),
+        version         INTEGER NOT NULL,
+        definition_json TEXT NOT NULL,     -- objectives/conditions/rewards/time_limit/branches/hidden/scope
+        status          TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT','REVIEW','PUBLISHED','ARCHIVED')),
+        created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+        published_at    TEXT,
+        UNIQUE (quest_id, version)
+      )`);
+      // 任务实例（玩家实际执行）
+      db.exec(`CREATE TABLE IF NOT EXISTS quest_instances (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        uid                 TEXT UNIQUE,
+        quest_version_id    INTEGER NOT NULL REFERENCES quest_versions(id),
+        room_id             TEXT NOT NULL,
+        dungeon_instance_id INTEGER REFERENCES dungeon_instances(id),
+        status              TEXT NOT NULL DEFAULT 'AVAILABLE'
+                            CHECK (status IN ('AVAILABLE','ACTIVE','PAUSED','COMPLETED','FAILED','ABANDONED')),
+        progress_scope      TEXT NOT NULL DEFAULT 'PERSONAL',
+        deadline_at         TEXT,                       -- 服务器时间限制（不用客户端时间）
+        version             INTEGER NOT NULL DEFAULT 1, -- 乐观锁
+        started_at          TEXT,
+        completed_at        TEXT,
+        failed_at           TEXT,
+        created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      // 参与者（个人 + 多人共享）
+      db.exec(`CREATE TABLE IF NOT EXISTS quest_participants (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        quest_instance_id INTEGER NOT NULL REFERENCES quest_instances(id),
+        player_id         INTEGER NOT NULL REFERENCES players(id),
+        status            TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','COMPLETED','FAILED','LEFT')),
+        joined_at         TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (quest_instance_id, player_id)
+      )`);
+      // 目标定义（属于版本）
+      db.exec(`CREATE TABLE IF NOT EXISTS quest_objectives (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        quest_version_id INTEGER NOT NULL REFERENCES quest_versions(id),
+        objective_key    TEXT NOT NULL,
+        name             TEXT NOT NULL,
+        description      TEXT,
+        type             TEXT NOT NULL,   -- REACH_LOCATION/ENTER_DUNGEON/OPEN_DOOR/COLLECT_ITEM/...
+        required_count   INTEGER NOT NULL DEFAULT 1,
+        order_index      INTEGER NOT NULL DEFAULT 1,  -- 同 index = 并行；递增 = 顺序
+        is_optional      INTEGER NOT NULL DEFAULT 0,
+        definition_json  TEXT,            -- event_type/match/branch/conditions
+        UNIQUE (quest_version_id, objective_key)
+      )`);
+      // 目标运行时实例（不修改定义）
+      db.exec(`CREATE TABLE IF NOT EXISTS quest_objective_instances (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        quest_instance_id INTEGER NOT NULL REFERENCES quest_instances(id),
+        objective_id      INTEGER NOT NULL REFERENCES quest_objectives(id),
+        status            TEXT NOT NULL DEFAULT 'LOCKED'
+                          CHECK (status IN ('LOCKED','ACTIVE','COMPLETED','FAILED','SKIPPED')),
+        current_count     INTEGER NOT NULL DEFAULT 0,
+        required_count    INTEGER NOT NULL DEFAULT 1,
+        progress_json     TEXT,           -- PERSONAL 作用域：{playerId: count}
+        version           INTEGER NOT NULL DEFAULT 1,  -- 乐观锁（并发推进防护）
+        completed_at      TEXT,
+        UNIQUE (quest_instance_id, objective_id)
+      )`);
+      // 任务事件日志（debug/replay/断线恢复/审计）+ 事件幂等唯一约束
+      db.exec(`CREATE TABLE IF NOT EXISTS quest_events (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        quest_instance_id INTEGER NOT NULL REFERENCES quest_instances(id),
+        player_id         INTEGER,
+        event_id          TEXT,
+        event_type        TEXT NOT NULL,
+        objective_id      INTEGER,
+        before_state      TEXT,
+        after_state       TEXT,
+        created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (quest_instance_id, event_id, objective_id)  -- 同一 event 不能重复推进同一目标
+      )`);
+      // 玩家选择（分支）：服务器验证后解析
+      db.exec(`CREATE TABLE IF NOT EXISTS quest_choices (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        quest_instance_id INTEGER NOT NULL REFERENCES quest_instances(id),
+        choice_key        TEXT NOT NULL,
+        options_json      TEXT NOT NULL,
+        status            TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','RESOLVED')),
+        chosen_by         INTEGER REFERENCES players(id),
+        chosen_option     TEXT,
+        resolved_at       TEXT,
+        UNIQUE (quest_instance_id, choice_key)
+      )`);
+      // Game Event Bus 日志（全局事件流；quest 幂等处理的依据）
+      db.exec(`CREATE TABLE IF NOT EXISTS game_events (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        uid         TEXT UNIQUE,
+        room_id     TEXT,
+        instance_id INTEGER,
+        type        TEXT NOT NULL,
+        actor       TEXT,
+        data        TEXT,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_game_events_room ON game_events(room_id, id)');
+      // 任务奖励幂等（复用阶段5 reward_grants 机制；独立表避免 FK 冲突）
+      db.exec(`CREATE TABLE IF NOT EXISTS quest_reward_grants (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        grant_uid         TEXT UNIQUE,
+        quest_instance_id INTEGER NOT NULL REFERENCES quest_instances(id),
+        player_id         INTEGER NOT NULL REFERENCES players(id),
+        reward_key        TEXT NOT NULL,
+        reward_type       TEXT NOT NULL,
+        status            TEXT NOT NULL DEFAULT 'GRANTED' CHECK (status IN ('GRANTED','SKIPPED')),
+        granted_at        TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (quest_instance_id, player_id, reward_key)
+      )`);
+    },
+  },
+  {
     name: '004_stage7_agent_runtime',
     up(db) {
       // Agent Run 追踪（阶段7 第四十一节）

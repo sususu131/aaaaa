@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import PlayerList from './PlayerList.jsx';
 import ChatPanel from './ChatPanel.jsx';
 import ContextViewer from './ContextViewer.jsx';
@@ -7,6 +7,8 @@ import DungeonDesigner from './DungeonDesigner.jsx';
 import DungeonRuntime from './DungeonRuntime.jsx';
 import CharacterPanel from './CharacterPanel.jsx';
 import RobloxBindPanel from './RobloxBindPanel.jsx';
+import QuestPanel from './QuestPanel.jsx';
+import { socket } from '../lib/socket.js';
 
 /**
  * 房间视图：房间ID / 副本卡片 / 玩家列表 / 聊天区 + 三个功能面板。
@@ -27,6 +29,26 @@ export default function RoomScreen({
   getSessionToken,
 }) {
   const [copied, setCopied] = useState(false);
+  const [toasts, setToasts] = useState([]);
+
+  // 任务通知（第三十二节）：QUEST_STARTED / OBJECTIVE_COMPLETED / COMPLETED / FAILED / BRANCH / REWARD
+  useEffect(() => {
+    const label = {
+      QUEST_STARTED: '📜 新任务开始',
+      QUEST_OBJECTIVE_COMPLETED: '✓ 任务目标完成',
+      QUEST_COMPLETED: '🎉 任务完成！',
+      QUEST_FAILED: '❌ 任务失败',
+      QUEST_BRANCH: '🔀 任务出现分支',
+      QUEST_REWARD: '🎁 任务奖励结算',
+    };
+    const onQuestEvent = (e) => {
+      const id = `${Date.now()}_${Math.random()}`;
+      setToasts((t) => [...t.slice(-4), { id, text: `${label[e.type] || e.type}${e.objective ? `：${e.objective}` : ''}` }]);
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
+    };
+    socket.on('quest:event', onQuestEvent);
+    return () => socket.off('quest:event', onQuestEvent);
+  }, []);
 
   const copyRoomId = async () => {
     try {
@@ -69,10 +91,23 @@ export default function RoomScreen({
         <button className="btn small" onClick={() => onOpenModal(modal === 'character' ? null : 'character')}>
           角色
         </button>
+        <button className="btn small" onClick={() => onOpenModal(modal === 'quest' ? null : 'quest')}>
+          任务
+        </button>
         <button className="btn danger" onClick={onLeave}>
           离开
         </button>
       </div>
+
+      {toasts.length > 0 && (
+        <div className="toast-stack">
+          {toasts.map((t) => (
+            <div key={t.id} className="quest-toast">
+              {t.text}
+            </div>
+          ))}
+        </div>
+      )}
 
       {(room.experience || room.dungeon) && (
         <div className="dungeon-banner">
@@ -135,6 +170,7 @@ export default function RoomScreen({
           getSessionToken={getSessionToken}
         />
       )}
+      {modal === 'quest' && <QuestPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
     </main>
   );
 }

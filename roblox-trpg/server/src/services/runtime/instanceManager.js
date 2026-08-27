@@ -150,6 +150,14 @@ function startInstance(io, instance) {
     } catch { /* 快照失败不阻塞开始 */ }
   }
 
+  // 阶段8：加载副本绑定的任务定义 → 创建任务实例 → 玩家进入事件驱动目标
+  try {
+    const questEngine = require('../quests/questEngine');
+    questEngine.onDungeonInstanceStarted(io, fresh, party);
+  } catch (err) {
+    console.error('[instanceManager] quest auto-start error:', err.message);
+  }
+
   applySceneEntryEvents(io, fresh, definition, firstScene.id);
   broadcastUpdate(io, fresh);
   return getInstance(instance.id);
@@ -157,6 +165,7 @@ function startInstance(io, instance) {
 
 /** 场景进入时的声明式事件（阶段4 事件模型：仅声明式动作，由服务器执行）。 */
 function applySceneEntryEvents(io, instance, definition, sceneId) {
+  const gameEvents = require('../quests/gameEvents');
   const scene = (definition.scenes || []).find((s) => s.id === sceneId);
   if (!scene) return;
   const eventIds = scene.events || [];
@@ -172,6 +181,13 @@ function applySceneEntryEvents(io, instance, definition, sceneId) {
           });
           logEvent(instance, 'EVENT', `event:${evt.id}`, { flag: action.flag, value: action.value });
           io.to(instance.room_id).emit('world:changed', { flag: action.flag, value: action.value, source: 'event' });
+          // 阶段8：世界状态变化 → Game Event（驱动隐藏任务发现等）
+          gameEvents.emit(io, instance.room_id, {
+            type: 'WORLD_STATE_CHANGED',
+            actor: `event:${evt.id}`,
+            data: { flag: action.flag, value: action.value },
+            instanceId: instance.id,
+          });
         } catch {
           /* 版本冲突等：声明式事件失败不阻塞场景 */
         }

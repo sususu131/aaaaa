@@ -156,6 +156,14 @@ const TOOL_META = {
   get_roblox_experience: { permission: 'ROBLOX', scopes: ['lobby', 'room', 'dungeon'] },
   get_roblox_user: { permission: 'ROBLOX', scopes: ['lobby', 'room', 'dungeon'] },
   get_roblox_avatar: { permission: 'ROBLOX', scopes: ['lobby', 'room', 'dungeon'] },
+  // 阶段8：Quest 工具
+  get_active_quests: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  get_quest: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  get_quest_progress: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  start_quest: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  abandon_quest: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  advance_quest: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  submit_quest_choice: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
 };
 
 function toolMeta(name) {
@@ -209,3 +217,5 @@ require('./getScene');
 require('./damageHeal');
 require('./useSkill');
 require('./robloxSearch');
+// 阶段8 新增
+require('./questTools');

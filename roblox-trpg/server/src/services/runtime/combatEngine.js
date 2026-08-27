@@ -170,6 +170,19 @@ function attack(io, instance, definition, combat, playerRowId, targetId, { rollO
     events,
   });
 
+  // 阶段8：敌人被击败事件（驱动 DEFEAT_ENEMY 任务目标）
+  if (enemy.hp <= 0) {
+    const gameEvents = require('../quests/gameEvents');
+    const byPlayer = db.prepare('SELECT name FROM players WHERE id = ?').get(playerRowId);
+    gameEvents.emit(io, instance.room_id, {
+      type: 'ENEMY_DEFEATED',
+      actor: byPlayer ? byPlayer.name : null,
+      actorPlayerId: playerRowId,
+      data: { enemy: targetId, enemyName: enemy.name, isBoss: Boolean(enemy.isBoss) },
+      instanceId: instance.id,
+    });
+  }
+
   const updated = db.prepare('SELECT * FROM instance_combats WHERE id = ?').get(combat.id);
   io.to(instance.room_id).emit('instance:combat', { ...serialize(updated), lastRoll: rollResult, events });
   return { combat: updated, rollResult, events, narrative, resolved: finalStatus === 'RESOLVED' };

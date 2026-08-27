@@ -191,8 +191,18 @@ function settleCompletion(io, instance, definition) {
     characterService.clearTemporaryModifiers(playerRowId, instance.id);
   }
 
+  const gameEvents = require('../quests/gameEvents');
   for (const g of grants) {
     im.logEvent(instance, 'REWARD', g.player, g);
+    // 阶段8：奖励事件驱动任务（COLLECT_ITEM / ACQUIRE_ITEM / ACQUIRE_SKILL）
+    const pRow = db.prepare('SELECT id FROM players WHERE name = ?').get(g.player);
+    if (g.type === 'ITEM' || g.type === 'EQUIPMENT') {
+      gameEvents.emit(io, instance.room_id, { type: 'ITEM_ACQUIRED', actor: g.player, actorPlayerId: pRow && pRow.id, data: { item: g.name, itemName: g.name }, instanceId: instance.id });
+    } else if (g.type === 'SKILL') {
+      gameEvents.emit(io, instance.room_id, { type: 'SKILL_ACQUIRED', actor: g.player, actorPlayerId: pRow && pRow.id, data: { skill: g.name }, instanceId: instance.id });
+    } else if (g.type === 'CURRENCY') {
+      gameEvents.emit(io, instance.room_id, { type: 'ITEM_ACQUIRED', actor: g.player, actorPlayerId: pRow && pRow.id, data: { item: `currency:${g.name}`, amount: g.amount }, instanceId: instance.id });
+    }
   }
   io.to(instance.room_id).emit('instance:reward', { grants, skipped });
   return { grants, skipped };
