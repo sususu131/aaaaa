@@ -350,3 +350,68 @@ frontend/src/components/       DungeonDesigner.jsx
 npm run test:stage4    # 42 项（mock AI/Vision + 脚本化 Roblox stub，无需外网）
 npm test               # 129 项全套件
 ```
+
+---
+
+# 阶段5：Dungeon Runtime（已发布副本运行系统）
+
+PUBLISHED Dungeon Version → **Dungeon Instance**（一次实际游戏）：2~3 人共享同一个世界、
+行动经服务器排队裁定、AI GM（复用，非第二套）驱动叙事、双骰拼点战斗（复用）、
+场景推进、Boss 阶段、声明式事件、通关结算（复用 Reward Validation Chain）、
+奖励幂等发放、全程事件日志（可重放数据）、断线恢复。
+
+**复用（零重写）**：Session/@AI/@玩家/聊天（阶段2）、Dice Engine/World State 乐观锁/
+Tool Registry/Player State/属性系统（阶段3）、Definition/版本/奖励表（阶段4）、
+Context 压缩（阶段2）。AI GM 仍是同一个 Agent/Provider 体系，仅新增 Runtime 专用 Prompt 与输出模式。
+
+## 新增结构
+
+- `dungeon_instances`：uid / version_id / room_id / 状态机（WAITING→RUNNING→COMPLETED/FAILED/ABORTED）/
+  current_scene_id / world_state_version / party（座位制 JSON）
+- `instance_actions`：队列 + sequence + 状态（PENDING/PROCESSING/RESOLVED/REJECTED/FAILED）+ client_action_id 幂等
+- `instance_events`：ACTION/ROLL/STATE_CHANGE/SCENE_TRANSITION/COMBAT/REWARD/NARRATION… 单调 sequence（Replay 数据）
+- `instance_combats`：turn/round/enemy_states/player_states/boss_phase/version（乐观锁 Combat Lock）
+- `reward_grants`：grant_uid + UNIQUE(instance_id, player_id, reward_key)（奖励幂等）
+
+## 新增文件
+
+```
+server/src/services/runtime/   instanceManager.js / runtimeEngine.js / combatEngine.js / rewardEngine.js
+server/src/routes/             runtimeRoutes.js
+server/test/                   stage5-runtime.test.js（51 项）
+frontend/src/components/       DungeonRuntime.jsx
+```
+
+## API（阶段5）
+
+| 方法/路径 | 说明 |
+|---|---|
+| `GET /api/dungeons` | 副本列表（含已发布版本） |
+| `POST /api/dungeon-instances` | 在玩家当前房间创建实例（仅 PUBLISHED；同房间唯一活跃实例） |
+| `POST /api/dungeon-instances/:id/join` | 加入（仅 WAITING；2~3 人；运行中禁止） |
+| `POST /api/dungeon-instances/:id/start` | 开始（≥2 人；初始化场景/世界/事件） |
+| `POST /api/dungeon-instances/:id/actions` | 提交 Action（`await:true` 同步返回结果；幂等键 `clientActionId`） |
+| `GET /api/dungeon-instances/:id` | 完整快照（断线恢复：场景/队伍/HP/属性/技能/战斗/世界状态） |
+| `GET /api/dungeon-instances/:id/events` | 事件日志（Replay） |
+| `POST /api/dungeon-instances/:id/leave` | 离开 |
+
+## 运行与多人演示
+
+```
+npm test              # 180 项全套件（16+30+41+42+51）
+npm run test:stage5   # 仅阶段5
+npm run dev
+```
+
+1. 「副本设计」生成→审核→发布一个副本（或测试库中已有）
+2. 浏览器A 建房，浏览器B 加入房间
+3. 任一玩家开「副本运行」→ 选已发布版本 → 创建实例；另一玩家同面板点「加入实例」
+4. 「开始」（≥2人）→ 共享场景出现；聊天 `@AI ...` 或面板「行动」提交动作
+5. 服务器排队裁定：叙事/双骰战斗/场景推进/事件 → 全体实时同步（Socket.IO）
+6. 击败 Boss → `@AI 我们完成了` → COMPLETED → 奖励经验证发放 → 技能进入玩家技能库
+7. 刷新页面：`instance:sync` + GET 快照恢复；房主断线副本不消失
+
+## 防作弊与幂等
+
+客户端只能提交 Action 文本；骰子/HP/金币/技能/场景跳转/Boss 数值全部服务器裁定。
+client_action_id / tool_call_id / reward_grant_id 三层幂等；并发 Action 串行队列 + 乐观锁。

@@ -136,6 +136,26 @@ async function triggerGm(io, socket, room, player, text) {
     return;
   }
 
+  // 阶段5：房间有 RUNNING 副本实例且发言者在队伍中 → 走 Runtime GM（实例 Context）
+  const { getActiveByRoom } = require('../services/runtime/instanceManager');
+  const runtimeEngine = require('../services/runtime/runtimeEngine');
+  const activeInstance = getActiveByRoom(room.id);
+  if (activeInstance && activeInstance.status === 'RUNNING') {
+    const playerRow = getDb().prepare('SELECT * FROM players WHERE socket_id = ?').get(socket.id);
+    if (playerRow && JSON.parse(activeInstance.party || '[]').includes(playerRow.id)) {
+      room.gmBusy = true;
+      try {
+        await runtimeEngine.submitAction(io, room, activeInstance, playerRow, text, null);
+      } catch (err) {
+        broadcastSystem(io, room, `GM 无法回应：${err.message || '未知错误'}`);
+      } finally {
+        room.gmBusy = false;
+        io.to(room.id).emit('gm:status', { status: null });
+      }
+      return;
+    }
+  }
+
   room.gmBusy = true;
   const ctx = {
     io,
@@ -449,7 +469,23 @@ module.exports = function registerSocketHandlers(io) {
       }
     });
 
-    /** 断线即离开。 */
+    /** 阶段5：断线重连后同步房间活跃副本实例（实例独立于房主会话）。 */
+    socket.on('instance:sync', (_data, ack) => {
+      const room = roomManager.findRoomBySocket(socket.id);
+      if (!room) return typeof ack === 'function' && ack({ ok: false, error: '不在房间中' });
+      const { getActiveByRoom } = require('../services/runtime/instanceManager');
+      const inst = getActiveByRoom(room.id);
+      if (typeof ack === 'function') {
+        ack({
+          ok: true,
+          instance: inst
+            ? { uid: inst.uid, status: inst.status, currentSceneId: inst.current_scene_id, party: JSON.parse(inst.party || '[]') }
+            : null,
+        });
+      }
+    });
+
+    /** 断线即离开房间（副本实例不受影响：座位保留，可重连恢复）。 */
     socket.on('disconnect', () => {
       leaveCurrentRoom(io, socket);
     });

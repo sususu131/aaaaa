@@ -4,6 +4,7 @@ import ChatPanel from './ChatPanel.jsx';
 import ContextViewer from './ContextViewer.jsx';
 import DungeonPanel from './DungeonPanel.jsx';
 import DungeonDesigner from './DungeonDesigner.jsx';
+import DungeonRuntime from './DungeonRuntime.jsx';
 import RobloxBindPanel from './RobloxBindPanel.jsx';
 
 /**
@@ -58,6 +59,9 @@ export default function RoomScreen({
         <button className="btn small" onClick={() => onOpenModal(modal === 'designer' ? null : 'designer')}>
           副本设计
         </button>
+        <button className="btn small" onClick={() => onOpenModal(modal === 'runtime' ? null : 'runtime')}>
+          副本运行
+        </button>
         <button className="btn small" onClick={() => onOpenModal(modal === 'avatar' ? null : 'avatar')}>
           Roblox形象
         </button>
@@ -106,6 +110,9 @@ export default function RoomScreen({
 
       {modal === 'context' && <ContextViewer onClose={() => onOpenModal(null)} />}
       {modal === 'designer' && <DungeonDesigner onClose={() => onOpenModal(null)} />}
+      {modal === 'runtime' && (
+        <DungeonRuntime onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} onPickOption={onPickOption} />
+      )}
       {modal === 'dungeon' && (
         <DungeonPanel current={room.experience} currentDungeon={room.dungeon} onClose={() => onOpenModal(null)} />
       )}

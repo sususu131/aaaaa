@@ -1,0 +1,178 @@
+/**
+ * Dungeon Runtime REST（阶段5 第四十五节）。
+ * 客户端只能提交 Action；所有状态由服务器裁定。
+ */
+const express = require('express');
+const { getDb } = require('@roblox-trpg/database');
+const { resolveSession } = require('../sessions/sessionManager');
+const roomManager = require('../rooms/roomManager');
+const im = require('../services/runtime/instanceManager');
+const runtimeEngine = require('../services/runtime/runtimeEngine');
+const worldState = require('../services/world/worldState');
+const playerStates = require('../services/world/playerStates');
+const combatEngine = require('../services/runtime/combatEngine');
+
+const router = express.Router();
+
+function authPlayer(req, res) {
+  let token = req.body && req.body.sessionToken;
+  if (!token && req.headers.cookie) {
+    const m = req.headers.cookie.match(/(?:^|;\s*)rtp_session=([^;]+)/);
+    token = m && m[1];
+  }
+  const sess = token ? resolveSession(token) : null;
+  if (!sess) {
+    res.status(401).json({ error: '无效会话', code: 'UNAUTHORIZED' });
+    return null;
+  }
+  return sess;
+}
+
+function fail(res, err) {
+  const code = err.code || 'INTERNAL_ERROR';
+  const status = err.status || (code === 'INTERNAL_ERROR' ? 500 : 400);
+  if (code === 'INTERNAL_ERROR') console.error('[runtime] 未处理异常:', err);
+  res.status(status).json({ error: err.message, code });
+}
+
+/** GET /api/dungeons —— 副本列表（含已发布版本，供前端选择）。 */
+router.get('/api/dungeons', (_req, res) => {
+  const db = getDb();
+  const dungeons = db.prepare('SELECT id, uid, dungeon_name, roblox_experience_name, difficulty FROM dungeons ORDER BY id').all();
+  for (const d of dungeons) {
+    d.publishedVersions = db
+      .prepare("SELECT id, version FROM dungeon_versions WHERE dungeon_id = ? AND status = 'PUBLISHED' ORDER BY version")
+      .all(d.id);
+  }
+  res.json({ dungeons });
+});
+
+/** POST /api/dungeon-instances —— 在玩家当前房间创建实例。 */
+router.post('/api/dungeon-instances', (req, res) => {
+  try {
+    const sess = authPlayer(req, res);
+    if (!sess) return;
+    const player = getDb().prepare('SELECT * FROM players WHERE id = ?').get(sess.playerRowId);
+    if (!player || !player.room_id) return res.status(400).json({ error: '你必须先在一个房间里', code: 'NO_ROOM' });
+    const { dungeonVersionId } = req.body || {};
+    const instance = im.createInstance({ roomId: player.room_id, dungeonVersionId });
+    im.joinInstance(instance, sess.playerRowId); // 创建者自动加入
+    res.json({ instance: im.getInstance(instance.id) });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+/** POST /api/dungeon-instances/:id/join */
+router.post('/api/dungeon-instances/:id/join', (req, res) => {
+  try {
+    const sess = authPlayer(req, res);
+    if (!sess) return;
+    const instance = im.getInstance(req.params.id);
+    const updated = im.joinInstance(instance, sess.playerRowId);
+    res.json({ instance: updated });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+/** POST /api/dungeon-instances/:id/start */
+router.post('/api/dungeon-instances/:id/start', (req, res) => {
+  try {
+    const sess = authPlayer(req, res);
+    if (!sess) return;
+    const instance = im.getInstance(req.params.id);
+    const { io } = require('../index.js');
+    const started = im.startInstance(io, instance);
+    res.json({ instance: started });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+/** POST /api/dungeon-instances/:id/actions —— 提交 Action（服务器排队处理）。 */
+router.post('/api/dungeon-instances/:id/actions', async (req, res) => {
+  try {
+    const sess = authPlayer(req, res);
+    if (!sess) return;
+    const instance = im.getInstance(req.params.id);
+    const player = getDb().prepare('SELECT * FROM players WHERE id = ?').get(sess.playerRowId);
+    if (!player || !im.partyOf(instance).includes(player.id)) {
+      return res.status(403).json({ error: '你不是该实例的队伍成员', code: 'NOT_IN_PARTY' });
+    }
+    const text = String((req.body && req.body.action) || '').trim();
+    if (!text) return res.status(400).json({ error: 'Action 不能为空', code: 'EMPTY_ACTION' });
+    if (text.length > 2000) return res.status(400).json({ error: 'Action 过长（2000字符）', code: 'ACTION_TOO_LONG' });
+
+    const room = roomManager.getRoom(instance.room_id) || { id: instance.room_id, players: [] };
+    const { io } = require('../index.js');
+
+    if (req.body && req.body.await === true) {
+      const result = await runtimeEngine.submitAction(io, room, instance, player, text, req.body.clientActionId || null);
+      return res.json(result);
+    }
+    // 默认：入队后立即返回（结果经 Socket 广播）
+    const pending = runtimeEngine.submitAction(io, room, instance, player, text, req.body.clientActionId || null);
+    pending.catch(() => {});
+    res.json({ queued: true, instanceUid: instance.uid });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+/** GET /api/dungeon-instances/:id —— 完整快照（断线恢复用）。 */
+router.get('/api/dungeon-instances/:id', (req, res) => {
+  try {
+    const instance = im.getInstance(req.params.id);
+    const { definition, version } = im.getDefinition(instance);
+    const db = getDb();
+    const party = im.partyOf(instance).map((pid) => {
+      const p = db.prepare('SELECT * FROM players WHERE id = ?').get(pid);
+      if (!p) return null;
+      const st = playerStates.getPlayerState(pid);
+      return { name: p.name, uid: p.uid, hp: st.hp, maxHp: st.maxHp, attributes: st.attributes, skills: st.skills.map((s) => s.name), statusEffects: st.statusEffects };
+    }).filter(Boolean);
+    const scene = (definition.scenes || []).find((s) => s.id === instance.current_scene_id) || null;
+    const combat = combatEngine.activeCombat(instance.id);
+    res.json({
+      instance: {
+        uid: instance.uid,
+        status: instance.status,
+        currentSceneId: instance.current_scene_id,
+        startedAt: instance.started_at,
+        endedAt: instance.ended_at,
+      },
+      dungeon: { name: definition.dungeon?.display_name || definition.dungeon?.name, version: version.version, canonicalFacts: definition.canonical_facts },
+      scene: scene ? { id: scene.id, name: scene.name, description: scene.description, exits: scene.exits, encounters: scene.encounters } : null,
+      party,
+      worldState: worldState.getWorld(instance.room_id),
+      combat: combat ? combatEngine.serialize(combat) : null,
+    });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+/** GET /api/dungeon-instances/:id/events —— 事件日志（Replay 数据）。 */
+router.get('/api/dungeon-instances/:id/events', (req, res) => {
+  try {
+    const instance = im.getInstance(req.params.id);
+    res.json({ events: im.events(instance, Number(req.query.limit) || 200) });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+/** POST /api/dungeon-instances/:id/leave */
+router.post('/api/dungeon-instances/:id/leave', (req, res) => {
+  try {
+    const sess = authPlayer(req, res);
+    if (!sess) return;
+    const instance = im.getInstance(req.params.id);
+    res.json({ instance: im.leaveInstance(instance, sess.playerRowId) });
+  } catch (err) {
+    fail(res, err);
+  }
+});
+
+module.exports = router;

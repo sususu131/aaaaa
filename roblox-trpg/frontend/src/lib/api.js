@@ -45,4 +45,21 @@ export const api = {
     }),
   publishVersion: (versionId) =>
     request(`/api/dungeon-versions/${versionId}/publish`, { method: 'POST', body: '{}' }),
+  // ── 阶段5：Dungeon Runtime ──
+  listDungeons: () => request('/api/dungeons'),
+  createInstance: (dungeonVersionId, sessionToken) =>
+    request('/api/dungeon-instances', { method: 'POST', body: JSON.stringify({ dungeonVersionId, sessionToken }) }),
+  joinInstance: (id, sessionToken) =>
+    request(`/api/dungeon-instances/${id}/join`, { method: 'POST', body: JSON.stringify({ sessionToken }) }),
+  startInstance: (id, sessionToken) =>
+    request(`/api/dungeon-instances/${id}/start`, { method: 'POST', body: JSON.stringify({ sessionToken }) }),
+  submitAction: (id, action, sessionToken, clientActionId) =>
+    request(`/api/dungeon-instances/${id}/actions`, {
+      method: 'POST',
+      body: JSON.stringify({ action, sessionToken, clientActionId }),
+    }),
+  getInstance: (id) => request(`/api/dungeon-instances/${id}`),
+  getInstanceEvents: (id) => request(`/api/dungeon-instances/${id}/events`),
+  leaveInstance: (id, sessionToken) =>
+    request(`/api/dungeon-instances/${id}/leave`, { method: 'POST', body: JSON.stringify({ sessionToken }) }),
 };

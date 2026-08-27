@@ -109,7 +109,7 @@ function joinRoom(roomId, player) {
   return { room };
 }
 
-/** 从所在房间移除玩家；房间无人时销毁。返回 { roomId, room, player } 或 null。 */
+/** 从所在房间移除玩家；房间无人且无活跃副本实例时销毁（阶段5：实例独立于房主会话）。 */
 function leaveRoom(socketId) {
   const room = findRoomBySocket(socketId);
   if (!room) return null;
@@ -121,6 +121,11 @@ function leaveRoom(socketId) {
   db.prepare('UPDATE players SET room_id = NULL, left_at = datetime(\'now\') WHERE socket_id = ?').run(socketId);
 
   if (room.players.length === 0) {
+    // 有活跃副本实例时保留房间（玩家可重连恢复；实例生命周期独立于房主）
+    const { getActiveByRoom } = require('../services/runtime/instanceManager');
+    if (getActiveByRoom(room.id)) {
+      return { roomId: room.id, room, player };
+    }
     db.prepare('UPDATE rooms SET status = ?, closed_at = datetime(\'now\') WHERE id = ?').run('finished', room.id);
     rooms.delete(room.id);
     return { roomId: room.id, room: null, player };
