@@ -251,12 +251,24 @@ function grantItem(playerRowId, itemId, { quantity = 1, sourceType = 'DUNGEON_RE
     const newQty = Math.min(99, existing.quantity + qty);
     db.prepare('UPDATE player_items SET quantity = ? WHERE id = ?').run(newQty, existing.id);
     audit(playerRowId, 'ITEM', 'stack', sourceType, sourceId, `${item.name}×${existing.quantity}`, `${item.name}×${newQty}`);
+    // 阶段14 桥接：堆叠同步进入持久背包
+    try {
+      const inventoryService = require('../inventory/inventoryService');
+      const def = inventoryService.syncDefinitionFromLegacyItem(item);
+      inventoryService.addItem(null, playerRowId, def.item_key, { amount: qty, sourceType, sourceId: sourceId != null ? String(sourceId) : null });
+    } catch { /* ignore */ }
     return { granted: 'STACKED', itemName: item.name, quantity: newQty };
   }
   db.prepare(
     'INSERT INTO player_items (player_id, item_id, quantity, source, source_type, metadata) VALUES (?, ?, ?, ?, ?, ?)'
   ).run(playerRowId, itemId, qty, sourceId != null ? String(sourceId) : sourceType, sourceType, metadata ? JSON.stringify(metadata) : null);
   audit(playerRowId, 'ITEM', 'grant', sourceType, sourceId, null, `${item.name}×${qty}`);
+  // 阶段14 桥接：旧物品发放同步进入持久背包（失败不阻塞旧流程）
+  try {
+    const inventoryService = require('../inventory/inventoryService');
+    const def = inventoryService.syncDefinitionFromLegacyItem(item);
+    inventoryService.addItem(null, playerRowId, def.item_key, { amount: qty, sourceType, sourceId: sourceId != null ? String(sourceId) : null });
+  } catch { /* 背包满等：旧系统发放仍有效 */ }
   return { granted: 'NEW', itemName: item.name, quantity: qty };
 }
 

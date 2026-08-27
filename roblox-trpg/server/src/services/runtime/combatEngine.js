@@ -80,6 +80,28 @@ function attributeBonus(playerRowId) {
   return Math.floor((str - 5) / 2);
 }
 
+/** 阶段14：实例对应体验名（武器跨副本削弱需要目标世界规则）。 */
+function experienceNameOf(instance) {
+  try {
+    const row = getDb()
+      .prepare('SELECT d.roblox_experience_name AS name FROM dungeon_versions v JOIN dungeons d ON d.id = v.dungeon_id WHERE v.id = ?')
+      .get(instance.dungeon_version_id);
+    return row ? row.name : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 阶段14：战斗装备修正（武器加成受副本规则削弱；护甲减伤）。 */
+function equipmentBonus(playerRowId, instance) {
+  try {
+    const inventoryService = require('../inventory/inventoryService');
+    return inventoryService.equippedCombatStats(playerRowId, experienceNameOf(instance));
+  } catch {
+    return { weaponBonus: 0, armorReduction: 0, weapon: null, armor: null };
+  }
+}
+
 /** Boss 阶段由服务器状态决定（HP < 70% → Phase 2；< 40% → Phase 3）。 */
 function bossPhaseFor(hp, maxHp) {
   const ratio = maxHp > 0 ? hp / maxHp : 0;
@@ -109,16 +131,19 @@ function attack(io, instance, definition, combat, playerRowId, targetId, { rollO
 
   const events = [];
   let narrative;
+  const equip = equipmentBonus(playerRowId, instance);
   if (rollResult.success) {
-    const dmg = Math.max(1, Math.min(99, rollResult.margin));
+    const dmg = Math.max(1, Math.min(99, rollResult.margin + equip.weaponBonus));
     enemy.hp = Math.max(0, enemy.hp - dmg);
-    narrative = `对 ${enemy.name} 造成 ${dmg} 点伤害`;
-    events.push({ op: 'damage_enemy', target: targetId, damage: dmg, enemyHp: enemy.hp });
+    narrative = equip.weapon
+      ? `对 ${enemy.name} 造成 ${dmg} 点伤害（${equip.weapon.name}${equip.weapon.multiplier < 1 ? `，受本世界规则削弱×${equip.weapon.multiplier}` : ''}）`
+      : `对 ${enemy.name} 造成 ${dmg} 点伤害`;
+    events.push({ op: 'damage_enemy', target: targetId, damage: dmg, enemyHp: enemy.hp, weapon: equip.weapon ? equip.weapon.name : null });
   } else if (rollResult.draw) {
     narrative = '僵持（平局）';
     events.push({ op: 'draw' });
   } else {
-    const dmg = clampNum(enemy.damage, 0, 500);
+    const dmg = clampNum(Math.max(0, enemy.damage - equip.armorReduction), 0, 500);
     const before = playerStates.getPlayerState(playerRowId);
     const newHp = Math.max(0, before.hp - dmg);
     playerStates.modifyPlayerState(playerRowId, 'hp', newHp);

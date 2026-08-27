@@ -184,7 +184,14 @@ const TOOL_META = {
   request_combat_reward: { permission: 'GAME_ACTION', scopes: ['dungeon'] },
   // 阶段12：世界模拟（AI 只能【申请】事件，无直接创造事件/生成怪物/发物品工具 —— 服务器专属）
   request_world_event: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  request_random_world_event: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
   get_world_simulation: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  // 阶段14：持久背包（无创建物品定义工具；一切增减经服务器验证）
+  get_inventory: { permission: 'READ_ONLY', scopes: ['lobby', 'room', 'dungeon'] },
+  add_item: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  remove_item: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  use_item: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  equip_item: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
   // 阶段13：队伍与决策（AI 只能创建选择请求/只读；无关系修改/强制选择/改倒计时工具）
   get_party_status: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
   get_player_relationship: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
@@ -257,3 +264,5 @@ require('./encounterTools');
 require('./worldTools');
 // 阶段13 新增
 require('./partyTools');
+// 阶段14 新增
+require('./inventoryTools');

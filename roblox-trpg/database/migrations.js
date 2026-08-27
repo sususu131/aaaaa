@@ -9,6 +9,60 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '011_stage14_inventory',
+    up(db) {
+      // ── 物品定义（与玩家持有分离；第一节）──
+      db.exec(`CREATE TABLE IF NOT EXISTS item_definitions (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_key      TEXT NOT NULL UNIQUE,
+        name          TEXT NOT NULL,
+        description   TEXT,
+        type          TEXT NOT NULL DEFAULT 'MATERIAL'
+                      CHECK (type IN ('CONSUMABLE','WEAPON','ARMOR','TOOL','QUEST_ITEM','MATERIAL','SPECIAL')),
+        rarity        TEXT NOT NULL DEFAULT 'COMMON'
+                      CHECK (rarity IN ('COMMON','UNCOMMON','RARE','EPIC','LEGENDARY','MYTHIC')),
+        icon          TEXT,
+        stack_limit   INTEGER NOT NULL DEFAULT 1,          -- 1 = 唯一/不可堆叠；>1 = 堆叠上限
+        bind_on_acquire INTEGER NOT NULL DEFAULT 0,        -- 绑定物品（获得后不可移除/交易）
+        permanent     INTEGER NOT NULL DEFAULT 0,          -- 永久物品（跨副本保留，受副本规则削弱）
+        base_power    INTEGER NOT NULL DEFAULT 0,          -- 基础强度（跨副本削弱计算的基数）
+        metadata_json TEXT NOT NULL DEFAULT '{}',          -- damage/element/source/armor/quest_id…
+        source        TEXT NOT NULL DEFAULT 'original',    -- official / inspired / original
+        status        TEXT NOT NULL DEFAULT 'approved' CHECK (status IN ('draft','approved')),
+        created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      // ── 背包（第二节）──
+      db.exec(`CREATE TABLE IF NOT EXISTS inventories (
+        player_id INTEGER PRIMARY KEY REFERENCES players(id),
+        capacity  INTEGER NOT NULL DEFAULT 20,             -- 物品种类槽位上限
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      db.exec(`CREATE TABLE IF NOT EXISTS inventory_items (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id     INTEGER NOT NULL REFERENCES players(id),
+        item_id       INTEGER NOT NULL REFERENCES item_definitions(id),
+        amount        INTEGER NOT NULL DEFAULT 1,
+        equipped_slot TEXT,                                -- weapon / armor（NULL = 未装备）
+        bound         INTEGER NOT NULL DEFAULT 0,
+        metadata_json TEXT NOT NULL DEFAULT '{}',          -- 实例级特殊属性（第六节）
+        acquired_from TEXT,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (player_id, item_id)                        -- 同定义单行堆叠
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_inv_items_player ON inventory_items(player_id)');
+      // 奖励发放幂等台账（第十节：重复领奖不重复获得）
+      db.exec(`CREATE TABLE IF NOT EXISTS inventory_grants (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        grant_key   TEXT NOT NULL UNIQUE,
+        player_id   INTEGER NOT NULL REFERENCES players(id),
+        item_id     INTEGER NOT NULL REFERENCES item_definitions(id),
+        amount      INTEGER NOT NULL DEFAULT 1,
+        source_type TEXT,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+    },
+  },
+  {
     name: '010_stage13_party_decision',
     up(db) {
       // ── Party 系统（第一节）──

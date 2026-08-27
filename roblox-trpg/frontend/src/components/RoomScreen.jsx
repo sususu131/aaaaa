@@ -13,6 +13,7 @@ import LegendPanel from './LegendPanel.jsx';
 import WorldPanel from './WorldPanel.jsx';
 import PartyPanel from './PartyPanel.jsx';
 import DecisionPanel from './DecisionPanel.jsx';
+import InventoryPanel from './InventoryPanel.jsx';
 import { socket } from '../lib/socket.js';
 
 /**
@@ -116,12 +117,23 @@ export default function RoomScreen({
     };
     socket.on('decision:new', onDecisionNew);
     socket.on('party:update', onPartyUpdate);
+
+    // 阶段14：物品获得/使用/装备提示
+    const itemLabel = { ITEM_ACQUIRED: '🎁 获得物品', ITEM_USED: '🧪 使用物品', ITEM_EQUIPPED: '🛡 装备物品', ITEM_REMOVED: '🗑 失去物品' };
+    const onItemEvent = (e) => {
+      if (!itemLabel[e.type]) return;
+      const id = `${Date.now()}_${Math.random()}`;
+      setToasts((t) => [...t.slice(-4), { id, text: `${itemLabel[e.type]}：${e.data && e.data.item ? e.data.item : ''}${e.data && e.data.amount > 1 ? ` ×${e.data.amount}` : ''}` }]);
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
+    };
+    socket.on('game:event', onItemEvent);
     return () => {
       socket.off('quest:event', onQuestEvent);
       socket.off('npc:event', onNpcEvent);
       socket.off('world:event', onWorldEvent);
       socket.off('decision:new', onDecisionNew);
       socket.off('party:update', onPartyUpdate);
+      socket.off('game:event', onItemEvent);
     };
   }, []);
 
@@ -169,6 +181,9 @@ export default function RoomScreen({
           </button>
           <button className={`btn tiny ${modal === 'decision' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'decision' ? null : 'decision')}>
             🎭 抉择
+          </button>
+          <button className={`btn tiny ${modal === 'inventory' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'inventory' ? null : 'inventory')}>
+            🎒 背包
           </button>
           <button className={`btn tiny ${modal === 'character' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'character' ? null : 'character')}>
             👤 角色
@@ -268,6 +283,7 @@ export default function RoomScreen({
       {modal === 'world' && <WorldPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
       {modal === 'party' && <PartyPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} myName={myName} />}
       {modal === 'decision' && <DecisionPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
+      {modal === 'inventory' && <InventoryPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
     </main>
   );
 }

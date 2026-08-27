@@ -220,7 +220,8 @@ function decisionContextContent(roomId) {
   }
 }
 
-/** 阶段12：WORLD_STATE（世界模拟）分区 ——
+/**
+ * 阶段12：WORLD_STATE（世界模拟）分区 ——
  * 当前世界事件 / 阵营状态 / NPC活动 / 环境状态 / 副本变体。
  * 全部来自服务器数据库（WORLD_SIMULATION 数据，非 AI 生成）。
  */
@@ -253,6 +254,26 @@ function worldSimContent(roomId) {
     return parts.join('\n');
   } catch (err) {
     return `（世界模拟状态不可用：${err.message}）`;
+  }
+}
+
+/**
+ * 阶段14：INVENTORY_CONTEXT —— 玩家拥有什么 / 装备了什么。
+ * 隐藏内部 ID：只给名称/品质/装备状态，供 GM 叙事（如「你腰间携带着散发微光的剑」）。
+ */
+function inventoryContextContent(room) {
+  try {
+    const inventoryService = require('../inventory/inventoryService');
+    const db = getDb();
+    const lines = [];
+    for (const p of room.players) {
+      const row = db.prepare('SELECT id FROM players WHERE socket_id = ?').get(p.socketId);
+      if (!row) continue;
+      lines.push(`- ${p.name}: ${inventoryService.contextSummary(row.id)}`);
+    }
+    return lines.length ? lines.join('\n') : '（房间内没有玩家）';
+  } catch (err) {
+    return `（背包状态不可用：${err.message}）`;
   }
 }
 
@@ -305,6 +326,7 @@ function buildContext(room) {
     { key: 'world_sim', label: 'WORLD_STATE (World Simulation)', content: worldSimContent(room.id) },
     { key: 'party', label: 'PARTY_CONTEXT', content: partyContextContent(room) },
     { key: 'decisions', label: 'DECISION_CONTEXT', content: decisionContextContent(room.id) },
+    { key: 'inventory', label: 'INVENTORY_CONTEXT', content: inventoryContextContent(room) },
     { key: 'avatar', label: 'Avatar / Initial State', content: avatarContext(room) },
     { key: 'roblox', label: 'Roblox Source Data', content: robloxBlock },
   ];

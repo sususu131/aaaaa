@@ -55,6 +55,61 @@ register({
 });
 
 register({
+  name: 'request_random_world_event',
+  description:
+    '请求随机世界事件：AI 提供候选事件（白名单内，2~4 个）与可选权重，抽签由服务器执行（服务器随机数），' +
+    '选中后仍走常规审核（冷却/上限）。AI 不能扩大候选范围，也不能宣称自己决定了结果。',
+  permission: 'GAME_ACTION',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      candidates: {
+        type: 'string',
+        required: true,
+        maxLength: 200,
+        description: `JSON 数组，候选事件类型（限：${worldEvents.AI_REQUESTABLE_TYPES.join(' / ')}），至少2个`,
+      },
+      weights: { type: 'string', maxLength: 100, description: '可选：JSON 权重数组（与候选等长，1~100）' },
+      duration_minutes: { type: 'integer', min: 1, max: 30 },
+      reason: { type: 'string', required: true, maxLength: 200 },
+    },
+  },
+  execute(ctx, args) {
+    let candidates;
+    let weights = null;
+    try {
+      candidates = JSON.parse(args.candidates);
+    } catch {
+      throw new ToolError('candidates 必须是合法 JSON 数组', 'invalid_args');
+    }
+    if (args.weights) {
+      try {
+        weights = JSON.parse(args.weights);
+      } catch {
+        throw new ToolError('weights 必须是合法 JSON 数组', 'invalid_args');
+      }
+    }
+    try {
+      const r = worldEvents.requestRandomEvent(ctx.io, ctx.room.id, {
+        candidates,
+        weights,
+        durationMs: args.duration_minutes ? args.duration_minutes * 60 * 1000 : null,
+        reason: args.reason,
+      });
+      return {
+        ok: true,
+        chosenByServer: r.type,
+        triggered: r.triggered,
+        reason: r.reason || null,
+        note: '抽签与执行均由服务器完成；AI 仅提供候选。',
+      };
+    } catch (err) {
+      throw new ToolError(err.message, err.code === 'CANDIDATE_NOT_REQUESTABLE' ? 'forbidden' : 'tool_error');
+    }
+  },
+});
+
+register({
   name: 'get_world_simulation',
   description:
     '只读：获取世界模拟快照 —— 当前世界事件 / 阵营关系 / NPC 活动（行为状态与位置）/ 副本变体 / 调度器状态。',

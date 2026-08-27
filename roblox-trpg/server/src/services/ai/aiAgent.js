@@ -138,6 +138,13 @@ async function runAgentTurn(ctx, playerText) {
 /** 落库最终回复的副作用：消息 / 长期记忆 / 规则请求审计。 */
 function persistGmOutcome(room, parsed) {
   const db = getDb();
+  // 阶段14 补充：存在待点击抉择时，GM 输出附带按钮提示（服务器生成，非 AI 自由发挥）
+  try {
+    const hint = require('../party/decisionEngine').decisionHint(room.id);
+    if (hint && !String(parsed.narrative || '').includes('抉择等待玩家点击')) {
+      parsed.narrative = `${parsed.narrative}\n\n${hint}`;
+    }
+  } catch { /* 提示失败不阻塞回复 */ }
   const msgId = require('../../rooms/roomManager').saveMessage(room.id, null, 'gm', parsed.narrative);
   for (const m of parsed.memory_update || []) {
     db.prepare('INSERT INTO room_memories (room_id, kind, content) VALUES (?, ?, ?)').run(room.id, m.kind, m.content);

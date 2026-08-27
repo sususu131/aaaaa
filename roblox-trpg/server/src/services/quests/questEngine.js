@@ -126,8 +126,14 @@ function validateQuestDraft(draft) {
     if (type === 'XP' && (!Number.isFinite(r.amount) || r.amount <= 0 || r.amount > 10000)) errors.push('XP 奖励必须在 1~10000');
     if (type === 'CURRENCY' && (!Number.isFinite(r.amount) || r.amount <= 0 || r.amount > 100000)) errors.push('货币奖励必须在 1~100000');
     if (type === 'ITEM' || type === 'EQUIPMENT') {
-      const row = db.prepare("SELECT 1 FROM items WHERE name = ? AND status = 'approved'").get(String(r.item || ''));
-      if (!row) errors.push(`物品不存在或未审核：${r.item}（REWARD_VALIDATION_FAILED）`);
+      if (r.itemKey) {
+        // 阶段14：新物品定义路径（item_definitions 必须存在且审核）
+        const invDef = db.prepare("SELECT 1 FROM item_definitions WHERE item_key = ? AND status = 'approved'").get(String(r.itemKey));
+        if (!invDef) errors.push(`物品定义不存在或未审核：${r.itemKey}（REWARD_VALIDATION_FAILED，禁止引用不存在的物品）`);
+      } else {
+        const row = db.prepare("SELECT 1 FROM items WHERE name = ? AND status = 'approved'").get(String(r.item || ''));
+        if (!row) errors.push(`物品不存在或未审核：${r.item}（REWARD_VALIDATION_FAILED）`);
+      }
     }
     if (type === 'SKILL') {
       const row = db.prepare("SELECT 1 FROM skills WHERE name = ? AND status = 'approved'").get(String(r.skill || ''));
@@ -428,9 +434,25 @@ function settleRewards(io, qiId) {
         const cur = db.prepare('SELECT * FROM currencies WHERE name = ?').get(String(r.currency || '金币'));
         if (cur) result = { ...result, ...characterService.grantCurrency(p.player_id, cur.id, Math.min(100000, Number(r.amount) || 0), { sourceType: 'QUEST', sourceId: full.quest.uid }) };
       } else if (type === 'ITEM' || type === 'EQUIPMENT') {
-        const item = db.prepare("SELECT * FROM items WHERE name = ? AND status = 'approved'").get(String(r.item || ''));
-        if (item) result = { ...result, ...characterService.grantItem(p.player_id, item.id, { sourceType: 'QUEST', sourceId: full.quest.uid }) };
-        else result = { ...result, granted: 'REJECTED', reason: 'ITEM_NOT_APPROVED' };
+        // 阶段14：优先 itemKey（持久背包，grantKey 幂等）；否则旧物品名路径
+        if (r.itemKey) {
+          const inventoryService = require('../inventory/inventoryService');
+          try {
+            const grant = inventoryService.addItem(io, p.player_id, r.itemKey, {
+              amount: Math.min(99, Number(r.amount) || 1),
+              sourceType: 'QUEST_REWARD',
+              sourceId: full.quest.uid,
+              grantKey: `quest:${qiId}:${p.player_id}:${r.itemKey}`,
+            });
+            result = { ...result, granted: grant.added ? 'GRANTED' : 'ALREADY_GRANTED', itemKey: r.itemKey, reason: grant.reason || null };
+          } catch (err) {
+            result = { ...result, granted: 'REJECTED', reason: err.code || err.message };
+          }
+        } else {
+          const item = db.prepare("SELECT * FROM items WHERE name = ? AND status = 'approved'").get(String(r.item || ''));
+          if (item) result = { ...result, ...characterService.grantItem(p.player_id, item.id, { sourceType: 'QUEST', sourceId: full.quest.uid }) };
+          else result = { ...result, granted: 'REJECTED', reason: 'ITEM_NOT_APPROVED' };
+        }
       } else if (type === 'SKILL') {
         const skill = db.prepare("SELECT * FROM skills WHERE name = ? AND status = 'approved'").get(String(r.skill || ''));
         if (skill) result = { ...result, ...characterService.grantSkill(p.player_id, skill.id, { sourceType: 'QUEST', sourceId: full.quest.uid }) };

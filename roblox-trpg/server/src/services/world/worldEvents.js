@@ -234,6 +234,52 @@ function validateAiEventRequest(roomId, { type, durationMs = null, data = {} } =
   return { ok: true };
 }
 
+/**
+ * 随机事件抽取（阶段14 补充需求：高随机性事件允许 AI 生成一部分——提供候选与权重，
+ * 但【抽签由服务器执行】：候选必须在白名单内，权重被钳制，随机数来自服务器）。
+ * @param candidates AI 提议的事件类型数组（必须是 AI_REQUESTABLE_TYPES 的子集，≥2）
+ * @param weights 与 candidates 等长的权重（可缺省=均等；钳制 1~100）
+ * @param rng 可注入（测试）；默认服务器加密随机
+ * @returns 选中的事件类型
+ */
+function pickRandomEventType(roomId, { candidates, weights = null, rng = null } = {}) {
+  if (!Array.isArray(candidates) || candidates.length < 2) {
+    throw new WorldEventError('BAD_CANDIDATES', '候选事件至少 2 个（AI 提供候选，服务器抽签）');
+  }
+  const uniq = [...new Set(candidates.map(String))];
+  if (uniq.length < 2) throw new WorldEventError('BAD_CANDIDATES', '候选事件重复（至少 2 个不同候选）');
+  for (const c of uniq) {
+    if (!AI_REQUESTABLE_TYPES.includes(c)) {
+      throw new WorldEventError('CANDIDATE_NOT_REQUESTABLE', `候选事件 ${c} 不在服务器白名单内（AI 不能扩大随机范围）`, 403);
+    }
+  }
+  const ws = uniq.map((_, i) => {
+    const raw = Array.isArray(weights) ? Number(weights[i]) : 1;
+    return Math.max(1, Math.min(100, Number.isFinite(raw) && raw > 0 ? raw : 1));
+  });
+  const total = ws.reduce((a, b) => a + b, 0);
+  const roll = rng !== null ? rng * total : (crypto.randomInt(0, 100000) / 100000) * total;
+  let acc = 0;
+  for (let i = 0; i < uniq.length; i += 1) {
+    acc += ws[i];
+    if (roll < acc) return uniq[i];
+  }
+  return uniq[uniq.length - 1];
+}
+
+/** 申请随机世界事件：AI 给候选 → 服务器抽签 → 常规审核（冷却/上限）→ 触发。 */
+function requestRandomEvent(io, roomId, { candidates, weights = null, durationMs = null, reason = '', rng = null } = {}) {
+  const type = pickRandomEventType(roomId, { candidates, weights, rng });
+  validateAiEventRequest(roomId, { type, durationMs, data: {} });
+  const result = triggerWorldEvent(io, roomId, {
+    type,
+    data: { requested_by: 'ai_random', reason, candidates, via: 'random_pick' },
+    source: 'ai_request',
+    durationMs,
+  });
+  return { type, ...result };
+}
+
 module.exports = {
   WorldEventError,
   EVENT_CATALOG,
@@ -245,4 +291,6 @@ module.exports = {
   hasActiveEvent,
   validateAiEventRequest,
   getEventRow,
+  pickRandomEventType,
+  requestRandomEvent,
 };

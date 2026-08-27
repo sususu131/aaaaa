@@ -489,6 +489,28 @@ function resolveIfReady(io, decisionIdOrUid) {
   throw new DecisionError('PLAYER_CHOICE_PENDING', 'NORMAL/TIMED 决策必须由玩家选择：AI 不能代替玩家做决定', 403);
 }
 
+/**
+ * GM 输出提示（阶段14 补充需求）：房间存在待点击抉择时，
+ * GM 回复末尾附带按钮提示（剩余时间由服务器计算，客户端只显示）。
+ * @returns 提示文本；无待决选择时返回 null
+ */
+function decisionHint(roomId) {
+  const pending = pendingDecisions(roomId);
+  if (!pending.length) return null;
+  const timed = pending.filter((d) => d.type === 'TIMED' && d.expires_at);
+  const party = pending.filter((d) => d.type === 'PARTY');
+  let minRemain = null;
+  for (const d of timed) {
+    const remain = Math.max(0, new Date(d.expires_at).getTime() - Date.now());
+    if (minRemain === null || remain < minRemain) minRemain = remain;
+  }
+  const parts = [`🎭 提示：当前有 ${pending.length} 个抉择等待玩家点击按钮决定`];
+  if (timed.length) parts.push(`其中 ${timed.length} 个为限时抉择（最短剩余约 ${Math.ceil(minRemain / 1000)} 秒，超时自动执行默认选项）`);
+  if (party.length) parts.push(`${party.length} 个为团队投票`);
+  parts.push('请打开「🎭 抉择」面板点击选项按钮完成选择，GM 不会代替玩家决定。');
+  return parts.join('；');
+}
+
 module.exports = {
   DecisionError,
   DECISION_TYPES,
@@ -500,6 +522,7 @@ module.exports = {
   triggerDungeonTimedEvent,
   pendingDecisions,
   decisionView,
+  decisionHint,
   getDecision,
   optionsOf,
   votesOf,

@@ -403,3 +403,37 @@ INSERT OR IGNORE INTO quest_objectives (quest_version_id, objective_key, name, d
 SELECT qv.id, 'inspect_basement', '检查地下室', '到地下室查看发电机状况', 'REACH_LOCATION', 1, 1, 0, '{"event_type":"LOCATION_REACHED","match":{"location":"loc_basement"}}'
 FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id
 WHERE q.uid = 'quest_world_blackout' AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'inspect_basement');
+
+-- ============================================================
+-- 阶段14：Persistent Inventory & Item System
+-- ============================================================
+-- 物品定义桥接：既有 approved 旧物品（items）→ item_definitions（不改旧表语义）
+INSERT OR IGNORE INTO item_definitions (item_key, name, description, type, rarity, stack_limit, metadata_json, source, status)
+SELECT
+  REPLACE(i.name, ' ', '_'), i.name, COALESCE(i.description, ''),
+  CASE i.kind WHEN 'weapon' THEN 'WEAPON' WHEN 'armor' THEN 'ARMOR' WHEN 'consumable' THEN 'CONSUMABLE'
+              WHEN 'accessory' THEN 'SPECIAL' WHEN 'special' THEN 'SPECIAL' ELSE 'MATERIAL' END,
+  CASE i.rarity WHEN 'common' THEN 'COMMON' WHEN 'rare' THEN 'RARE' WHEN 'epic' THEN 'EPIC' ELSE 'LEGENDARY' END,
+  CASE i.stacking WHEN 'STACKABLE' THEN 99 ELSE 1 END,
+  COALESCE(NULLIF(i.stat_bonus, ''), '{}'), i.source_type, 'approved'
+FROM items i WHERE i.status = 'approved';
+
+-- SFOTH 真实剑库 → 永久物品定义（基础强度为灾变世界规则，TRPG_ORIGINAL；能力描述沿用公开资料标注）
+INSERT OR IGNORE INTO item_definitions (item_key, name, description, type, rarity, stack_limit, permanent, base_power, metadata_json, source, status) VALUES
+  ('Linked_Sword', 'Linked Sword', '经典连击之剑，剑斗的象征。', 'WEAPON', 'COMMON', 1, 1, 40, '{"damage":40,"element":"none","source":"Sword Fight on the Heights"}', 'official', 'approved'),
+  ('Fire_Sword',   'Fire Sword',   '燃烧之剑，攻击附带火焰。',   'WEAPON', 'RARE',   1, 1, 55, '{"damage":55,"element":"fire","source":"Sword Fight on the Heights"}', 'official', 'approved'),
+  ('Ice_Dagger',   'Ice Dagger',   '寒冰匕首，轻巧迅捷。',       'WEAPON', 'RARE',   1, 1, 50, '{"damage":50,"element":"ice","source":"Sword Fight on the Heights"}', 'official', 'approved'),
+  ('Darkheart',    'Darkheart',    '黑暗之心，吸血魔剑。',       'WEAPON', 'EPIC',   1, 1, 70, '{"damage":70,"element":"dark","source":"Sword Fight on the Heights"}', 'official', 'approved'),
+  ('Venoms_Edge',  'Venoms Edge',  '毒刃，攻击附带毒素。',       'WEAPON', 'EPIC',   1, 1, 70, '{"damage":70,"element":"poison","source":"Sword Fight on the Heights"}', 'official', 'approved'),
+  ('Illumina',     'Illumina',     '光之圣剑，传说中的武器。',   'WEAPON', 'LEGENDARY', 1, 1, 100, '{"damage":100,"element":"light","source":"Sword Fight on the Heights"}', 'official', 'approved'),
+  ('Ghostwalker',  'Ghostwalker',  '幽灵行者，神秘之剑。',       'WEAPON', 'LEGENDARY', 1, 1, 85, '{"damage":85,"element":"ghost","source":"Sword Fight on the Heights"}', 'official', 'approved');
+
+-- 任务物品示例：旅馆钥匙（绑定 + 任务元数据）
+INSERT OR IGNORE INTO item_definitions (item_key, name, description, type, rarity, stack_limit, bind_on_acquire, metadata_json, source, status) VALUES
+  ('DOORS_KEY', '旅馆钥匙', '多尔斯旅馆某扇门的钥匙，微微发凉。', 'QUEST_ITEM', 'RARE', 1, 1, '{"quest_id":"quest_doors_main"}', 'inspired', 'approved');
+
+-- 治疗药水补充消耗品元数据（使用效果：恢复生命）
+UPDATE item_definitions SET metadata_json = '{"heal":10}', type = 'CONSUMABLE' WHERE item_key = '治疗药水';
+
+-- 跨副本削弱：世界规则限制（用户基准示例：Illumina 原始 100 → DOORS 30；不删除物品）
+UPDATE item_balance_rules SET multiplier = 0.3 WHERE item_name = 'Illumina' AND target_experience = 'DOORS';
