@@ -9,6 +9,44 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '007_stage10_legendary',
+    up(db) {
+      const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+      // NPC 本性：hostile（怪物/实体）好感度不改变敌对行为 —— 关系只记录，不解锁友好内容
+      if (!hasCol('npcs', 'nature')) {
+        db.exec("ALTER TABLE npcs ADD COLUMN nature TEXT NOT NULL DEFAULT 'neutral'");
+      }
+      // 传奇人物
+      db.exec(`CREATE TABLE IF NOT EXISTS legendary_npcs (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        npc_id            INTEGER NOT NULL UNIQUE REFERENCES npcs(id),
+        display_name      TEXT NOT NULL,
+        title             TEXT,
+        description       TEXT,
+        origin_type       TEXT NOT NULL CHECK (origin_type IN ('CREATOR','LEGEND','ADMIN_LEGEND','EXPERIENCE_AUTHOR')),
+        origin_experience TEXT,
+        rarity            TEXT NOT NULL DEFAULT 'legendary' CHECK (rarity IN ('rare','epic','legendary','mythic')),
+        base_power        INTEGER NOT NULL DEFAULT 50,
+        personality_json  TEXT NOT NULL DEFAULT '{}',
+        ability_json      TEXT NOT NULL DEFAULT '[]',
+        power_rules_json  TEXT NOT NULL DEFAULT '{}',
+        spawn_rules_json  TEXT NOT NULL DEFAULT '{}',
+        equipment_rules_json TEXT NOT NULL DEFAULT '{}',
+        created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      // 传奇商店
+      db.exec(`CREATE TABLE IF NOT EXISTS legendary_shop_items (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        legendary_npc_id  INTEGER NOT NULL REFERENCES legendary_npcs(id),
+        item_id           INTEGER NOT NULL REFERENCES items(id),
+        price             INTEGER NOT NULL DEFAULT 0,
+        currency          TEXT NOT NULL DEFAULT '金币',
+        requirements_json TEXT NOT NULL DEFAULT '{}',
+        UNIQUE (legendary_npc_id, item_id)
+      )`);
+    },
+  },
+  {
     name: '006_stage9_npc_world',
     up(db) {
       // 阵营
@@ -484,9 +522,10 @@ const migrations = [
   },
 ];
 
-/** 应用全部迁移（幂等）。 */
+/** 应用全部迁移（幂等；按名称升序，保证依赖顺序）。 */
 function runMigrations(db) {
-  for (const m of migrations) m.up(db);
+  const sorted = [...migrations].sort((a, b) => a.name.localeCompare(b.name));
+  for (const m of sorted) m.up(db);
 }
 
 module.exports = { runMigrations };

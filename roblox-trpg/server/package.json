@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node src/index.js",
     "start": "node src/index.js",
-    "test": "node test/smoke.test.js && node test/stage3.test.js && node test/stage3b-vision.test.js && node test/stage4-pipeline.test.js && node test/stage5-runtime.test.js && node test/stage6-character.test.js && node test/stage7-agent.test.js && node test/stage8-quest.test.js && node test/stage9-npc.test.js",
+    "test": "node test/smoke.test.js && node test/stage3.test.js && node test/stage3b-vision.test.js && node test/stage4-pipeline.test.js && node test/stage5-runtime.test.js && node test/stage6-character.test.js && node test/stage7-agent.test.js && node test/stage8-quest.test.js && node test/stage9-npc.test.js && node test/stage10-legend.test.js",
     "test:stage12": "node test/smoke.test.js",
     "test:stage3": "node test/stage3.test.js",
     "test:stage3b": "node test/stage3b-vision.test.js",
@@ -16,7 +16,8 @@
     "test:stage6": "node test/stage6-character.test.js",
     "test:stage7": "node test/stage7-agent.test.js",
     "test:stage8": "node test/stage8-quest.test.js",
-    "test:stage9": "node test/stage9-npc.test.js"
+    "test:stage9": "node test/stage9-npc.test.js",
+    "test:stage10": "node test/stage10-legend.test.js"
   },
   "dependencies": {
     "@roblox-trpg/database": "file:../database",

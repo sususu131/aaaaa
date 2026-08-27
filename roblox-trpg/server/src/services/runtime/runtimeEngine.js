@@ -127,6 +127,38 @@ function buildRuntimeContext(instance, definition, playerRows) {
     ? `Boss：${definition.boss.name}（HP ${definition.boss.stats?.hp}）— 只能引用该定义，禁止临时增强。`
     : '（无 Boss）';
 
+  // 阶段10：LEGENDARY_NPC_CONTEXT 分区（身份/来源/能力限制/关系/目标）
+  let legendBlock = '（房间内无传奇人物）';
+  try {
+    const legendEngine = require('../legends/legendEngine');
+    const npcEngine2 = require('../npcs/npcEngine');
+    const insts = npcEngine2.npcInstancesInRoom(instance.room_id);
+    const blocks = [];
+    for (const ni of insts) {
+      const legend = legendEngine.getLegendById(
+        (() => {
+          const row = getDb().prepare('SELECT id FROM legendary_npcs WHERE npc_id = ?').get(ni.npc_id);
+          return row ? row.id : null;
+        })()
+      );
+      if (!legend) continue;
+      const expName = definition.roblox_universe_id ? (getDb().prepare('SELECT roblox_experience_name FROM dungeons WHERE roblox_universe_id = ?').get(definition.roblox_universe_id) || {}).roblox_experience_name : null;
+      const power = legendEngine.realPower(legend, expName);
+      const rels = playerRows
+        .map((p) => {
+          const rel = npcEngine2.getRelationship('npc', legend.npc_id, 'player', p.id);
+          return `${p.name}:${rel.value}(${rel.relationshipType})`;
+        })
+        .join('，');
+      const abilities = JSON.parse(legend.ability_json || '[]').map((a) => a.name).join('、');
+      blocks.push(
+        `传奇人物「${legend.display_name}」（称号:${legend.title}，来源:${legend.origin_experience}，稀有度:${legend.rarity}）` +
+          ` 能力:${abilities} 当前战力:${power.realPower}(base ${power.basePower} × ${power.multiplier}) 关系:${rels} 目标:${JSON.stringify(npcEngine2.getNpc(legend.npc_id).goals)}`
+      );
+    }
+    if (blocks.length) legendBlock = blocks.join('\n');
+  } catch { /* 传奇系统异常不影响主流程 */ }
+
   // 阶段9：NPC_CONTEXT 分区（附近NPC/关系/最近记忆/当前目标）
   let npcBlock = '（房间内无 NPC）';
   try {
@@ -169,6 +201,8 @@ function buildRuntimeContext(instance, definition, playerRows) {
     questBlock,
     `## NPC_CONTEXT（阶段9：附近NPC/关系/记忆/目标）`,
     npcBlock,
+    `## LEGENDARY_NPC_CONTEXT（阶段10：身份/来源/能力限制/关系）`,
+    legendBlock,
     `## 世界状态（version=${world.version}，白名单标志）`,
     JSON.stringify(world.state),
     `## 最近行动日志`,

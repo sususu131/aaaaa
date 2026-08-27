@@ -47,7 +47,12 @@ export default function NpcPanel({ onClose, getSessionToken }) {
           <div key={n.npcInstanceId} className="quest-card">
             <div className="quest-head">
               <strong>
-                {n.avatar} {n.name} {!n.alive && <span className="muted small">（已死亡）</span>}
+                {n.avatar} {n.name}
+                {!n.alive && <span className="muted small">（已死亡）</span>}
+                {n.nature === 'hostile' && (
+                  <span className="small" style={{ color: '#e07a5f' }}>（怪物·好感无效）</span>
+                )}
+                {n.legendary && <span className="legend-title">「{n.legendary.title}」</span>}
               </strong>
               <span className="small" style={{ color: relColor(n.relationship.value) }}>
                 {n.relationship.type}（{n.relationship.value}）· 情绪：{n.mood}

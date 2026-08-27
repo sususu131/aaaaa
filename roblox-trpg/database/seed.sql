@@ -185,3 +185,125 @@ SELECT qv.id, 'listen_keeper', '聆听秘密', '听旅馆管理员讲完100号�
 FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id
 WHERE q.uid = 'quest_doors_keeper_secret'
   AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'listen_keeper');
+
+-- ============================================================
+-- 阶段10：传奇人物（不是管理员/权限账号，是世界中的特殊存在）
+-- ============================================================
+-- 基础 NPC 定义（传奇人物挂靠在 npcs 上；nature=neutral 可建立关系）
+INSERT OR IGNORE INTO npcs (uid, name, description, avatar, personality_json, goals_json, knowledge_json, nature)
+VALUES ('npc_legend_shedletsky', 'Shedletsky', '传说中的剑术大师，手持连击之剑。', '⚔️',
+  '{"traits":["高傲","重荣誉"],"speech":"简洁、锋利"}', '["寻找配得上剑道的挑战者"]', '["通晓所有剑类知识"]', 'neutral');
+INSERT OR IGNORE INTO npcs (uid, name, description, avatar, personality_json, goals_json, knowledge_json, nature)
+VALUES ('npc_legend_builderman', 'Builderman', '世界的创造者之一，乐于助人并出售建造装备。', '🏗️',
+  '{"traits":["热心","务实"],"speech":"明快、鼓励"}', '["帮助幸存者重建世界"]', '["掌握建造科技"]', 'neutral');
+INSERT OR IGNORE INTO npcs (uid, name, description, avatar, personality_json, goals_json, knowledge_json, nature)
+VALUES ('npc_legend_lsplash', 'LSPLASH', '多尔斯旅馆的建筑师，知道旅馆的每一条走廊与每一个实体。', '🚪',
+  '{"traits":["神秘","谨慎"],"speech":"低声、断续"}', '["守护旅馆最后的秘密"]', '["知晓全部实体的弱点"]', 'neutral');
+-- 实体阵营的 NPC 设为 hostile 本性：好感度不改变敌对行为
+UPDATE npcs SET nature = 'hostile' WHERE uid LIKE 'npc_entity%' OR uid IN (SELECT n.uid FROM npcs n JOIN factions f ON f.id = n.faction_id WHERE f.uid = 'faction_doors_entities');
+
+-- 传奇人物档案
+INSERT OR IGNORE INTO legendary_npcs (npc_id, display_name, title, description, origin_type, origin_experience, rarity, base_power, personality_json, ability_json, power_rules_json, spawn_rules_json, equipment_rules_json)
+SELECT n.id, 'Shedletsky', 'The Sword Master', '剑术大师。所有剑类熟练度提升。', 'LEGEND', 'Sword Fight on the Heights', 'legendary', 90,
+  '{"traits":["高傲","重荣誉"]}',
+  '[{"key":"sword_mastery","name":"Sword Mastery","description":"所有剑类熟练度提升"},{"key":"legendary_slash","name":"Legendary Slash","description":"强力剑技"},{"key":"sword_knowledge","name":"Sword Knowledge","description":"识别所有剑"}]',
+  '{"default":0.4,"Sword Fight on the Heights":1.0,"FORSAKEN":0.2}',
+  '{"base_chance":0.02,"experience_boost":{"Sword Fight on the Heights":0.25},"min_level":1}',
+  '{"default":{"allowed":["普通剑"],"legendary_allowed":false},"Sword Fight on the Heights":{"legendary_allowed":true},"FORSAKEN":{"pool":[{"item":"Linked Sword","chance":0.95},{"item":"Light Sword","chance":0.05}]}}'
+FROM npcs n WHERE n.uid = 'npc_legend_shedletsky'
+  AND NOT EXISTS (SELECT 1 FROM legendary_npcs ln JOIN npcs m ON m.id = ln.npc_id WHERE m.uid = 'npc_legend_shedletsky');
+
+INSERT OR IGNORE INTO legendary_npcs (npc_id, display_name, title, description, origin_type, origin_experience, rarity, base_power, personality_json, ability_json, power_rules_json, spawn_rules_json, equipment_rules_json)
+SELECT n.id, 'Builderman', 'The Creator', '创造者。出售建造科技装备。', 'CREATOR', 'Roblox Platform', 'mythic', 100,
+  '{"traits":["热心","务实"]}',
+  '[{"key":"creation_knowledge","name":"Creation Knowledge","description":"掌握建造科技"}]',
+  '{"default":0.6,"Roblox Platform":1.0}',
+  '{"base_chance":0.03,"experience_boost":{},"min_level":1}',
+  '{}'
+FROM npcs n WHERE n.uid = 'npc_legend_builderman'
+  AND NOT EXISTS (SELECT 1 FROM legendary_npcs ln JOIN npcs m ON m.id = ln.npc_id WHERE m.uid = 'npc_legend_builderman');
+
+INSERT OR IGNORE INTO legendary_npcs (npc_id, display_name, title, description, origin_type, origin_experience, rarity, base_power, personality_json, ability_json, power_rules_json, spawn_rules_json, equipment_rules_json)
+SELECT n.id, 'LSPLASH', 'Hotel Architect', '旅馆建筑师。知晓副本与实体的知识。', 'EXPERIENCE_AUTHOR', 'DOORS', 'legendary', 80,
+  '{"traits":["神秘","谨慎"]}',
+  '[{"key":"dungeon_knowledge","name":"Dungeon Knowledge","description":"副本知识"},{"key":"entity_knowledge","name":"Entity Knowledge","description":"实体资料"},{"key":"experience_control","name":"Experience Control","description":"体验控制"}]',
+  '{"default":0.3,"DOORS":1.0}',
+  '{"base_chance":0.01,"experience_boost":{"DOORS":0.3},"min_level":1}',
+  '{}'
+FROM npcs n WHERE n.uid = 'npc_legend_lsplash'
+  AND NOT EXISTS (SELECT 1 FROM legendary_npcs ln JOIN npcs m ON m.id = ln.npc_id WHERE m.uid = 'npc_legend_lsplash');
+
+-- 传奇装备物品（科技类/剑类 —— 均为数据库登记的合法物品，不可凭空创造）
+INSERT OR IGNORE INTO items (name, description, source_type, rarity, status, kind, slot, stacking, stat_bonus) VALUES
+  ('普通剑',         '一把可靠的剑。',           'original', 'common', 'approved', 'weapon', 'weapon', 'NON_STACKABLE', '{"STR":1}'),
+  ('Linked Sword',  '连击之剑，剑术大师的佩剑。', 'original', 'legendary', 'approved', 'weapon', 'weapon', 'UNIQUE', '{"STR":3,"DEX":1}'),
+  ('Light Sword',   '光之剑，极低概率的传奇武器。', 'original', 'legendary', 'approved', 'weapon', 'weapon', 'UNIQUE', '{"STR":4,"DEX":2}'),
+  ('Build Wall',    '建造一堵墙。',               'original', 'common', 'approved', 'material', NULL, 'STACKABLE', NULL),
+  ('Auto Turret',   '自动炮塔。',                 'original', 'epic', 'approved', 'special', NULL, 'NON_STACKABLE', NULL),
+  ('Healing Station','治疗站。',                  'original', 'rare', 'approved', 'special', NULL, 'NON_STACKABLE', NULL),
+  ('Shield Generator','护盾发生器。',              'original', 'epic', 'approved', 'special', NULL, 'NON_STACKABLE', NULL),
+  ('Emergency Repair Kit','应急修理包。',          'original', 'common', 'approved', 'consumable', NULL, 'STACKABLE', NULL);
+
+-- Builderman 商店（关系等级门控）
+INSERT OR IGNORE INTO legendary_shop_items (legendary_npc_id, item_id, price, requirements_json)
+SELECT ln.id, i.id, 100, '{"relationship":10}' FROM legendary_npcs ln JOIN npcs n ON n.id=ln.npc_id JOIN items i ON i.name='Build Wall' WHERE n.uid='npc_legend_builderman'
+  AND NOT EXISTS (SELECT 1 FROM legendary_shop_items s WHERE s.legendary_npc_id = ln.id AND s.item_id = i.id);
+INSERT OR IGNORE INTO legendary_shop_items (legendary_npc_id, item_id, price, requirements_json)
+SELECT ln.id, i.id, 200, '{"relationship":30}' FROM legendary_npcs ln JOIN npcs n ON n.id=ln.npc_id JOIN items i ON i.name='Healing Station' WHERE n.uid='npc_legend_builderman'
+  AND NOT EXISTS (SELECT 1 FROM legendary_shop_items s WHERE s.legendary_npc_id = ln.id AND s.item_id = i.id);
+INSERT OR IGNORE INTO legendary_shop_items (legendary_npc_id, item_id, price, requirements_json)
+SELECT ln.id, i.id, 300, '{"relationship":50}' FROM legendary_npcs ln JOIN npcs n ON n.id=ln.npc_id JOIN items i ON i.name='Shield Generator' WHERE n.uid='npc_legend_builderman'
+  AND NOT EXISTS (SELECT 1 FROM legendary_shop_items s WHERE s.legendary_npc_id = ln.id AND s.item_id = i.id);
+INSERT OR IGNORE INTO legendary_shop_items (legendary_npc_id, item_id, price, requirements_json)
+SELECT ln.id, i.id, 500, '{"relationship":90}' FROM legendary_npcs ln JOIN npcs n ON n.id=ln.npc_id JOIN items i ON i.name='Auto Turret' WHERE n.uid='npc_legend_builderman'
+  AND NOT EXISTS (SELECT 1 FROM legendary_shop_items s WHERE s.legendary_npc_id = ln.id AND s.item_id = i.id);
+INSERT OR IGNORE INTO legendary_shop_items (legendary_npc_id, item_id, price, requirements_json)
+SELECT ln.id, i.id, 80, '{"relationship":0}' FROM legendary_npcs ln JOIN npcs n ON n.id=ln.npc_id JOIN items i ON i.name='Emergency Repair Kit' WHERE n.uid='npc_legend_builderman'
+  AND NOT EXISTS (SELECT 1 FROM legendary_shop_items s WHERE s.legendary_npc_id = ln.id AND s.item_id = i.id);
+
+-- Shedletsky 商店（剑类；关系50解锁普通剑，关系80解锁连击之剑）
+INSERT OR IGNORE INTO legendary_shop_items (legendary_npc_id, item_id, price, requirements_json)
+SELECT ln.id, i.id, 150, '{"relationship":50}' FROM legendary_npcs ln JOIN npcs n ON n.id=ln.npc_id JOIN items i ON i.name='普通剑' WHERE n.uid='npc_legend_shedletsky'
+  AND NOT EXISTS (SELECT 1 FROM legendary_shop_items s WHERE s.legendary_npc_id = ln.id AND s.item_id = i.id);
+INSERT OR IGNORE INTO legendary_shop_items (legendary_npc_id, item_id, price, requirements_json)
+SELECT ln.id, i.id, 2000, '{"relationship":80,"faction_reputation":{"faction":"幸存者","value":30}}' FROM legendary_npcs ln JOIN npcs n ON n.id=ln.npc_id JOIN items i ON i.name='Linked Sword' WHERE n.uid='npc_legend_shedletsky'
+  AND NOT EXISTS (SELECT 1 FROM legendary_shop_items s WHERE s.legendary_npc_id = ln.id AND s.item_id = i.id);
+
+-- 传奇技能（任务奖励专用，approved）
+INSERT OR IGNORE INTO skills (name, description, source_type, skill_type, rarity, status, effect_data) VALUES
+  ('Sword Technique',  '剑术技法：剑类攻击检定获得优势。', 'original', 'passive', 'epic', 'approved', '{"effects":[{"type":"ROLL_MODIFIER","value":2,"when":"sword"}]}'),
+  ('Construction Skill','建造技能：可建造防御工事。',      'original', 'active', 'rare', 'approved', '{"effects":[{"type":"UNLOCK_ACTION","action":"build"}]}');
+
+-- 传奇任务（复用任务系统；npc_gate 绑定传奇人物）
+INSERT OR IGNORE INTO quests (uid, name, description, type, status, source_type, difficulty, max_players)
+SELECT 'quest_legend_first_sword', '失落的第一把剑', 'Shedletsky 遗失了他的第一把剑。帮他找回来。', 'SIDE', 'ACTIVE', 'DESIGNER', 4, 3
+WHERE NOT EXISTS (SELECT 1 FROM quests WHERE uid = 'quest_legend_first_sword');
+INSERT OR IGNORE INTO quest_versions (quest_id, version, definition_json, status, published_at)
+SELECT q.id, 1, '{"scope":"PARTY","npc_gate":{"npc":"npc_legend_shedletsky","min_relationship":50},"rewards":[{"type":"SKILL","skill":"Sword Technique"},{"type":"XP","amount":500}],"objectives":[{"key":"find_first_sword","name":"寻回第一把剑","description":"找到失落的第一把剑","type":"COLLECT_ITEM","required_count":1,"order_index":1}]}', 'PUBLISHED', datetime('now')
+FROM quests q WHERE q.uid = 'quest_legend_first_sword' AND NOT EXISTS (SELECT 1 FROM quest_versions qv WHERE qv.quest_id = q.id);
+INSERT OR IGNORE INTO quest_objectives (quest_version_id, objective_key, name, description, type, required_count, order_index, is_optional, definition_json)
+SELECT qv.id, 'find_first_sword', '寻回第一把剑', '找到失落的第一把剑', 'COLLECT_ITEM', 1, 1, 0, '{"event_type":"ITEM_ACQUIRED","match":{"item":"普通剑"}}'
+FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id WHERE q.uid = 'quest_legend_first_sword'
+  AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'find_first_sword');
+
+INSERT OR IGNORE INTO quests (uid, name, description, type, status, source_type, difficulty, max_players)
+SELECT 'quest_legend_rebuild', '重建世界', 'Builderman 想重建世界，需要你的帮助。', 'SIDE', 'ACTIVE', 'DESIGNER', 3, 3
+WHERE NOT EXISTS (SELECT 1 FROM quests WHERE uid = 'quest_legend_rebuild');
+INSERT OR IGNORE INTO quest_versions (quest_id, version, definition_json, status, published_at)
+SELECT q.id, 1, '{"scope":"PARTY","npc_gate":{"npc":"npc_legend_builderman","min_relationship":50},"rewards":[{"type":"SKILL","skill":"Construction Skill"},{"type":"XP","amount":400}],"objectives":[{"key":"gather_materials","name":"收集建材","description":"收集建造材料","type":"COLLECT_ITEM","required_count":1,"order_index":1}]}', 'PUBLISHED', datetime('now')
+FROM quests q WHERE q.uid = 'quest_legend_rebuild' AND NOT EXISTS (SELECT 1 FROM quest_versions qv WHERE qv.quest_id = q.id);
+INSERT OR IGNORE INTO quest_objectives (quest_version_id, objective_key, name, description, type, required_count, order_index, is_optional, definition_json)
+SELECT qv.id, 'gather_materials', '收集建材', '收集建造材料', 'COLLECT_ITEM', 1, 1, 0, '{"event_type":"ITEM_ACQUIRED","match":{"item":"Build Wall"}}'
+FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id WHERE q.uid = 'quest_legend_rebuild'
+  AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'gather_materials');
+
+INSERT OR IGNORE INTO quests (uid, name, description, type, status, source_type, difficulty, max_players)
+SELECT 'quest_legend_hotel_secret', '酒店最后的秘密', 'LSPLASH 知道酒店最后的秘密，但他只告诉信任的人。', 'SIDE', 'ACTIVE', 'DESIGNER', 5, 3
+WHERE NOT EXISTS (SELECT 1 FROM quests WHERE uid = 'quest_legend_hotel_secret');
+INSERT OR IGNORE INTO quest_versions (quest_id, version, definition_json, status, published_at)
+SELECT q.id, 1, '{"scope":"PARTY","npc_gate":{"npc":"npc_legend_lsplash","min_relationship":50},"rewards":[{"type":"SKILL","skill":"危险感知"},{"type":"XP","amount":600}],"objectives":[{"key":"earn_trust","name":"赢得信任","description":"帮助 LSPLASH 完成一件事","type":"INTERACT","required_count":1,"order_index":1}]}', 'PUBLISHED', datetime('now')
+FROM quests q WHERE q.uid = 'quest_legend_hotel_secret' AND NOT EXISTS (SELECT 1 FROM quest_versions qv WHERE qv.quest_id = q.id);
+INSERT OR IGNORE INTO quest_objectives (quest_version_id, objective_key, name, description, type, required_count, order_index, is_optional, definition_json)
+SELECT qv.id, 'earn_trust', '赢得信任', '帮助 LSPLASH 完成一件事', 'INTERACT', 1, 1, 0, '{"event_type":"NPC_HELPED","match":{"npc":"npc_legend_lsplash"}}'
+FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id WHERE q.uid = 'quest_legend_hotel_secret'
+  AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'earn_trust');

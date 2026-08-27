@@ -171,6 +171,12 @@ const TOOL_META = {
   npc_relationship_event: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
   update_npc_plan: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
   kill_npc: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  // 阶段10：传奇人物工具（无 spawn 工具 —— 服务器专属）
+  get_legendary_status: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  legendary_dialog: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  buy_legendary_item: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  legendary_battle_action: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  get_legendary_shop: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
 };
 
 function toolMeta(name) {
@@ -228,3 +234,5 @@ require('./robloxSearch');
 require('./questTools');
 // 阶段9 新增
 require('./npcTools');
+// 阶段10 新增
+require('./legendTools');

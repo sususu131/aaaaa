@@ -584,3 +584,34 @@ body {
   animation: toast-in .2s ease-out;
 }
 @keyframes toast-in { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ── 阶段10：顶栏紧凑布局 ── */
+.room-header-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: #1d212b;
+  border: 1px solid #2c3242;
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+.toolbar { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
+.btn.tiny { padding: 3px 8px; font-size: 12px; border-radius: 6px; }
+.btn.tiny.active { background: #3f6ce0; }
+.btn.tiny.danger { background: #7a2f2f; }
+.room-header-bar .room-count { margin-left: 0; }
+
+/* 传奇卡片/商店 */
+.legend-card {
+  background: linear-gradient(135deg, #241d33, #1b1f2a);
+  border: 1px solid #5b4a8a;
+  border-radius: 12px;
+  padding: 12px;
+}
+.legend-title { color: #e0b34c; font-size: 12px; }
+.rarity-legendary { color: #e0b34c; }
+.rarity-mythic { color: #b44ce0; }
+.shop-item { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px dashed #2c3242; }
+.shop-req { font-size: 11px; color: #e07a5f; }
+.shop-req.met { color: #7fd18b; }

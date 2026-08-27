@@ -9,6 +9,7 @@ import CharacterPanel from './CharacterPanel.jsx';
 import RobloxBindPanel from './RobloxBindPanel.jsx';
 import QuestPanel from './QuestPanel.jsx';
 import NpcPanel from './NpcPanel.jsx';
+import LegendPanel from './LegendPanel.jsx';
 import { socket } from '../lib/socket.js';
 
 /**
@@ -86,42 +87,47 @@ export default function RoomScreen({
 
   return (
     <main className="room">
-      <div className="room-header">
+      <div className="room-header-bar">
         <div className="room-id-box">
-          <span className="label">房间ID</span>
+          <span className="label">房间</span>
           <strong className="room-id">{room.id}</strong>
-          <button className="btn small" onClick={copyRoomId}>
-            {copied ? '已复制 ✓' : '复制'}
+          <button className="btn tiny" onClick={copyRoomId}>
+            {copied ? '✓' : '复制'}
           </button>
         </div>
         <span className="room-count">
-          {players.length}/{room.maxPlayers} 人
+          {players.length}/{room.maxPlayers}
         </span>
-        <button className="btn small" onClick={() => onOpenModal(modal === 'context' ? null : 'context')}>
-          查看 Context
-        </button>
-        <button className="btn small" onClick={() => onOpenModal(modal === 'dungeon' ? null : 'dungeon')}>
-          副本
-        </button>
-        <button className="btn small" onClick={() => onOpenModal(modal === 'designer' ? null : 'designer')}>
-          副本设计
-        </button>
-        <button className="btn small" onClick={() => onOpenModal(modal === 'runtime' ? null : 'runtime')}>
-          副本运行
-        </button>
-        <button className="btn small" onClick={() => onOpenModal(modal === 'avatar' ? null : 'avatar')}>
-          Roblox形象
-        </button>
-        <button className="btn small" onClick={() => onOpenModal(modal === 'character' ? null : 'character')}>
-          角色
-        </button>
-        <button className="btn small" onClick={() => onOpenModal(modal === 'quest' ? null : 'quest')}>
-          任务
-        </button>
-        <button className="btn small" onClick={() => onOpenModal(modal === 'npc' ? null : 'npc')}>
-          NPC
-        </button>
-        <button className="btn danger" onClick={onLeave}>
+        <div className="toolbar">
+          <button className={`btn tiny ${modal === 'runtime' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'runtime' ? null : 'runtime')}>
+            ⚔ 副本
+          </button>
+          <button className={`btn tiny ${modal === 'quest' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'quest' ? null : 'quest')}>
+            📜 任务
+          </button>
+          <button className={`btn tiny ${modal === 'npc' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'npc' ? null : 'npc')}>
+            🧍 NPC
+          </button>
+          <button className={`btn tiny ${modal === 'legend' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'legend' ? null : 'legend')}>
+            ⭐ 传奇
+          </button>
+          <button className={`btn tiny ${modal === 'character' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'character' ? null : 'character')}>
+            👤 角色
+          </button>
+          <button className={`btn tiny ${modal === 'context' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'context' ? null : 'context')}>
+            🧠 Context
+          </button>
+          <button className={`btn tiny ${modal === 'dungeon' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'dungeon' ? null : 'dungeon')}>
+            🗺 绑定
+          </button>
+          <button className={`btn tiny ${modal === 'designer' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'designer' ? null : 'designer')}>
+            🛠 设计
+          </button>
+          <button className={`btn tiny ${modal === 'avatar' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'avatar' ? null : 'avatar')}>
+            🥓 形象
+          </button>
+        </div>
+        <button className="btn tiny danger" onClick={onLeave}>
           离开
         </button>
       </div>
@@ -199,6 +205,7 @@ export default function RoomScreen({
       )}
       {modal === 'quest' && <QuestPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
       {modal === 'npc' && <NpcPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
+      {modal === 'legend' && <LegendPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
     </main>
   );
 }

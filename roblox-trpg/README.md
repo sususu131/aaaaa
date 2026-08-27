@@ -640,3 +640,51 @@ npm run test:stage9   # 仅阶段9（62 项）
 覆盖：NPC 模型/记忆（类型/隐藏过滤/长度/容量）/关系（固定增量/钳制/类型阈值/并发原子累加）/
 阵营声望/Listener 联动/6 工具（含作弊拒绝）/任务门控（<50 隐藏、≥50 激活、幂等）/
 NPC_CONTEXT/REST 权限/隐藏记忆防泄漏/无直接修改工具存在性验证。
+
+---
+
+# 阶段10：Legendary Roblox NPC & Creator Mythology System
+
+传奇人物不是管理员/权限账号，而是世界中的特殊存在：独特能力、专属装备、专属任务、专属商店、
+副本关联、世界事件影响。
+
+## 核心机制
+
+- **传奇人物**（`legendary_npcs`）：Shedletsky（The Sword Master / LEGEND）、
+  Builderman（The Creator / CREATOR）、LSPLASH（Hotel Architect / EXPERIENCE_AUTHOR）；
+  origin_type: CREATOR / LEGEND / ADMIN_LEGEND / EXPERIENCE_AUTHOR
+- **生成系统**：服务器掷骰（crypto 随机），概率由 副本匹配（DOORS→LSPLASH↑、Sword Fight→Shedletsky↑）/
+  world_state / player_level / quest_progress 决定；同房间不重复生成；**AI 无 spawn 工具**
+- **能力倍率（Power Adaptation）**：`real_power = base_power × world_multiplier`，
+  规则存 `power_rules_json`（Shedletsky：主场 1.0 / 普通世界 0.4 / FORSAKEN 0.2；LSPLASH：DOORS 1.0）；
+  倍率只读自数据库，AI 不可修改
+- **装备规则**：Shedletsky 普通世界禁用传奇剑 / Sword Fight 解除限制 / FORSAKEN 战利品池
+  （Linked Sword 95% / Light Sword 5%，服务器掷骰）
+- **传奇商店**（`legendary_shop_items`）：价格 + 条件（关系等级/阵营声望/任务前置）服务器验证；
+  购买 = 条件验证 → 扣金币 → 发放 → LEGENDARY_REWARD 事件；UNIQUE 物品不可重复购买（失败回滚扣款）
+- **传奇任务**：《失落的第一把剑》(Sword Technique)、《重建世界》(Construction Skill)、
+  《酒店最后的秘密》(危险感知)，复用任务系统 + npc_gate 关系门控
+- **传奇战斗**：`legendary_battle_action`（attack/defend/flee/skill），服务器掷骰判定，
+  LEGENDARY_BATTLE 事件；AI 只描述，不能控制结果
+- **怪物本性**（`npcs.nature`）：hostile NPC（实体/怪物）好感度只记录、**不改变敌对情绪、不解锁任务**
+- **事件**：LEGENDARY_NPC_FOUND / LEGENDARY_DIALOG / LEGENDARY_REWARD / LEGENDARY_BATTLE / LEGENDARY_LEAVE
+- **Context**：LEGENDARY_NPC_CONTEXT 分区（身份/称号/来源/稀有度/能力/当前战力与倍率/关系/目标）
+- **UI**：顶栏紧凑化（两行工具栏）+「⭐ 传奇」面板（传奇卡片 + 商店 + 购买）；
+  NPC 面板显示怪物标记「（怪物·好感无效）」
+
+## 新增 AI Tools（5 个）
+
+`get_legendary_status`（READ_ONLY：身份/能力/倍率/关系）· `legendary_dialog`（+2 固定）·
+`buy_legendary_item`（服务器验证购买）· `legendary_battle_action`（服务器掷骰）·
+`get_legendary_shop`（READ_ONLY：可购买状态）。**无 spawn / 无倍率修改 / 无直接发放工具**。
+
+## 测试
+
+```
+npm test               # 541 项全套件（16+30+41+42+51+65+82+70+62+82）
+npm run test:stage10   # 仅阶段10（82 项）
+```
+
+覆盖：生成概率/副本匹配/能力削弱/装备限制/商店权限与购买流程/关系复用/传奇任务/战斗动作/
+怪物好感无效/LEGENDARY 五事件/多人同步/断线恢复/UNIQUE 购买幂等/跨房间隔离/
+AI 作弊拒绝（无 spawn/无倍率修改/无直接发放/不存在传奇拒绝）。

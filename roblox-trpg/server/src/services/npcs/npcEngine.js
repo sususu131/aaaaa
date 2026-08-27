@@ -44,7 +44,7 @@ class NpcError extends Error {
 }
 
 // ── NPC 定义 / 实例 ──
-function createNpc({ name, description = '', avatar = '🧍', personality = {}, goals = [], knowledge = [], factionId = null, locationId = null }) {
+function createNpc({ name, description = '', avatar = '🧍', personality = {}, goals = [], knowledge = [], factionId = null, locationId = null, nature = 'neutral' }) {
   const db = getDb();
   let uid;
   do {
@@ -52,9 +52,9 @@ function createNpc({ name, description = '', avatar = '🧍', personality = {}, 
   } while (db.prepare('SELECT 1 FROM npcs WHERE uid = ?').get(uid));
   const info = db
     .prepare(
-      'INSERT INTO npcs (uid, name, description, avatar, personality_json, goals_json, knowledge_json, faction_id, location_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO npcs (uid, name, description, avatar, personality_json, goals_json, knowledge_json, faction_id, location_id, nature) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )
-    .run(uid, String(name).slice(0, 60), String(description).slice(0, 500), String(avatar).slice(0, 200), JSON.stringify(personality), JSON.stringify(goals), JSON.stringify(knowledge), factionId, locationId);
+    .run(uid, String(name).slice(0, 60), String(description).slice(0, 500), String(avatar).slice(0, 200), JSON.stringify(personality), JSON.stringify(goals), JSON.stringify(knowledge), factionId, locationId, nature);
   return getNpc(info.lastInsertRowid);
 }
 
@@ -69,6 +69,7 @@ function getNpc(npcIdOrUid) {
     personality: JSON.parse(row.personality_json || '{}'),
     goals: JSON.parse(row.goals_json || '[]'),
     knowledge: JSON.parse(row.knowledge_json || '[]'),
+    nature: row.nature || 'neutral',
   };
 }
 
@@ -181,8 +182,13 @@ function applyRelationshipEvent(io, { npcInstanceId, playerId, action, reason = 
   addMemory(inst.npc_id, { playerId, type: memSpec.type, importance: memSpec.importance, content: `${action === 'help' ? '帮助' : action === 'deceive' ? '欺骗' : action === 'attack' ? '攻击' : action === 'betray' ? '背叛' : action === 'quest_complete' ? '完成任务' : '交流'}：${playerName}（${reason || action}）` });
 
   // 情绪联动（服务器决定，不由 AI 指定）
+  // 怪物本性（nature=hostile）：好感度只记录，不改变敌对情绪/行为
+  const npcDef = getNpc(inst.npc_id);
+  const isHostileNature = npcDef && npcDef.nature === 'hostile';
   let mood = 'neutral';
-  if (rel.value <= -50) mood = 'hostile';
+  if (isHostileNature) {
+    mood = 'hostile';
+  } else if (rel.value <= -50) mood = 'hostile';
   else if (rel.value >= 50) mood = 'grateful';
   else if (action === 'attack' || action === 'betray') mood = 'afraid';
   else if (action === 'help') mood = 'friendly';
@@ -272,6 +278,9 @@ function checkQuestGates(io, roomId) {
     // 门控：任一房间内玩家与该 NPC 的关系达标
     const npcInst = findNpcInstanceInRoom(roomId, def.npc_gate.npc);
     if (!npcInst) continue;
+    // 怪物本性（hostile）NPC：好感度不解锁任务（关系只记录，不改变敌对行为）
+    const gateNpc = getNpc(npcInst.npc_id);
+    if (gateNpc && gateNpc.nature === 'hostile') continue;
     const players = db.prepare("SELECT id FROM players WHERE room_id = ? AND left_at IS NULL").all(roomId);
     const passed = players.some((p) => getRelationship('npc', npcInst.npc_id, 'player', p.id).value >= (def.npc_gate.min_relationship ?? 50));
     if (!passed) continue;
@@ -285,18 +294,33 @@ function checkQuestGates(io, roomId) {
 function publicNpcView(npcInstance, { playerId = null } = {}) {
   const npc = getNpc(npcInstance.npc_id);
   const rel = playerId ? getRelationship('npc', npcInstance.npc_id, 'player', playerId) : { value: 0, relationshipType: '陌生' };
+  // 传奇人物档案（阶段10）
+  const db = getDb();
+  const legend = db.prepare('SELECT * FROM legendary_npcs WHERE npc_id = ?').get(npcInstance.npc_id);
   return {
     npcInstanceId: npcInstance.id,
     npcUid: npc.uid,
     name: npc.name,
     description: npc.description,
     avatar: npc.avatar,
+    nature: npc.nature || 'neutral',
     alive: Boolean(npcInstance.alive),
     mood: npcInstance.mood,
     goals: npc.goals,
     relationship: { value: rel.value, type: rel.relationshipType },
     publicMemories: getMemories(npcInstance.npc_id, { publicOnly: true, limit: 5 }).map((m) => ({ type: m.memory_type, content: m.content, importance: m.importance })),
     currentPlan: JSON.parse(npcInstance.current_plan_json || '{}').plan || null,
+    legendary: legend
+      ? {
+          legendId: legend.id,
+          displayName: legend.display_name,
+          title: legend.title,
+          originType: legend.origin_type,
+          originExperience: legend.origin_experience,
+          rarity: legend.rarity,
+          abilities: JSON.parse(legend.ability_json || '[]'),
+        }
+      : null,
   };
 }
 
