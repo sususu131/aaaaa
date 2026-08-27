@@ -7,6 +7,7 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    allowedHosts: true, // 允许预览代理域名访问
     proxy: {
       '/socket.io': {
         target: 'http://localhost:3000',

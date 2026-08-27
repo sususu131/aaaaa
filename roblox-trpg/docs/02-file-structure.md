@@ -44,7 +44,7 @@ roblox-trpg/
     ├── package.json
     ├── index.js                  # 连接管理 + 启动自动建表
     ├── schema.sql                # 全部表结构（含未来扩展预留表）
-    ├── seed.sql                  # 未来副本/技能种子数据（仅数据，无逻辑）
+    ├── seed.sql                  # 仅预置测试用副本基础资料（不预写技能/奖励）
     └── data/                     # .gitignore：roblox_trpg.db 运行时生成
 ```
 

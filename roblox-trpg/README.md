@@ -60,13 +60,20 @@ roblox-trpg/
 ## 数据库（含未来预留）
 
 - **阶段1 使用**：`rooms`、`players`、`messages`
-- **未来预留**：`dungeons`（Roblox体验→副本）、`skills`（技能）、
-  `dungeon_rewards`（副本掉落）、`player_skills`（玩家技能 + 获得来源）
+- **未来预留**：`dungeons`（Roblox体验→副本）、`skills`（含 `source_type` /
+  `skill_type` / `effect_data` / 审核状态）、`items`、`currencies`、
+  `dungeon_rewards`（多类型奖励：技能/物品/货币/特殊，支持概率/必得/可选）、
+  `player_skills`（玩家技能 + 获得来源）
+- **种子数据只预置测试用副本基础资料**（Doors / Jailbreak / Blox Fruits），
+  **不预写任何技能与奖励** —— 技能/奖励必须由副本设计流水线产出并审核。
 
-未来成长逻辑：完成副本 → 获得该体验相关技能
-（Doors→危险感知 / Jailbreak→开锁能力 / Blox Fruits→果实能力），种子数据已就位。
+未来成长逻辑：完成副本 → 获得该体验相关技能。技能设计走
+[副本设计流水线](docs/03-dungeon-design-pipeline.md)：
+AI Web Search 真实资料 → 分析玩法 → 设计候选（`source_type` 区分
+official/inspired/original）→ 规则系统审核 → 发放。
 
 ## 开发文档
 
 - [步骤1 需求分析](docs/01-requirements-analysis.md)
 - [步骤2 文件结构设计](docs/02-file-structure.md)
+- [副本设计流水线（AI Web Search 规范）](docs/03-dungeon-design-pipeline.md)
