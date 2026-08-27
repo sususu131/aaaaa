@@ -9,6 +9,19 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '015_stage18_dod_lore',
+    up(db) {
+      const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+      // Die of Death Lore Simulation（阶段18）：Civilian Identity 模型扩展
+      if (!hasCol('civilian_instance', 'life_experience')) {
+        db.exec('ALTER TABLE civilian_instance ADD COLUMN life_experience TEXT');
+      }
+      if (!hasCol('civilian_instance', 'personality_traits')) {
+        db.exec("ALTER TABLE civilian_instance ADD COLUMN personality_traits TEXT NOT NULL DEFAULT '[]'");
+      }
+    },
+  },
+  {
     name: '014_stage17_dod_civilian',
     up(db) {
       // ── Die of Death 预设 Phase 1：Civilian System（模板制，非固定角色）──

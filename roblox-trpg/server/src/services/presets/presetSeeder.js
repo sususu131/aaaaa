@@ -268,7 +268,9 @@ function importPreset(io, preset) {
     JSON.stringify(preset),
     'DRAFT'
   );
-  db.prepare("UPDATE preset_dungeon_configs SET dungeon_id = ?, status = 'PUBLISHED', published_at = datetime('now') WHERE preset_id = ?").run(dungeon.id, presetRow.id);
+  // 配置内容随导入更新（幂等；保证预设迭代生效）
+  db.prepare('UPDATE preset_dungeon_configs SET config_json = ?, dungeon_id = ? WHERE preset_id = ?').run(JSON.stringify(preset), dungeon.id, presetRow.id);
+  db.prepare("UPDATE preset_dungeon_configs SET status = 'PUBLISHED', published_at = datetime('now') WHERE preset_id = ?").run(presetRow.id);
   return {
     key: preset.key,
     presetId: presetRow.id,
