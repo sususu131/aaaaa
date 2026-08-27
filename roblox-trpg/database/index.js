@@ -22,11 +22,11 @@ function initDb() {
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   db.exec(schema);
 
+  // 迁移先于种子（种子可能引用迁移新增的列）；全部幂等
+  runMigrations(db);
+
   const seed = fs.readFileSync(path.join(__dirname, 'seed.sql'), 'utf8');
   db.exec(seed);
-
-  // 迁移（阶段4+），幂等
-  runMigrations(db);
 
   return db;
 }

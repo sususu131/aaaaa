@@ -415,3 +415,66 @@ npm run dev
 
 客户端只能提交 Action 文本；骰子/HP/金币/技能/场景跳转/Boss 数值全部服务器裁定。
 client_action_id / tool_call_id / reward_grant_id 三层幂等；并发 Action 串行队列 + 乐观锁。
+
+---
+
+# 阶段6：Persistent Character Progression（长期角色成长）
+
+Session ≠ Dungeon Instance ≠ Character：**Character = 扩展后的 players 行**（零第二套系统）。
+玩家拥有长期角色：等级/XP/HP/属性/技能/装备/物品/货币，全部服务器权威 + 乐观锁 + 交易日志。
+
+## 复用（零重建）
+
+- 属性系统：阶段3b `player_states.attributes`（base）+ 修正/装备计算（不重写）
+- 技能：`player_skills`/`skills`（3b 初始技能 + 4/5 副本技能统一库存）
+- 背包：`player_items` 扩展（堆叠规则/来源/元数据）
+- 货币：`currencies` 表（阶段2 已有金币）
+- 奖励：阶段5 Reward Validation Chain + reward_grants 幂等
+- Avatar：阶段3b 初始化结果直接作为角色初始属性/技能来源
+
+## 核心机制
+
+- **Stats**：total = base + 永久修正 + 装备加成 + 临时修正（限实例），Clamp 1~10；装备不写回 base
+- **XP/Level**：数据驱动阈值（`leveling.js` 集中配置）；升级服务器计算 → `LEVEL_UP` 事件；AI 无 XP 通道
+- **HP**：damage/heal/death(DOWNED)/revive 全部服务器执行；副本内死亡不污染长期角色（结束按快照恢复），
+  仅当 Definition 声明 `permadeath` 才有服务器验证的永久后果
+- **技能**：唯一性（重复→升级）；声明式效果（HEAL/DAMAGE/ROLL_MODIFIER/STAT_MODIFIER/ADVANTAGE/…）；
+  回合制冷却 + 次数限制；AI 只能 `skill_use` 请求，服务器验证所有权/状态/冷却/次数
+- **装备**：weapon/armor/accessory_1/accessory_2 槽；所有权+可装备性服务器验证；替换回背包
+- **物品**：STACKABLE 堆叠 / NON_STACKABLE 恒1 / UNIQUE 拒绝重复
+- **快照**：副本开始时存角色快照；副本内用实例状态；结束经验证回写（临时效果自动清除）
+- **并发**：`players.version` 乐观锁 + 冲突重试（并发 XP +100/+100/+100 → 无丢失）
+- **审计**：`character_transactions`（XP/LEVEL/HP/CURRENCY/ITEM/SKILL/EQUIPMENT/STAT，old/new 值）
+
+## 新增文件
+
+```
+server/src/services/character/   characterService.js / leveling.js
+server/src/routes/               characterRoutes.js
+server/test/                     stage6-character.test.js（65 项）
+frontend/src/components/         CharacterPanel.jsx
+```
+
+## Migration（003_stage6_character_progression）
+
+`players.version`；`player_skills` +level/source_type/cooldown/uses；`skills` +cooldown_turns/max_uses；
+`items` +kind/slot/stacking/stat_bonus；新表 `character_equipment` / `character_modifiers` /
+`player_currency` / `character_transactions` / `instance_character_snapshots`。
+注意：迁移先于种子执行（种子可引用新列）。
+
+## API（阶段6）
+
+`GET /api/character` · `/api/character/stats|skills|inventory|equipment` ·
+`POST /api/character/skills/:id/use` · `POST /api/character/equipment/equip|unequip`
+（无任何客户端修改 XP/等级/属性/HP/技能/物品/货币 的端点）
+
+## 成长闭环（完成标准）
+
+新玩家进入 → 自动创建 Character → Avatar Vision/Bacon Head 初始属性与技能（3b 复用）→
+进入副本（快照）→ 战斗/事件 → 通关 → Reward Validation → XP/技能/物品/装备/货币结算 →
+角色更新 → 离开 → 重新进入：角色仍在（Persistent Progression Loop ✅）。
+
+```
+npm test              # 245 项全套件（16+30+41+42+51+65）
+npm run test:stage6   # 仅阶段6
+```

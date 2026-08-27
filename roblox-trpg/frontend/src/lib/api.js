@@ -62,4 +62,16 @@ export const api = {
   getInstanceEvents: (id) => request(`/api/dungeon-instances/${id}/events`),
   leaveInstance: (id, sessionToken) =>
     request(`/api/dungeon-instances/${id}/leave`, { method: 'POST', body: JSON.stringify({ sessionToken }) }),
+  // ── 阶段6：Persistent Character ──
+  getCharacter: () => request('/api/character'),
+  getCharacterStats: () => request('/api/character/stats'),
+  getCharacterSkills: () => request('/api/character/skills'),
+  getCharacterInventory: () => request('/api/character/inventory'),
+  getCharacterEquipment: () => request('/api/character/equipment'),
+  useSkill: (holdId, sessionToken, turn) =>
+    request(`/api/character/skills/${holdId}/use`, { method: 'POST', body: JSON.stringify({ sessionToken, turn }) }),
+  equipItem: (itemId, sessionToken) =>
+    request('/api/character/equipment/equip', { method: 'POST', body: JSON.stringify({ itemId, sessionToken }) }),
+  unequipSlot: (slot, sessionToken) =>
+    request('/api/character/equipment/unequip', { method: 'POST', body: JSON.stringify({ slot, sessionToken }) }),
 };

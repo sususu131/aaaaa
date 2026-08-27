@@ -79,10 +79,18 @@ function buildRuntimeContext(instance, definition, playerRows) {
     if (enc) encounterLines.push(`- ${enc.id}「${enc.name}」(${enc.type}) 难度${enc.difficulty}：${enc.description}`);
   }
 
+  // 阶段6：角色摘要（等级/属性/技能/关键装备；不发送整个 Inventory）
+  const characterService = require('../character/characterService');
   const partyLines = playerRows.map((p) => {
-    const st = playerStates.getPlayerState(p.id);
-    const skills = st.skills.map((s) => s.name).join('、') || '无';
-    return `- ${p.name}（${p.uid}）HP ${st.hp}/${st.maxHp}，技能：${skills}，状态：${st.statusEffects.join('、') || '正常'}`;
+    try {
+      const c = characterService.getCharacter(p.id);
+      const skills = c.skills.map((s) => `${s.name}Lv${s.level}`).join('、') || '无';
+      const equip = c.equipment.map((e) => e.name).join('、') || '无';
+      return `- ${p.name}（${p.uid}）Lv${c.level} XP${c.experience} HP ${c.currentHp}/${c.maxHp}，属性 STR${c.stats.STR} DEX${c.stats.DEX} CON${c.stats.CON} PER${c.stats.PER} INT${c.stats.INT} LUK${c.stats.LUK}，技能：${skills}，装备：${equip}，状态：${c.statusEffects.join('、') || '正常'}`;
+    } catch {
+      const st = playerStates.getPlayerState(p.id);
+      return `- ${p.name}（${p.uid}）HP ${st.hp}/${st.maxHp}`;
+    }
   });
 
   const sceneExits = (scene && scene.exits || []).join('、') || '（无）';
@@ -206,16 +214,40 @@ async function applyOutput(io, instance, definition, output, playerRows, gmCtx) 
     }
   }
 
-  // 1) 技能使用：服务器验证玩家真实拥有
+  // 1) 技能使用：服务器全验证（拥有/状态/冷却/次数）+ 声明式效果执行
   if (output.skill_use) {
+    const characterService = require('../character/characterService');
     const p = playerRows.find((x) => x.name === output.skill_use.player || x.uid === output.skill_use.player);
-    const owned = p && playerStates.playerHasSkill(p.id, output.skill_use.skill);
-    if (!owned) {
-      applied.push({ type: 'SKILL_REJECTED', skill: output.skill_use.skill, reason: '未拥有该技能，不能使用' });
-      im.logEvent(instance, 'SKILL_REJECTED', output.skill_use.player, output.skill_use);
+    const combatRow = combatEngine.activeCombat(instance.id);
+    const turn = combatRow ? combatRow.turn : db.prepare('SELECT COUNT(*) c FROM instance_actions WHERE instance_id = ?').get(instance.id).c;
+    if (!p) {
+      applied.push({ type: 'SKILL_REJECTED', skill: output.skill_use.skill, reason: '玩家不存在' });
     } else {
-      applied.push({ type: 'SKILL_USED', skill: output.skill_use.skill, player: p.name });
-      im.logEvent(instance, 'SKILL_USED', p.name, output.skill_use);
+      const useRes = characterService.useSkill(p.id, output.skill_use.skill, { instanceId: instance.id, turn });
+      if (!useRes.ok) {
+        applied.push({ type: 'SKILL_REJECTED', skill: output.skill_use.skill, reason: useRes.reason, player: p.name });
+        im.logEvent(instance, 'SKILL_REJECTED', p.name, { ...output.skill_use, reason: useRes.reason });
+      } else {
+        // DAMAGE 效果应用到当前战斗目标（服务器计算）
+        for (const eff of useRes.effects) {
+          if (eff.type === 'DAMAGE' && combatRow) {
+            const enemyStates = JSON.parse(combatRow.enemy_states);
+            const targetId = Object.keys(enemyStates).find((k) => enemyStates[k].hp > 0);
+            if (targetId) {
+              const dmg = Math.max(1, Math.min(50, Number(eff.value) || 0));
+              enemyStates[targetId].hp = Math.max(0, enemyStates[targetId].hp - dmg);
+              const allDead = Object.values(enemyStates).every((e) => e.hp <= 0);
+              db.prepare(
+                `UPDATE instance_combats SET enemy_states = ?, version = version + 1, ${allDead ? "status = 'RESOLVED'," : ''} turn = turn + 1 WHERE id = ? AND version = ?`
+              ).run(JSON.stringify(enemyStates), combatRow.id, combatRow.version);
+              applied.push({ type: 'SKILL_DAMAGE', skill: useRes.skillName, target: targetId, damage: dmg, resolved: allDead });
+              io.to(instance.room_id).emit('instance:combat', { ...combatEngine.serialize(db.prepare('SELECT * FROM instance_combats WHERE id = ?').get(combatRow.id)), skillEffect: eff });
+            }
+          }
+        }
+        applied.push({ type: 'SKILL_USED', skill: useRes.skillName, player: p.name, effects: useRes.effects.map((e) => e.type) });
+        im.logEvent(instance, 'SKILL_USED', p.name, { skill: useRes.skillName, effects: useRes.effects });
+      }
     }
   }
 

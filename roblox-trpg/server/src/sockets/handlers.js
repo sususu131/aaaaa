@@ -233,6 +233,7 @@ module.exports = function registerSocketHandlers(io) {
 
       const row = roomManager.getPlayerRow(socket.id);
       const session = attachSession(socket, row.id);
+      require('../services/character/characterService').ensureCharacter(row.id); // 阶段6：新玩家自动创建 Character
       const payload = roomPayload(room, session);
       if (typeof ack === 'function') ack({ ok: true, ...payload });
       socket.emit('room:joined', payload);
@@ -261,6 +262,7 @@ module.exports = function registerSocketHandlers(io) {
 
       const row = roomManager.getPlayerRow(socket.id);
       const session = attachSession(socket, row.id);
+      require('../services/character/characterService').ensureCharacter(row.id); // 阶段6：新玩家自动创建 Character
       const payload = roomPayload(room, session);
       if (typeof ack === 'function') ack({ ok: true, ...payload });
       socket.emit('room:joined', payload);

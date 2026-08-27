@@ -12,6 +12,7 @@ const apiRoutes = require('./routes/apiRoutes');
 const visionRoutes = require('./routes/visionRoutes');
 const dungeonRoutes = require('./routes/dungeonRoutes');
 const runtimeRoutes = require('./routes/runtimeRoutes');
+const characterRoutes = require('./routes/characterRoutes');
 
 // 启动即建表（幂等）
 initDb();
@@ -28,6 +29,7 @@ app.use('/api', apiRoutes);
 app.use(visionRoutes); // /api/vision/avatar/analyze、/vision-test 等
 app.use(dungeonRoutes); // 阶段4：Dungeon Design Pipeline
 app.use(runtimeRoutes); // 阶段5：Dungeon Runtime
+app.use(characterRoutes); // 阶段6：Persistent Character
 
 registerSocketHandlers(io);
 

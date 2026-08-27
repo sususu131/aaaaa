@@ -9,6 +9,97 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '003_stage6_character_progression',
+    up(db) {
+      const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+      const addCol = (table, col, def) => {
+        if (!hasCol(table, col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+      };
+
+      // players 扩展为 Persistent Character（复用现有行，不新建第二套）
+      addCol('players', 'version', 'INTEGER NOT NULL DEFAULT 1'); // 乐观锁
+
+      // 技能持有扩展：等级 / 来源 / 冷却 / 次数
+      addCol('player_skills', 'level', 'INTEGER NOT NULL DEFAULT 1');
+      addCol('player_skills', 'source_type', "TEXT");                     // INITIAL_AVATAR/DUNGEON_REWARD/QUEST/SPECIAL_EVENT/ADMIN
+      addCol('player_skills', 'source_id', 'TEXT');
+      addCol('player_skills', 'last_used_turn', 'INTEGER');
+      addCol('player_skills', 'cooldown_until_turn', 'INTEGER');
+      addCol('player_skills', 'uses_remaining', 'INTEGER');
+
+      // 技能定义扩展：冷却/次数（声明式，数据驱动）
+      addCol('skills', 'cooldown_turns', 'INTEGER NOT NULL DEFAULT 0');
+      addCol('skills', 'max_uses', 'INTEGER');
+
+      // 物品扩展：装备槽 / 堆叠规则 / 属性加成
+      addCol('items', 'kind', "TEXT NOT NULL DEFAULT 'material'");        // weapon/armor/accessory/special/material/consumable
+      addCol('items', 'slot', 'TEXT');                                     // weapon/armor/accessory（装备类）
+      addCol('items', 'stacking', "TEXT NOT NULL DEFAULT 'STACKABLE'");   // STACKABLE/NON_STACKABLE/UNIQUE
+      addCol('items', 'stat_bonus', 'TEXT');                               // JSON：{"STR":2}
+
+      // 背包扩展（复用 player_items）
+      addCol('player_items', 'metadata', 'TEXT');
+      addCol('player_items', 'source_type', 'TEXT');                      // DUNGEON_REWARD/DROP/QUEST/EVENT/STARTER/SPECIAL
+
+      // 装备槽（角色 × 槽位唯一）
+      db.exec(`CREATE TABLE IF NOT EXISTS character_equipment (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id  INTEGER NOT NULL REFERENCES players(id),
+        slot       TEXT NOT NULL CHECK (slot IN ('weapon','armor','accessory_1','accessory_2')),
+        item_id    INTEGER NOT NULL REFERENCES items(id),
+        equipped_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (player_id, slot),
+        UNIQUE (player_id, item_id)
+      )`);
+
+      // 属性修正（PERMANENT / TEMPORARY；临时修正绑定实例，副本结束清除）
+      db.exec(`CREATE TABLE IF NOT EXISTS character_modifiers (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id   INTEGER NOT NULL REFERENCES players(id),
+        stat        TEXT NOT NULL,
+        delta       INTEGER NOT NULL,
+        scope       TEXT NOT NULL CHECK (scope IN ('PERMANENT','TEMPORARY')),
+        instance_id INTEGER,
+        source_type TEXT,
+        source_id   TEXT,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+
+      // 货币余额（复用 currencies 表）
+      db.exec(`CREATE TABLE IF NOT EXISTS player_currency (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id   INTEGER NOT NULL REFERENCES players(id),
+        currency_id INTEGER NOT NULL REFERENCES currencies(id),
+        balance     INTEGER NOT NULL DEFAULT 0,
+        UNIQUE (player_id, currency_id)
+      )`);
+
+      // 角色交易日志（所有 XP/货币/物品/技能/装备/属性/HP 变化，审计）
+      db.exec(`CREATE TABLE IF NOT EXISTS character_transactions (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id   INTEGER NOT NULL REFERENCES players(id),
+        kind        TEXT NOT NULL,     -- XP/LEVEL/HP/CURRENCY/ITEM/SKILL/EQUIPMENT/STAT
+        action      TEXT NOT NULL,     -- grant/damage/heal/equip/unequip/level_up/use/...
+        source_type TEXT,
+        source_id   TEXT,
+        old_value   TEXT,
+        new_value   TEXT,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_char_tx_player ON character_transactions(player_id)');
+
+      // 副本开始时的角色快照（副本内用实例状态，结束才回写长期角色）
+      db.exec(`CREATE TABLE IF NOT EXISTS instance_character_snapshots (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        instance_id INTEGER NOT NULL REFERENCES dungeon_instances(id),
+        player_id   INTEGER NOT NULL REFERENCES players(id),
+        snapshot    TEXT NOT NULL,     -- JSON：level/hp/max_hp/stats/skills/equipment
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (instance_id, player_id)
+      )`);
+    },
+  },
+  {
     name: '002_stage5_dungeon_runtime',
     up(db) {
       // 副本实例：一次实际游戏（独立于房主会话；世界状态按房间隔离）

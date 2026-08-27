@@ -6,6 +6,8 @@
 const crypto = require('crypto');
 const { getDb } = require('@roblox-trpg/database');
 const im = require('./instanceManager');
+const characterService = require('../character/characterService');
+const leveling = require('../character/leveling');
 
 /** 实例对应的 dungeon 行（经 universe 关联，用于查询 approved 奖励表）。 */
 function dungeonRowFor(definition) {
@@ -85,12 +87,30 @@ function settleCompletion(io, instance, definition) {
           grants.push({ player: player.name, rewardKey: key, type: 'SKILL', name: r.skill_name });
           io.to(instance.room_id).emit('skill:gained', { playerName: player.name, skillName: r.skill_name, dungeon: definition.dungeon?.display_name || '', at: new Date().toISOString() });
         } else if (r.reward_type === 'item') {
-          db.prepare(
-            `INSERT INTO player_items (player_id, item_id, quantity, source, reason) VALUES (?, ?, 1, ?, '副本通关')
-             ON CONFLICT(player_id, item_id) DO UPDATE SET quantity = MIN(quantity + 1, 99)`
-          ).run(playerRowId, r.reward_id, `instance:${instance.uid}`);
-          grants.push({ player: player.name, rewardKey: key, type: 'ITEM', name: r.item_name });
+          const itemRow = db.prepare('SELECT * FROM items WHERE id = ?').get(r.reward_id);
+          const grantRes = characterService.grantItem(playerRowId, r.reward_id, {
+            sourceType: 'DUNGEON_REWARD',
+            sourceId: `instance:${instance.uid}`,
+          });
+          if (grantRes.granted === 'REJECTED') {
+            skipped.push({ player: player.name, reward: key, reason: grantRes.reason });
+            continue;
+          }
+          grants.push({ player: player.name, rewardKey: key, type: itemRow && ['weapon', 'armor', 'accessory'].includes(itemRow.kind) ? 'EQUIPMENT' : 'ITEM', name: r.item_name });
           io.to(instance.room_id).emit('item:gained', { playerName: player.name, itemName: r.item_name, quantity: 1, at: new Date().toISOString() });
+        } else if (r.reward_type === 'currency') {
+          // 货币奖励：数量来自 condition_data（服务器读取，AI 不可指定）
+          let amount = 100;
+          try {
+            amount = Math.max(1, Math.min(99999, Number((r.condition_data ? JSON.parse(r.condition_data) : {}).amount) || 100));
+          } catch { /* 非法 JSON 用默认 */ }
+          const curRes = characterService.grantCurrency(playerRowId, r.reward_id, amount, {
+            sourceType: 'DUNGEON_REWARD',
+            sourceId: `instance:${instance.uid}`,
+          });
+          const curName = db.prepare('SELECT name FROM currencies WHERE id = ?').get(r.reward_id);
+          grants.push({ player: player.name, rewardKey: key, type: 'CURRENCY', name: curName ? curName.name : '货币', amount });
+          io.to(instance.room_id).emit('currency:gained', { playerName: player.name, currencyName: curName && curName.name, amount, at: new Date().toISOString() });
         }
       }
     }
@@ -115,21 +135,60 @@ function settleCompletion(io, instance, definition) {
         continue;
       }
       if (skillRow) {
-        db.prepare('INSERT OR IGNORE INTO player_skills (player_id, skill_id, obtained_from_dungeon_id) VALUES (?, ?, ?)').run(
-          playerRowId,
-          skillRow.id,
-          dungeonRow ? dungeonRow.id : null
-        );
-        grants.push({ player: player.name, rewardKey: key, type: 'SKILL', name: skillRow.name });
+        const g = characterService.grantSkill(playerRowId, skillRow.id, {
+          sourceType: 'DUNGEON_REWARD',
+          sourceId: `instance:${instance.uid}`,
+          obtainedFromDungeonId: dungeonRow ? dungeonRow.id : null,
+        });
+        if (g.granted === 'REJECTED') {
+          skipped.push({ player: player.name, reward: key, reason: g.reason });
+          db.prepare("UPDATE reward_grants SET status = 'SKIPPED' WHERE instance_id = ? AND player_id = ? AND reward_key = ?").run(instance.id, playerRowId, key);
+          continue;
+        }
+        grants.push({ player: player.name, rewardKey: key, type: 'SKILL', name: skillRow.name, note: g.granted });
         io.to(instance.room_id).emit('skill:gained', { playerName: player.name, skillName: skillRow.name, dungeon: definition.dungeon?.display_name || '', at: new Date().toISOString() });
       } else if (itemRow) {
-        db.prepare(
-          `INSERT INTO player_items (player_id, item_id, quantity, source, reason) VALUES (?, ?, 1, ?, '副本通关(候选)')
-           ON CONFLICT(player_id, item_id) DO UPDATE SET quantity = MIN(quantity + 1, 99)`
-        ).run(playerRowId, itemRow.id, `instance:${instance.uid}`);
-        grants.push({ player: player.name, rewardKey: key, type: 'ITEM', name: itemRow.name });
+        const grantRes = characterService.grantItem(playerRowId, itemRow.id, {
+          sourceType: 'DUNGEON_REWARD',
+          sourceId: `instance:${instance.uid}`,
+        });
+        if (grantRes.granted === 'REJECTED') {
+          skipped.push({ player: player.name, reward: key, reason: grantRes.reason });
+          db.prepare("UPDATE reward_grants SET status = 'SKIPPED' WHERE instance_id = ? AND player_id = ? AND reward_key = ?").run(instance.id, playerRowId, key);
+          continue;
+        }
+        grants.push({ player: player.name, rewardKey: key, type: ['weapon', 'armor', 'accessory'].includes(itemRow.kind) ? 'EQUIPMENT' : 'ITEM', name: itemRow.name });
       }
     }
+
+    // 阶段6：XP（服务器按难度计算，AI 不能指定）+ 角色回写规则
+    const xp = leveling.dungeonCompletionXp(definition.dungeon?.difficulty, true);
+    const xpRes = characterService.grantXp(playerRowId, xp, { sourceType: 'DUNGEON_COMPLETION', sourceId: `instance:${instance.uid}` });
+    grants.push({ player: player.name, rewardKey: `xp:${xp}`, type: 'XP', amount: xp, levelUps: xpRes.events });
+    for (const ev of xpRes.events) {
+      im.logEvent(instance, 'LEVEL_UP', player.name, ev);
+      io.to(instance.room_id).emit('character:levelUp', { playerName: player.name, ...ev });
+    }
+
+    // 死亡规则：副本内死亡只影响实例；结束时按快照恢复 HP（除非 PERMADEATH）
+    const snapshot = characterService.getSnapshot(playerRowId, instance.id);
+    const stNow = db.prepare('SELECT * FROM player_states WHERE player_id = ?').get(playerRowId);
+    const diedInInstance = stNow && (stNow.hp <= 0 || JSON.parse(stNow.status_effects || '[]').includes('DOWNED'));
+    const permadeath = definition.dungeon?.permadeath === true;
+    if (diedInInstance && permadeath) {
+      // 服务器规则验证的永久后果（仅当 Definition 明确声明）
+      characterService.addStatModifier(playerRowId, 'CON', -1, { scope: 'PERMANENT', sourceType: 'PERMADEATH', sourceId: `instance:${instance.uid}` });
+      characterService.revive(playerRowId, { hp: 1, sourceType: 'PERMADEATH', sourceId: `instance:${instance.uid}` });
+      grants.push({ player: player.name, rewardKey: 'permadeath', type: 'SPECIAL', note: 'PERMADEATH：永久 CON-1' });
+    } else if (snapshot) {
+      // 恢复长期角色：HP 回快照值并清除 DOWNED；临时属性修正清除
+      db.prepare("UPDATE player_states SET hp = ?, status_effects = ?, updated_at = datetime('now') WHERE player_id = ?").run(
+        Math.max(1, snapshot.hp),
+        JSON.stringify(JSON.parse(stNow.status_effects || '[]').filter((e) => e !== 'DOWNED')),
+        playerRowId
+      );
+    }
+    characterService.clearTemporaryModifiers(playerRowId, instance.id);
   }
 
   for (const g of grants) {

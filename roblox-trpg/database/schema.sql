@@ -155,7 +155,7 @@ CREATE TABLE IF NOT EXISTS items (
   description       TEXT,
   source_dungeon_id INTEGER REFERENCES dungeons(id),
   source_type       TEXT NOT NULL DEFAULT 'original'
-                    CHECK (source_type IN ('official', 'inspired', 'original')),
+                    CHECK (source_type IN ('official', 'inspired', 'original', 'INITIAL_AVATAR', 'DUNGEON')),
   rarity            TEXT NOT NULL DEFAULT 'common'
                     CHECK (rarity IN ('common', 'rare', 'epic', 'legendary')),
   effect_data       TEXT,                           -- JSON

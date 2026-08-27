@@ -15,6 +15,7 @@ export default function DungeonRuntime({ onClose, getSessionToken, onPickOption 
   const [actionText, setActionText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [rewardSummary, setRewardSummary] = useState(null); // 服务器最终结算结果
 
   const token = () => (getSessionToken ? getSessionToken() : null);
 
@@ -29,7 +30,10 @@ export default function DungeonRuntime({ onClose, getSessionToken, onPickOption 
     const onUpdate = () => refresh();
     const onScene = () => refresh();
     const onCombat = () => refresh();
-    const onCompleted = () => refresh();
+    const onCompleted = (data) => {
+      setRewardSummary(data && data.grants ? data.grants : []);
+      refresh();
+    };
     socket.on('instance:update', onUpdate);
     socket.on('instance:scene', onScene);
     socket.on('instance:combat', onCombat);
@@ -191,6 +195,22 @@ export default function DungeonRuntime({ onClose, getSessionToken, onPickOption 
             )}
             {(snapshot.instance.status === 'COMPLETED' || snapshot.instance.status === 'FAILED') && (
               <p className="gm-status">{snapshot.instance.status === 'COMPLETED' ? '🏁 副本已完成，奖励已结算' : '💀 副本失败（全队倒下）'}</p>
+            )}
+
+            {rewardSummary && rewardSummary.length > 0 && (
+              <div className="dd-section canon">
+                <h4>🎉 副本完成 — 奖励结算（服务器最终结果）</h4>
+                {rewardSummary.map((g, i) => (
+                  <div key={i} className="dd-item">
+                    {g.type === 'XP' && `+${g.amount} XP${g.levelUps && g.levelUps.length ? `（升级 → Lv${g.levelUps[g.levelUps.length - 1].new_level}）` : ''}`}
+                    {g.type === 'CURRENCY' && `${g.name} +${g.amount}`}
+                    {g.type === 'SKILL' && `技能「${g.name}」${g.note === 'LEVEL_UP' ? '（升级）' : ''}`}
+                    {(g.type === 'ITEM' || g.type === 'EQUIPMENT') && `${g.name} ×1`}
+                    {g.type === 'SPECIAL' && `${g.note || '特殊'}`}
+                    <span className="muted small"> · {g.player}</span>
+                  </div>
+                ))}
+              </div>
             )}
 
             <details className="source-refs">

@@ -56,6 +56,28 @@ INSERT OR IGNORE INTO skills (name, description, source_dungeon_id, source_type,
   ('beast_sense',        '野兽感知：动物的直觉，察觉危险更早。',            NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
   ('military_drill',     '军事训练：纪律化的战斗动作，稳定可靠。',          NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved');
 
+-- 阶段6：技能声明式效果（effect_data）+ 冷却/次数（数据驱动，禁止代码执行）
+UPDATE skills SET effect_data = '{"effects":[{"type":"ADVANTAGE","when":"danger_sense"}]}', cooldown_turns = 0 WHERE name = '危险感知' AND (effect_data IS NULL OR effect_data = '');
+UPDATE skills SET effect_data = '{"effects":[{"type":"UNLOCK_ACTION","action":"pick_lock"}]}', cooldown_turns = 0 WHERE name = '开锁能力' AND (effect_data IS NULL OR effect_data = '');
+UPDATE skills SET effect_data = '{"effects":[{"type":"DAMAGE","value":8}]}', cooldown_turns = 2 WHERE name = '果实能力' AND (effect_data IS NULL OR effect_data = '');
+UPDATE skills SET effect_data = '{"effects":[{"type":"ROLL_MODIFIER","value":2,"when":"combat"}]}', cooldown_turns = 1 WHERE name = 'heavy_combat' AND (effect_data IS NULL OR effect_data = '');
+UPDATE skills SET effect_data = '{"effects":[{"type":"ROLL_MODIFIER","value":2,"when":"stealth"}]}', cooldown_turns = 1 WHERE name = 'ninja_mobility' AND (effect_data IS NULL OR effect_data = '');
+UPDATE skills SET effect_data = '{"effects":[{"type":"HEAL","value":5}]}', cooldown_turns = 2, max_uses = 3 WHERE name = 'magic_affinity' AND (effect_data IS NULL OR effect_data = '');
+
+-- 阶段6：测试装备与消耗品（装备化 UPDATE 在文件末尾，确保物品已插入）
+INSERT OR IGNORE INTO items (name, description, source_dungeon_id, source_type, rarity, status, kind, slot, stacking, stat_bonus) VALUES
+  ('锈剑',     '一把陈旧但可靠的剑。',       (SELECT id FROM dungeons WHERE roblox_experience_name = 'Doors'), 'DUNGEON', 'common', 'approved', 'weapon', 'weapon', 'NON_STACKABLE', '{"STR":1}'),
+  ('皮甲',     '轻便的防护。',               (SELECT id FROM dungeons WHERE roblox_experience_name = 'Doors'), 'DUNGEON', 'common', 'approved', 'armor', 'armor', 'NON_STACKABLE', '{"CON":1}'),
+  ('幸运护符', '微微发光的护符。',           (SELECT id FROM dungeons WHERE roblox_experience_name = 'Doors'), 'DUNGEON', 'rare', 'approved', 'accessory', 'accessory', 'UNIQUE', '{"LUK":2}'),
+  ('治疗药水', '恢复少量生命。',             NULL, 'original', 'common', 'approved', 'consumable', NULL, 'STACKABLE', NULL);
+
+-- 阶段6：Doors 测试奖励链追加装备与货币（dungeon_rewards 多类型，阶段2 结构直接复用）
+INSERT OR IGNORE INTO dungeon_rewards (dungeon_id, reward_type, reward_id, drop_rate, is_guaranteed, status, condition_data) VALUES
+  ((SELECT id FROM dungeons WHERE roblox_experience_name = 'Doors'), 'item',
+    (SELECT id FROM items WHERE name = '锈剑'), 1.0, 1, 'approved', '{"slot_hint":"weapon"}'),
+  ((SELECT id FROM dungeons WHERE roblox_experience_name = 'Doors'), 'currency',
+    (SELECT id FROM currencies WHERE name = '金币'), 1.0, 1, 'approved', '{"amount":500}');
+
 -- 测试物品（approved）
 INSERT OR IGNORE INTO items (name, description, source_dungeon_id, source_type, rarity, status) VALUES
   ('骨架钥匙', '开启一扇特殊门的钥匙。',
@@ -75,3 +97,10 @@ INSERT OR IGNORE INTO dungeon_rewards (dungeon_id, reward_type, reward_id, drop_
     (SELECT id FROM items WHERE name = '撬棍'), 0.5, 0, 'approved'),
   ((SELECT id FROM dungeons WHERE roblox_experience_name = 'Blox Fruits'), 'skill',
     (SELECT id FROM skills WHERE name = '果实能力'), 0.3, 0, 'approved');
+
+-- 阶段6：物品装备化定义（必须位于物品 INSERT 之后）
+UPDATE items SET kind = 'special', stacking = 'UNIQUE' WHERE name = '骨架钥匙' AND (kind IS NULL OR kind = 'material');
+UPDATE items SET kind = 'weapon', slot = 'weapon', stacking = 'NON_STACKABLE', stat_bonus = '{"STR":2}' WHERE name = '撬棍' AND (kind IS NULL OR kind = 'material');
+
+-- 阶段6：种子副本补齐 uid（迁移先于种子执行，故种子也需回填）
+UPDATE dungeons SET uid = 'dungeon_' || REPLACE(LOWER(roblox_experience_name), ' ', '_') WHERE uid IS NULL;

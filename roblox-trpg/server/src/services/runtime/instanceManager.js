@@ -140,6 +140,16 @@ function startInstance(io, instance) {
 
   const fresh = getInstance(instance.id);
   logEvent(fresh, 'START', 'server', { scene: firstScene.id, party });
+
+  // 阶段6：副本开始 = 角色快照（副本内用实例状态；结束才回写长期角色）
+  const characterService = require('../character/characterService');
+  for (const pid of party) {
+    try {
+      characterService.ensureCharacter(pid);
+      characterService.snapshotCharacter(pid, fresh.id);
+    } catch { /* 快照失败不阻塞开始 */ }
+  }
+
   applySceneEntryEvents(io, fresh, definition, firstScene.id);
   broadcastUpdate(io, fresh);
   return getInstance(instance.id);

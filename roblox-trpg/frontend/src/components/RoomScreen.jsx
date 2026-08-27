@@ -5,6 +5,7 @@ import ContextViewer from './ContextViewer.jsx';
 import DungeonPanel from './DungeonPanel.jsx';
 import DungeonDesigner from './DungeonDesigner.jsx';
 import DungeonRuntime from './DungeonRuntime.jsx';
+import CharacterPanel from './CharacterPanel.jsx';
 import RobloxBindPanel from './RobloxBindPanel.jsx';
 
 /**
@@ -65,6 +66,9 @@ export default function RoomScreen({
         <button className="btn small" onClick={() => onOpenModal(modal === 'avatar' ? null : 'avatar')}>
           Roblox形象
         </button>
+        <button className="btn small" onClick={() => onOpenModal(modal === 'character' ? null : 'character')}>
+          角色
+        </button>
         <button className="btn danger" onClick={onLeave}>
           离开
         </button>
@@ -112,6 +116,13 @@ export default function RoomScreen({
       {modal === 'designer' && <DungeonDesigner onClose={() => onOpenModal(null)} />}
       {modal === 'runtime' && (
         <DungeonRuntime onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} onPickOption={onPickOption} />
+      )}
+      {modal === 'character' && (
+        <CharacterPanel
+          onClose={() => onOpenModal(null)}
+          getSessionToken={getSessionToken}
+          headshotUrl={(players.find((p) => p.name === myName) || {}).headshotUrl}
+        />
       )}
       {modal === 'dungeon' && (
         <DungeonPanel current={room.experience} currentDungeon={room.dungeon} onClose={() => onOpenModal(null)} />
