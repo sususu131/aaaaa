@@ -9,6 +9,83 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '009_stage12_world_simulation',
+    up(db) {
+      const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+      // NPC 地点（世界模拟的移动系统：大厅/地下室/…）
+      db.exec(`CREATE TABLE IF NOT EXISTS npc_locations (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        key         TEXT NOT NULL UNIQUE,
+        name        TEXT NOT NULL,
+        description TEXT,
+        is_safe     INTEGER NOT NULL DEFAULT 0,      -- 1 = 安全点（FLEEING 目标）
+        dungeon_id  INTEGER REFERENCES dungeons(id), -- 可绑定副本（NULL = 世界地点）
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+      // 阵营关系（阶段9 声望是玩家×阵营；本表是阵营×阵营）
+      db.exec(`CREATE TABLE IF NOT EXISTS faction_relations (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        faction_a  INTEGER NOT NULL REFERENCES factions(id),
+        faction_b  INTEGER NOT NULL REFERENCES factions(id),
+        relation   TEXT NOT NULL DEFAULT 'NEUTRAL' CHECK (relation IN ('HOSTILE','NEUTRAL','ALLIED')),
+        updated_by TEXT,                              -- server / rule_engine / event:xxx
+        reason     TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (faction_a, faction_b),
+        CHECK (faction_a < faction_b)                 -- 规范化存储：小 id 在前
+      )`);
+      // 世界模拟事件（自然/剧情/系统；与 world_events 审计表语义不同，不改动旧表）
+      db.exec(`CREATE TABLE IF NOT EXISTS world_sim_events (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        uid        TEXT UNIQUE,
+        room_id    TEXT,                              -- NULL = 全局事件
+        event_type TEXT NOT NULL,                     -- POWER_OUTAGE / MONSTER_INVASION / …
+        category   TEXT NOT NULL CHECK (category IN ('NATURAL','STORY','SYSTEM')),
+        status     TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE','EXPIRED','CANCELLED')),
+        data_json  TEXT NOT NULL DEFAULT '{}',
+        source     TEXT NOT NULL DEFAULT 'server',    -- server / rule_engine / ai_request
+        dedupe_key TEXT,                              -- 幂等去重键（同房间同键不重复触发）
+        started_at TEXT NOT NULL DEFAULT (datetime('now')),
+        expires_at TEXT,                              -- NULL = 永久（剧情类）
+        ended_at   TEXT
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_wse_room ON world_sim_events(room_id, status)');
+      // World Tick 审计（幂等依据：UNIQUE(room_id, tick_number)，重放同 tick 直接跳过）
+      db.exec(`CREATE TABLE IF NOT EXISTS world_ticks (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_id     TEXT NOT NULL,
+        tick_number INTEGER NOT NULL,
+        status      TEXT NOT NULL DEFAULT 'COMPLETED' CHECK (status IN ('COMPLETED','SKIPPED')),
+        result_json TEXT NOT NULL DEFAULT '{}',
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (room_id, tick_number)
+      )`);
+      // 调度器单例状态（暂停标志/最后 tick；重启与断线恢复后延续）
+      db.exec(`CREATE TABLE IF NOT EXISTS world_scheduler (
+        id          INTEGER PRIMARY KEY CHECK (id = 1),
+        paused      INTEGER NOT NULL DEFAULT 0,
+        last_tick   INTEGER NOT NULL DEFAULT 0,
+        interval_ms INTEGER NOT NULL DEFAULT 30000,
+        last_run_at TEXT
+      )`);
+      db.exec('INSERT OR IGNORE INTO world_scheduler (id, paused, last_tick, interval_ms) VALUES (1, 0, 0, 30000)');
+      // NPC 实例：自主行为状态 + 当前地点
+      if (!hasCol('npc_instances', 'behavior_state')) {
+        db.exec("ALTER TABLE npc_instances ADD COLUMN behavior_state TEXT NOT NULL DEFAULT 'IDLE'");
+      }
+      if (!hasCol('npc_instances', 'location_key')) {
+        db.exec('ALTER TABLE npc_instances ADD COLUMN location_key TEXT');
+      }
+      if (!hasCol('npc_instances', 'behavior_data_json')) {
+        db.exec("ALTER TABLE npc_instances ADD COLUMN behavior_data_json TEXT NOT NULL DEFAULT '{}'");
+      }
+      // 动态副本：实例创建时由世界状态解析变体（NORMAL/BLACKOUT/HARD/HIDDEN_ROUTE）
+      if (!hasCol('dungeon_instances', 'variant_key')) {
+        db.exec("ALTER TABLE dungeon_instances ADD COLUMN variant_key TEXT NOT NULL DEFAULT 'NORMAL'");
+      }
+    },
+  },
+  {
     name: '008_stage11_legendary_encounter',
     up(db) {
       const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);

@@ -361,3 +361,45 @@ UPDATE legendary_npcs SET encounter_rules_json = '{
 UPDATE legendary_npcs SET creator_type = 'CREATOR' WHERE display_name = 'Shedletsky';
 UPDATE legendary_npcs SET creator_type = 'ADMIN' WHERE display_name = 'Builderman';
 UPDATE legendary_npcs SET creator_type = 'CREATOR' WHERE display_name = 'LSPLASH';
+
+-- ============================================================
+-- 阶段12：World Simulation & Dynamic Event System
+-- ============================================================
+-- 世界地点（NPC 移动系统的节点；安全点 = FLEEING 目标）
+INSERT OR IGNORE INTO npc_locations (key, name, description, is_safe) VALUES
+  ('loc_lobby',    '大厅',   '旅馆大厅，幸存者聚集的相对安全区域。', 1),
+  ('loc_corridor', '走廊',   '昏暗的走廊，连接大厅与深处。', 0),
+  ('loc_basement', '地下室', '隐藏的地下室，知道的人不多。', 0),
+  ('loc_gate',     '出入口', '通往外界的出入口。', 1),
+  ('loc_watch',    '瞭望台', '可以观察远处动静的高处。', 0);
+
+-- 阵营关系初始状态（规范化：faction_a < faction_b 由服务层保证）
+INSERT OR IGNORE INTO faction_relations (faction_a, faction_b, relation, updated_by, reason)
+SELECT MIN(a.id, b.id), MAX(a.id, b.id), 'HOSTILE', 'seed', '幸存者与实体天生敌对'
+FROM factions a, factions b
+WHERE a.uid = 'faction_doors_survivors' AND b.uid = 'faction_doors_entities'
+  AND NOT EXISTS (SELECT 1 FROM faction_relations fr WHERE fr.faction_a = MIN(a.id, b.id) AND fr.faction_b = MAX(a.id, b.id));
+INSERT OR IGNORE INTO faction_relations (faction_a, faction_b, relation, updated_by, reason)
+SELECT MIN(a.id, b.id), MAX(a.id, b.id), 'NEUTRAL', 'seed', '幸存者对旅馆管理员保持观望'
+FROM factions a, factions b
+WHERE a.uid = 'faction_doors_survivors' AND b.uid = 'faction_doors_keeper'
+  AND NOT EXISTS (SELECT 1 FROM faction_relations fr WHERE fr.faction_a = MIN(a.id, b.id) AND fr.faction_b = MAX(a.id, b.id));
+
+-- 传奇人物世界模拟条件（不是简单随机：由剑术/世界状态/剧情决定；保留原有概率键）
+UPDATE legendary_npcs SET spawn_rules_json = '{"base_chance":0.02,"experience_boost":{"Sword Fight on the Heights":0.25},"min_level":1,"world_conditions":{"any_skill":["Sword","剑"],"any_world_flag":["sword_knowledge"],"min_quest_progress":1}}' WHERE display_name = 'Shedletsky';
+UPDATE legendary_npcs SET spawn_rules_json = '{"base_chance":0.03,"experience_boost":{},"min_level":1,"world_conditions":{"always":true}}' WHERE display_name = 'Builderman';
+UPDATE legendary_npcs SET spawn_rules_json = '{"base_chance":0.01,"experience_boost":{"DOORS":0.3},"min_level":1,"world_conditions":{"any_world_flag":["doors_entity_knowledge"],"active_event":"POWER_OUTAGE"}}' WHERE display_name = 'LSPLASH';
+
+-- 世界模拟示例任务门控：停电事件发生后出现的调查任务（EVENT 类型，发现条件 = 世界事件）
+INSERT OR IGNORE INTO quests (uid, name, description, type, status, source_type, dungeon_id, difficulty, max_players)
+SELECT 'quest_world_blackout', '查明停电原因', '旅馆突然陷入黑暗。有人说是发电机，有人说……是别的东西。', 'EVENT', 'ACTIVE', 'DESIGNER',
+       (SELECT id FROM dungeons WHERE roblox_experience_name = 'Doors'), 3, 3
+WHERE NOT EXISTS (SELECT 1 FROM quests WHERE uid = 'quest_world_blackout');
+INSERT OR IGNORE INTO quest_versions (quest_id, version, definition_json, status, published_at)
+SELECT q.id, 1, '{"scope":"PARTY","hidden":true,"discovery":{"event_type":"WORLD_EVENT_STARTED","match":{"event":"POWER_OUTAGE"},"count":1},"rewards":[{"type":"XP","amount":250}]}', 'PUBLISHED', datetime('now')
+FROM quests q WHERE q.uid = 'quest_world_blackout'
+  AND NOT EXISTS (SELECT 1 FROM quest_versions qv WHERE qv.quest_id = q.id AND qv.version = 1);
+INSERT OR IGNORE INTO quest_objectives (quest_version_id, objective_key, name, description, type, required_count, order_index, is_optional, definition_json)
+SELECT qv.id, 'inspect_basement', '检查地下室', '到地下室查看发电机状况', 'REACH_LOCATION', 1, 1, 0, '{"event_type":"LOCATION_REACHED","match":{"location":"loc_basement"}}'
+FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id
+WHERE q.uid = 'quest_world_blackout' AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'inspect_basement');

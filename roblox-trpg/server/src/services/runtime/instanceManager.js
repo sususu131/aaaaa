@@ -77,7 +77,15 @@ function createInstance({ roomId, dungeonVersionId }) {
   const info = db
     .prepare('INSERT INTO dungeon_instances (uid, dungeon_version_id, room_id, status) VALUES (?, ?, ?, ?)')
     .run(uid, version.id, roomId, 'WAITING');
-  logEvent({ id: info.lastInsertRowid }, 'CREATE', 'server', { uid, dungeonVersionId: version.id });
+  // 阶段12：动态副本 —— 创建时按世界状态解析变体（事件失败不阻塞创建）
+  try {
+    const { resolveVariantForInstance } = require('../world/dynamicDungeon');
+    const variant = resolveVariantForInstance({ dungeon_version_id: version.id, room_id: roomId });
+    db.prepare('UPDATE dungeon_instances SET variant_key = ? WHERE id = ?').run(variant.variant, info.lastInsertRowid);
+    logEvent({ id: info.lastInsertRowid }, 'CREATE', 'server', { uid, dungeonVersionId: version.id, variant: variant.variant });
+  } catch {
+    logEvent({ id: info.lastInsertRowid }, 'CREATE', 'server', { uid, dungeonVersionId: version.id });
+  }
   return getInstance(info.lastInsertRowid);
 }
 

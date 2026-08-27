@@ -15,6 +15,7 @@ const runtimeRoutes = require('./routes/runtimeRoutes');
 const characterRoutes = require('./routes/characterRoutes');
 const questRoutes = require('./routes/questRoutes');
 const npcRoutes = require('./routes/npcRoutes');
+const worldRoutes = require('./routes/worldRoutes');
 
 // 启动即建表（幂等）
 initDb();
@@ -26,7 +27,7 @@ const io = new Server(server, {
 });
 
 app.use(express.json({ limit: '2mb' }));
-app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 10 }));
+app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 12 }));
 app.use('/api', apiRoutes);
 app.use(visionRoutes); // /api/vision/avatar/analyze、/vision-test 等
 app.use(dungeonRoutes); // 阶段4：Dungeon Design Pipeline
@@ -34,6 +35,7 @@ app.use(runtimeRoutes); // 阶段5：Dungeon Runtime
 app.use(characterRoutes); // 阶段6：Persistent Character
 app.use(questRoutes); // 阶段8：Quest System
 app.use(npcRoutes); // 阶段9：NPC & Living World
+app.use(worldRoutes); // 阶段12：World Simulation & Dynamic Events
 
 registerSocketHandlers(io);
 
@@ -45,7 +47,14 @@ require('./services/legends/performanceListener').registerPerformanceListener();
 // 作为入口运行时才监听端口（测试可直接 require 后自管端口）
 if (require.main === module) {
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`[server] roblox-trpg 服务器已启动（阶段3）: http://localhost:${PORT}`);
+    console.log(`[server] roblox-trpg 服务器已启动（阶段12）: http://localhost:${PORT}`);
+    // 阶段12：World Tick 调度器（周期驱动世界演化；可经 /api/world/pause 暂停）
+    if (process.env.WORLD_TICK_ENABLED !== 'off') {
+      const worldSim = require('./services/world/worldSim');
+      const { WORLD_TICK_INTERVAL_MS } = require('./config');
+      const info = worldSim.startScheduler(io, WORLD_TICK_INTERVAL_MS);
+      console.log(`[server] World Tick 调度器已启动（每 ${info.intervalMs}ms${info.paused ? '，当前处于暂停状态' : ''}）`);
+    }
   });
 }
 

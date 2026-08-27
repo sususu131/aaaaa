@@ -165,6 +165,43 @@ function worldVarsContent(roomId) {
   return `world_version = ${w.version}\n${entries.join('\n') || '（无白名单状态字段）'}`;
 }
 
+/**
+ * 阶段12：WORLD_STATE（世界模拟）分区 ——
+ * 当前世界事件 / 阵营状态 / NPC活动 / 环境状态 / 副本变体。
+ * 全部来自服务器数据库（WORLD_SIMULATION 数据，非 AI 生成）。
+ */
+function worldSimContent(roomId) {
+  try {
+    const worldSim = require('../world/worldSim');
+    const snap = worldSim.worldSnapshot(roomId);
+    const parts = [];
+    parts.push(`调度器：tick#${snap.scheduler.lastTick}，${snap.scheduler.paused ? '已暂停' : '运行中'}`);
+    parts.push(
+      snap.events.length
+        ? `当前世界事件：${snap.events.map((e) => `${e.label}(${e.type}/${e.category}${e.expiresAt ? `，至${e.expiresAt}` : '，永久'})`).join('；')}`
+        : '当前世界事件：无'
+    );
+    parts.push(
+      snap.relations.length
+        ? `阵营关系：${snap.relations.map((r) => `${r.factionA}↔${r.factionB}=${r.relation}`).join('；')}`
+        : '阵营关系：（未定义）'
+    );
+    parts.push(
+      snap.npcs.length
+        ? `NPC活动：${snap.npcs.map((n) => `${n.name}@${n.locationName || '?'}[${n.behaviorState}]${n.alive ? '' : '(死亡)'}`).join('；')}`
+        : 'NPC活动：无'
+    );
+    const env = Object.entries(snap.environment.flags).map(([k, v]) => `${k}=${JSON.stringify(v)}`);
+    parts.push(`环境状态：${env.join('，') || '（无）'}`);
+    if (snap.variants.length) {
+      parts.push(`副本变体：${snap.variants.map((v) => `${v.dungeon_name}=${v.variant_key}(${v.variant.label})`).join('；')}`);
+    }
+    return parts.join('\n');
+  } catch (err) {
+    return `（世界模拟状态不可用：${err.message}）`;
+  }
+}
+
 /** 构建完整 Context。返回 { sections, totalTokens }。 */
 function buildContext(room) {
   const exp = room.currentExperience || null;
@@ -211,6 +248,7 @@ function buildContext(room) {
     { key: 'dice_tools', label: 'Dice & Tool Results', content: diceAndToolsContent(room.id) },
     { key: 'memories', label: 'Important Memories', content: memoriesContent(room.id) },
     { key: 'world_vars', label: 'World State (versioned)', content: worldVarsContent(room.id) },
+    { key: 'world_sim', label: 'WORLD_STATE (World Simulation)', content: worldSimContent(room.id) },
     { key: 'avatar', label: 'Avatar / Initial State', content: avatarContext(room) },
     { key: 'roblox', label: 'Roblox Source Data', content: robloxBlock },
   ];

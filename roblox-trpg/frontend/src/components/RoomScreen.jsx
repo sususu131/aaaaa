@@ -10,6 +10,7 @@ import RobloxBindPanel from './RobloxBindPanel.jsx';
 import QuestPanel from './QuestPanel.jsx';
 import NpcPanel from './NpcPanel.jsx';
 import LegendPanel from './LegendPanel.jsx';
+import WorldPanel from './WorldPanel.jsx';
 import { socket } from '../lib/socket.js';
 
 /**
@@ -69,9 +70,39 @@ export default function RoomScreen({
       setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
     };
     socket.on('npc:event', onNpcEvent);
+
+    // 阶段12：世界模拟事件提示（世界事件起止/NPC移动/阵营关系/副本变体/传奇现身）
+    const worldLabel = {
+      WORLD_EVENT_STARTED: '🌩 世界事件发生',
+      WORLD_EVENT_EXPIRED: '🌤 世界事件结束',
+      NPC_MOVED: '🚶 NPC 移动',
+      NPC_BEHAVIOR_CHANGED: '🧠 NPC 行为变化',
+      FACTION_RELATION_CHANGED: '⚔ 阵营关系变化',
+      DUNGEON_VARIANT_CHANGED: '🌀 副本形态变化',
+      LEGEND_WORLD_SPAWN: '⭐ 传奇人物现身',
+      WORLD_SCHEDULER: '⏯ 世界模拟调度',
+    };
+    const onWorldEvent = (e) => {
+      const base = worldLabel[e.type] || e.type;
+      const extra =
+        e.label || e.locationName
+          ? `：${e.label || e.locationName}`
+          : e.factionA
+            ? `：${e.factionA}↔${e.factionB} ${e.to}`
+            : e.npc
+              ? `：${e.npc}`
+              : e.name
+                ? `：${e.name}`
+                : '';
+      const id = `${Date.now()}_${Math.random()}`;
+      setToasts((t) => [...t.slice(-4), { id, text: `${base}${extra}` }]);
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4000);
+    };
+    socket.on('world:event', onWorldEvent);
     return () => {
       socket.off('quest:event', onQuestEvent);
       socket.off('npc:event', onNpcEvent);
+      socket.off('world:event', onWorldEvent);
     };
   }, []);
 
@@ -110,6 +141,9 @@ export default function RoomScreen({
           </button>
           <button className={`btn tiny ${modal === 'legend' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'legend' ? null : 'legend')}>
             ⭐ 传奇
+          </button>
+          <button className={`btn tiny ${modal === 'world' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'world' ? null : 'world')}>
+            🌍 世界
           </button>
           <button className={`btn tiny ${modal === 'character' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'character' ? null : 'character')}>
             👤 角色
@@ -206,6 +240,7 @@ export default function RoomScreen({
       {modal === 'quest' && <QuestPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
       {modal === 'npc' && <NpcPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
       {modal === 'legend' && <LegendPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
+      {modal === 'world' && <WorldPanel onClose={() => onOpenModal(null)} getSessionToken={getSessionToken} />}
     </main>
   );
 }

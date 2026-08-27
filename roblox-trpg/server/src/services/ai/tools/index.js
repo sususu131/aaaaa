@@ -182,6 +182,9 @@ const TOOL_META = {
   get_item_power: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
   get_experience_swords: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
   request_combat_reward: { permission: 'GAME_ACTION', scopes: ['dungeon'] },
+  // 阶段12：世界模拟（AI 只能【申请】事件，无直接创造事件/生成怪物/发物品工具 —— 服务器专属）
+  request_world_event: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
+  get_world_simulation: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
 };
 
 function toolMeta(name) {
@@ -243,3 +246,5 @@ require('./npcTools');
 require('./legendTools');
 // 阶段11 新增
 require('./encounterTools');
+// 阶段12 新增
+require('./worldTools');

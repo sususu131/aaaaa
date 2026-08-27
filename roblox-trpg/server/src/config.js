@@ -70,4 +70,10 @@ module.exports = {
   // 限时抉择（QTE）：超时未选择即承受失败后果
   TIMED_EVENT_MIN_MS: 3000,
   TIMED_EVENT_MAX_MS: 60000,
+
+  // ── 阶段12：World Simulation & Dynamic Event System ──
+  WORLD_TICK_INTERVAL_MS: Number(process.env.WORLD_TICK_INTERVAL_MS || 30000), // World Tick 周期（默认30秒）
+  WORLD_EVENT_MAX_ACTIVE: Number(process.env.WORLD_EVENT_MAX_ACTIVE || 3),      // 单房间活跃事件上限
+  WORLD_EVENT_MAX_DURATION_MS: Number(process.env.WORLD_EVENT_MAX_DURATION_MS || 30 * 60 * 1000), // AI 可申请的最长时长
+  WORLD_EVENT_COOLDOWN_MS: Number(process.env.WORLD_EVENT_COOLDOWN_MS || 10 * 60 * 1000),         // 同类型事件冷却
 };

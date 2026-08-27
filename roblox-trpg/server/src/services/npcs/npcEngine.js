@@ -297,6 +297,9 @@ function publicNpcView(npcInstance, { playerId = null } = {}) {
   // 传奇人物档案（阶段10）
   const db = getDb();
   const legend = db.prepare('SELECT * FROM legendary_npcs WHERE npc_id = ?').get(npcInstance.npc_id);
+  // 阶段12：世界模拟状态（行为/位置）——玩家再次进入时看到最新状态
+  const npcSim = require('../world/npcSimulation');
+  const locKey = npcInstance.location_key || npc.location_id || null;
   return {
     npcInstanceId: npcInstance.id,
     npcUid: npc.uid,
@@ -306,6 +309,9 @@ function publicNpcView(npcInstance, { playerId = null } = {}) {
     nature: npc.nature || 'neutral',
     alive: Boolean(npcInstance.alive),
     mood: npcInstance.mood,
+    behaviorState: npcInstance.behavior_state || 'IDLE',
+    locationKey: locKey,
+    locationName: npcSim.locationName(locKey),
     goals: npc.goals,
     relationship: { value: rel.value, type: rel.relationshipType },
     publicMemories: getMemories(npcInstance.npc_id, { publicOnly: true, limit: 5 }).map((m) => ({ type: m.memory_type, content: m.content, importance: m.importance })),
