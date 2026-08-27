@@ -9,6 +9,81 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '008_stage11_legendary_encounter',
+    up(db) {
+      const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+      // 传奇人物扩展：遭遇规则 / 创作者类型 / 头像资源
+      if (!hasCol('legendary_npcs', 'encounter_rules_json')) {
+        db.exec("ALTER TABLE legendary_npcs ADD COLUMN encounter_rules_json TEXT NOT NULL DEFAULT '{}'");
+      }
+      if (!hasCol('legendary_npcs', 'creator_type')) {
+        db.exec("ALTER TABLE legendary_npcs ADD COLUMN creator_type TEXT NOT NULL DEFAULT 'LEGEND'");
+      }
+      if (!hasCol('legendary_npcs', 'avatar_asset')) {
+        db.exec("ALTER TABLE legendary_npcs ADD COLUMN avatar_asset TEXT");
+      }
+      // 永久物品：玩家获得后永久保存（跨副本保留，强度经平衡规则计算）
+      db.exec(`CREATE TABLE IF NOT EXISTS permanent_items (
+        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id      INTEGER NOT NULL REFERENCES players(id),
+        item_id        INTEGER NOT NULL REFERENCES items(id),
+        acquired_from  TEXT,                     -- 来源体验/副本
+        acquired_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (player_id, item_id)
+      )`);
+      // 跨副本装备削弱规则：不同世界规则不同
+      db.exec(`CREATE TABLE IF NOT EXISTS item_balance_rules (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        item_name         TEXT NOT NULL,
+        source_experience TEXT NOT NULL,           -- 来源体验（主场 = 1.0）
+        target_experience TEXT NOT NULL,           -- 目标体验
+        multiplier        REAL NOT NULL DEFAULT 1.0,
+        UNIQUE (item_name, target_experience)
+      )`);
+      // 体验物品数据库：剑斗副本真实存在的剑（AI 禁止编造）
+      db.exec(`CREATE TABLE IF NOT EXISTS experience_items (
+        id               INTEGER PRIMARY KEY AUTOINCREMENT,
+        name             TEXT NOT NULL,
+        source_experience TEXT NOT NULL,
+        description      TEXT,
+        rarity           TEXT NOT NULL DEFAULT 'common' CHECK (rarity IN ('common','rare','epic','legendary')),
+        original_ability TEXT,                     -- 原始能力（来自公开资料；资料不足 = UNKNOWN）
+        status           TEXT NOT NULL DEFAULT 'approved' CHECK (status IN ('approved','unknown')),
+        UNIQUE (name, source_experience)
+      )`);
+      // 放宽 reward_grants.instance_id 为可空（阶段11：传奇战斗/剑斗奖励不绑定副本实例）
+      // SQLite 无法直接 ALTER 放宽 NOT NULL，需重建表
+      const rgCols = db.prepare('PRAGMA table_info(reward_grants)').all();
+      const instCol = rgCols.find((c) => c.name === 'instance_id');
+      if (instCol && instCol.notnull === 1) {
+        db.exec(`CREATE TABLE IF NOT EXISTS reward_grants_new (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          grant_uid   TEXT UNIQUE,
+          instance_id INTEGER REFERENCES dungeon_instances(id),
+          player_id   INTEGER NOT NULL REFERENCES players(id),
+          reward_key  TEXT NOT NULL,
+          reward_type TEXT NOT NULL,
+          status      TEXT NOT NULL DEFAULT 'GRANTED' CHECK (status IN ('GRANTED','SKIPPED')),
+          granted_at  TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE (instance_id, player_id, reward_key)
+        )`);
+        db.exec('INSERT OR IGNORE INTO reward_grants_new SELECT * FROM reward_grants');
+        db.exec('DROP TABLE reward_grants');
+        db.exec('ALTER TABLE reward_grants_new RENAME TO reward_grants');
+      }
+      // 副本表现追踪（完成度评分依据）
+      db.exec(`CREATE TABLE IF NOT EXISTS instance_performance (
+        instance_id    INTEGER NOT NULL UNIQUE REFERENCES dungeon_instances(id),
+        deaths         INTEGER NOT NULL DEFAULT 0,
+        combat_wins    INTEGER NOT NULL DEFAULT 0,
+        combat_losses  INTEGER NOT NULL DEFAULT 0,
+        explored_scenes TEXT NOT NULL DEFAULT '[]',
+        quests_done    INTEGER NOT NULL DEFAULT 0,
+        started_at     TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+    },
+  },
+  {
     name: '007_stage10_legendary',
     up(db) {
       const hasCol = (table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);

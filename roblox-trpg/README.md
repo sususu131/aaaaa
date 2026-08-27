@@ -688,3 +688,55 @@ npm run test:stage10   # 仅阶段10（82 项）
 覆盖：生成概率/副本匹配/能力削弱/装备限制/商店权限与购买流程/关系复用/传奇任务/战斗动作/
 怪物好感无效/LEGENDARY 五事件/多人同步/断线恢复/UNIQUE 购买幂等/跨房间隔离/
 AI 作弊拒绝（无 spawn/无倍率修改/无直接发放/不存在传奇拒绝）。
+
+---
+
+# 阶段11：Legendary NPC Encounter & Cross Experience Reward System
+
+朋友间的 TRPG（非 MMO）：玩家冒险中随机遇到特殊传奇 NPC（创作者/游戏作者/传奇人物），
+战斗奖励随机池、永久物品跨副本保留、跨体验装备削弱、剑斗完成度奖励。
+
+## 核心机制
+
+- **遭遇判定**（`encounterCheck`，服务器掷骰）：概率 = 基础遭遇率 × 副本匹配（DOORS→LSPLASH↑、
+  Sword Fight→Shedletsky↑）× 幸运属性 × 任务进度 × 剧情状态；副本开始自动判定
+  （`NPC_ENCOUNTER_CHECK` + `LEGENDARY_NPC_FOUND` 事件）；同房间不重复生成
+- **战斗奖励池**（随机，非固定）：指导（技能+1）/ 技能 / 物品（该体验真实物品随机）/
+  知识（世界信息标志）/ 货币 / 剧情分支——加权随机选择 + 条目数据库验证（禁止编造）+
+  幂等（同玩家同传奇同实例一次）；Builderman 为商店型（奖励池为空）
+- **永久物品**（`permanent_items`）：获得后永久保存（UNIQUE player+item），跨副本保留
+- **跨副本削弱**（`item_balance_rules`）：SFOTH 传奇剑在 DOORS ×0.2（100→20）、
+  FORSAKEN ×0.3；主场 ×1.0；无规则默认不削弱；服务器计算（AI 不可修改）
+- **体验物品数据库**（`experience_items`）：SFOTH 真实剑库（Linked Sword/Fire Sword/
+  Ice Dagger/Darkheart/Venoms Edge/Illumina/Ghostwalker），资料不足标记 `UNKNOWN`；
+  AI 禁止创造剑（无创建工具，只读工具）
+- **剑斗完成度奖励**：`completion_score` = 任务完成(30) + 战斗表现(30) + 探索(20) +
+  生存(20-死亡×5) + 任务(10)；档位 20% 基础 / 50% 稀有 / 80% 史诗 / 100% 传奇；
+  奖励剑必须来自该副本真实剑列表；低评分无奖励；幂等
+- **表现追踪**（`instance_performance`）：Game Event Bus 监听 PLAYER_DIED /
+  ENEMY_DEFEATED / PLAYER_ENTERED_SCENE / QUEST_COMPLETED 自动记录
+- **Context**：`PLAYER_LEGENDARY_ITEMS` 分区（永久物品 + 跨副本有效强度倍率）
+- **安全**：无发放永久装备工具 / 无修改价格工具 / 无修改平衡规则工具 / 无创造剑工具；
+  奖励池条目全部数据库验证
+
+## 数据库变化（008_stage11）
+
+`legendary_npcs` + encounter_rules_json/creator_type/avatar_asset；
+新表：`permanent_items` / `item_balance_rules` / `experience_items` / `instance_performance`；
+`reward_grants.instance_id` 放宽可空（传奇奖励不绑定副本实例，表重建迁移）
+
+## 新增 Tool（4 个）
+
+`get_permanent_items`（READ_ONLY：永久物品+削弱倍率）· `get_item_power`（READ_ONLY：有效强度）·
+`get_experience_swords`（READ_ONLY：体验真实剑列表）· `request_combat_reward`（GAME_ACTION：
+战斗胜利奖励，服务器随机+验证+幂等）
+
+## 测试
+
+```
+npm test               # 597 项全套件（16+30+41+42+51+65+82+70+62+82+56）
+npm run test:stage11   # 仅阶段11（56 项）
+```
+
+覆盖：遭遇判定/幂等/奖励池随机与验证/Builderman商店/永久物品/跨副本削弱/
+剑数据库验证/剑斗完成度奖励档位与幂等/Context显示/AI作弊拒绝（无发放/改价/改规则/造剑工具）。

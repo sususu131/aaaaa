@@ -39,6 +39,8 @@ registerSocketHandlers(io);
 
 // 阶段9：NPC Listener（Game Event Bus → NPC 反应，服务器规则决定）
 require('./services/npcs/npcListener').registerNpcListener();
+// 阶段11：表现追踪监听器（死亡/战斗/探索/任务 → 完成度评分）
+require('./services/legends/performanceListener').registerPerformanceListener();
 
 // 作为入口运行时才监听端口（测试可直接 require 后自管端口）
 if (require.main === module) {

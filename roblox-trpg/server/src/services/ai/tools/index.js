@@ -177,6 +177,11 @@ const TOOL_META = {
   buy_legendary_item: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
   legendary_battle_action: { permission: 'GAME_ACTION', scopes: ['room', 'dungeon'] },
   get_legendary_shop: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  // 阶段11：遭遇/永久物品/跨副本平衡（无发放工具 —— 服务器专属）
+  get_permanent_items: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  get_item_power: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  get_experience_swords: { permission: 'READ_ONLY', scopes: ['room', 'dungeon'] },
+  request_combat_reward: { permission: 'GAME_ACTION', scopes: ['dungeon'] },
 };
 
 function toolMeta(name) {
@@ -236,3 +241,5 @@ require('./questTools');
 require('./npcTools');
 // 阶段10 新增
 require('./legendTools');
+// 阶段11 新增
+require('./encounterTools');

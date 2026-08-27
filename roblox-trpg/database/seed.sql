@@ -307,3 +307,57 @@ INSERT OR IGNORE INTO quest_objectives (quest_version_id, objective_key, name, d
 SELECT qv.id, 'earn_trust', '赢得信任', '帮助 LSPLASH 完成一件事', 'INTERACT', 1, 1, 0, '{"event_type":"NPC_HELPED","match":{"npc":"npc_legend_lsplash"}}'
 FROM quest_versions qv JOIN quests q ON q.id = qv.quest_id WHERE q.uid = 'quest_legend_hotel_secret'
   AND NOT EXISTS (SELECT 1 FROM quest_objectives WHERE quest_version_id = qv.id AND objective_key = 'earn_trust');
+
+-- ============================================================
+-- 阶段11：SFOTH 真实剑库（公开资料中的经典剑；资料不足标记 unknown，禁止编造）
+-- ============================================================
+INSERT OR IGNORE INTO experience_items (name, source_experience, description, rarity, original_ability, status) VALUES
+  ('Linked Sword',      'Sword Fight on the Heights', '经典连击之剑，剑斗的象征。', 'common', '基础剑术连击', 'approved'),
+  ('Fire Sword',        'Sword Fight on the Heights', '燃烧之剑，攻击附带火焰。', 'rare', '火焰斩击', 'approved'),
+  ('Ice Dagger',        'Sword Fight on the Heights', '寒冰匕首，轻巧迅捷。', 'rare', '冰冻突刺', 'approved'),
+  ('Darkheart',         'Sword Fight on the Heights', '黑暗之心，吸血魔剑。', 'epic', '生命汲取', 'approved'),
+  ('Venoms Edge',       'Sword Fight on the Heights', '毒刃，攻击附带毒素。', 'epic', '淬毒攻击', 'approved'),
+  ('Illumina',          'Sword Fight on the Heights', '光之圣剑，传说中的武器。', 'legendary', '光辉斩', 'approved'),
+  ('Ghostwalker',       'Sword Fight on the Heights', '幽灵行者，神秘之剑。', 'legendary', '幽影步', 'approved'),
+  ('未知古剑',           'Sword Fight on the Heights', '资料不足，能力未知。', 'common', 'UNKNOWN', 'unknown');
+
+-- 跨副本装备削弱规则：不同世界规则不同（SFOTH 传奇剑在 DOORS 大幅削弱）
+INSERT OR IGNORE INTO item_balance_rules (item_name, source_experience, target_experience, multiplier) VALUES
+  ('Linked Sword', 'Sword Fight on the Heights', 'DOORS', 0.2),
+  ('Fire Sword',   'Sword Fight on the Heights', 'DOORS', 0.2),
+  ('Darkheart',    'Sword Fight on the Heights', 'DOORS', 0.2),
+  ('Illumina',     'Sword Fight on the Heights', 'DOORS', 0.25),
+  ('Linked Sword', 'Sword Fight on the Heights', 'FORSAKEN', 0.3);
+
+-- 传奇人物遭遇规则：遭遇概率 + 战斗奖励池（奖励池物品必须来自数据库，服务器验证）
+UPDATE legendary_npcs SET encounter_rules_json = '{
+  "encounter_chance": 0.05,
+  "behaviors": ["dialog", "combat", "guidance", "quest"],
+  "combat_reward_pool": [
+    {"type": "guidance", "weight": 25, "skill": "Sword Technique", "description": "剑术指导：剑术精通 +1"},
+    {"type": "item", "weight": 20, "experience": "Sword Fight on the Heights", "description": "随机体验物品"},
+    {"type": "knowledge", "weight": 20, "flag": "sword_knowledge", "description": "解锁世界信息"},
+    {"type": "currency", "weight": 20, "amount": 50, "description": "少量金币"},
+    {"type": "story", "weight": 15, "flag": "shedletsky_story_branch", "description": "特殊剧情分支"}
+  ]
+}' WHERE display_name = 'Shedletsky';
+
+UPDATE legendary_npcs SET encounter_rules_json = '{
+  "encounter_chance": 0.08,
+  "behaviors": ["dialog", "shop", "guidance"],
+  "combat_reward_pool": []
+}' WHERE display_name = 'Builderman';
+
+UPDATE legendary_npcs SET encounter_rules_json = '{
+  "encounter_chance": 0.05,
+  "behaviors": ["dialog", "guidance", "quest"],
+  "combat_reward_pool": [
+    {"type": "knowledge", "weight": 40, "flag": "doors_entity_knowledge", "description": "实体资料"},
+    {"type": "guidance", "weight": 30, "skill": "危险感知", "description": "危险感知指导"},
+    {"type": "currency", "weight": 30, "amount": 30, "description": "少量金币"}
+  ]
+}' WHERE display_name = 'LSPLASH';
+
+UPDATE legendary_npcs SET creator_type = 'CREATOR' WHERE display_name = 'Shedletsky';
+UPDATE legendary_npcs SET creator_type = 'ADMIN' WHERE display_name = 'Builderman';
+UPDATE legendary_npcs SET creator_type = 'CREATOR' WHERE display_name = 'LSPLASH';

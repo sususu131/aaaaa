@@ -127,6 +127,27 @@ function buildRuntimeContext(instance, definition, playerRows) {
     ? `Boss：${definition.boss.name}（HP ${definition.boss.stats?.hp}）— 只能引用该定义，禁止临时增强。`
     : '（无 Boss）';
 
+  // 阶段11：PLAYER_LEGENDARY_ITEMS 分区（玩家永久物品 + 跨副本有效强度）
+  let permItemsBlock = '（玩家无永久物品）';
+  try {
+    const encounter = require('../legends/legendEncounter');
+    const dbRef = getDb();
+    const expName = definition.roblox_universe_id
+      ? (dbRef.prepare('SELECT roblox_experience_name FROM dungeons WHERE roblox_universe_id = ?').get(definition.roblox_universe_id) || {}).roblox_experience_name
+      : null;
+    const lines = [];
+    for (const p of playerRows) {
+      const items = encounter.getPermanentItems(p.id, expName || null);
+      if (items.length) {
+        lines.push(
+          `${p.name}：` +
+            items.map((i) => `${i.name}(${i.acquired_from || '未知来源'}，有效强度×${i.effectiveMultiplier})`).join('、')
+        );
+      }
+    }
+    if (lines.length) permItemsBlock = lines.join('\n');
+  } catch { /* 异常不影响主流程 */ }
+
   // 阶段10：LEGENDARY_NPC_CONTEXT 分区（身份/来源/能力限制/关系/目标）
   let legendBlock = '（房间内无传奇人物）';
   try {
@@ -203,6 +224,8 @@ function buildRuntimeContext(instance, definition, playerRows) {
     npcBlock,
     `## LEGENDARY_NPC_CONTEXT（阶段10：身份/来源/能力限制/关系）`,
     legendBlock,
+    `## PLAYER_LEGENDARY_ITEMS（阶段11：玩家永久物品 + 跨副本有效强度）`,
+    permItemsBlock,
     `## 世界状态（version=${world.version}，白名单标志）`,
     JSON.stringify(world.state),
     `## 最近行动日志`,

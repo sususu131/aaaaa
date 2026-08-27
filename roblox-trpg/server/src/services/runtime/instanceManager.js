@@ -158,6 +158,31 @@ function startInstance(io, instance) {
     console.error('[instanceManager] quest auto-start error:', err.message);
   }
 
+  // 阶段11：传奇遭遇判定（NPC_ENCOUNTER_CHECK；概率由副本/幸运/任务进度决定；幂等不重复生成）
+  try {
+    const encounter = require('../legends/legendEncounter');
+    const expName = definition.roblox_universe_id
+      ? (getDb().prepare('SELECT roblox_experience_name FROM dungeons WHERE roblox_universe_id = ?').get(definition.roblox_universe_id) || {}).roblox_experience_name
+      : null;
+    // 幸运加成：取队伍最高 LUK 属性
+    let luckBonus = 0;
+    try {
+      const characterService = require('../character/characterService');
+      for (const pid of party) {
+        const st = characterService.effectiveStats(pid, {});
+        luckBonus = Math.max(luckBonus, (st.totals.LUK || 5) - 5);
+      }
+    } catch { /* ignore */ }
+    encounter.encounterCheck(io, fresh.room_id, {
+      dungeonInstance: { id: fresh.id, experienceName: expName },
+      luckBonus,
+      questProgress: 0,
+    });
+    encounter.ensurePerformance(fresh.id);
+  } catch (err) {
+    console.error('[instanceManager] encounter check error:', err.message);
+  }
+
   applySceneEntryEvents(io, fresh, definition, firstScene.id);
   broadcastUpdate(io, fresh);
   return getInstance(instance.id);
