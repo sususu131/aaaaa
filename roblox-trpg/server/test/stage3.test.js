@@ -5,6 +5,13 @@
  */
 const assert = require('assert');
 const http = require('http');
+const fs = require('fs');
+const path = require('path');
+
+// ── 每次运行前重置数据库（保证幂等、可重复执行）──
+for (const suffix of ['', '-wal', '-shm', '-journal']) {
+  fs.rmSync(path.join(__dirname, '../../database/data/roblox_trpg.db' + suffix), { force: true });
+}
 
 // ── 环境变量必须在 require 服务端模块之前设置 ──
 process.env.AI_API_KEY = 'test-key-xyz-do-not-leak';

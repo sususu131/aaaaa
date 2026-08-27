@@ -6,6 +6,14 @@
  * 运行：npm test --prefix server
  */
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+
+// ── 每次运行前重置数据库（保证幂等、可重复执行）──
+for (const suffix of ['', '-wal', '-shm', '-journal']) {
+  fs.rmSync(path.join(__dirname, '../../database/data/roblox_trpg.db' + suffix), { force: true });
+}
+
 const { io: ioc } = require('socket.io-client');
 const { server } = require('../src/index.js');
 const { parseExperienceUrl } = require('../src/services/roblox/robloxExperiences.js');
