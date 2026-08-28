@@ -667,12 +667,40 @@ function expireTimedEvent(io, instanceId) {
   }
   im.logEvent(instance, 'TIMED_EXPIRED', 'server', { id: evt.id, failDamage: evt.failDamage, victims });
   io.to(instance.room_id).emit('instance:timedExpired', { id: evt.id, outcome: 'EXPIRED', victims });
+  chatNotify.notify(
+    io,
+    instance.room_id,
+    `💀 来不及了！${victims.map((v) => `${v.name} -${v.damage}HP${v.downed ? '（倒下）' : ''}`).join('，') || '无人受伤'}`
+  );
   // 全队倒下 → 副本失败
   const combatEngine = require('./combatEngine');
-  if (combatEngine.allPlayersDowned(instance)) {
+  const downedAll = combatEngine.allPlayersDowned(instance);
+  if (downedAll) {
     im.setStatus(im.getInstance(instanceId), 'FAILED');
     im.logEvent(instance, 'FAILED', 'server', { reason: '限时抉择超时，全队倒下' });
     io.to(instance.room_id).emit('instance:failed', { uid: instance.uid });
+    chatNotify.notify(io, instance.room_id, '💀 全队倒下，副本失败……角色进度与永久物品已保留。');
+    return;
+  }
+  // 阶段32：倒计时结束 → GM 主动发话叙述后果（走 Runtime GM 流水线，串行不冲突）
+  const fresh = im.getInstance(instanceId);
+  if (fresh && fresh.status === 'RUNNING') {
+    const partyRows = im
+      .partyOf(fresh)
+      .map((pid) => getDb().prepare('SELECT * FROM players WHERE id = ?').get(pid))
+      .filter(Boolean);
+    const actor = partyRows.find((p) => p.name === evt.startedBy) || partyRows[0];
+    if (actor) {
+      const vline = victims.map((v) => `${v.name} -${v.damage}HP${v.downed ? '（倒下）' : ''}`).join('，') || '无人受伤';
+      submitAction(
+        io,
+        { id: fresh.room_id, players: [] },
+        fresh,
+        actor,
+        `（限时抉择超时）全队未能在倒计时内对「${evt.prompt}」做出选择，后果已发生：${vline}。请以 GM 身份主动叙述这一刻的紧张场面与后果，并给出接下来的行动选项。`,
+        `timed-expire:${evt.id}`
+      ).catch(() => {});
+    }
   }
 }
 
@@ -698,7 +726,8 @@ function resolveTimedChoice(io, instance, playerRow, choiceIndex) {
   const chosen = evt.options[idx];
   im.logEvent(instance, 'TIMED_RESOLVED', playerRow.name, { id: evt.id, choice: chosen.label, remainingMs: Math.max(0, evt.expiresAt - Date.now()) });
   io.to(instance.room_id).emit('instance:timedExpired', { id: evt.id, outcome: 'RESOLVED', by: playerRow.name, choice: chosen.label });
-  // 选择 → 普通行动（排队，Agent Lock 保证串行）
+  chatNotify.notify(io, instance.room_id, `✅ ${playerRow.name} 选择了「${chosen.label}」——GM 正在叙述后果…`);
+  // 选择 → 普通行动（排队，Agent Lock 保证串行；GM 会主动发话）
   submitAction(io, { id: instance.room_id, players: [] }, instance, playerRow, `${chosen.action}（限时抉择：${chosen.label}）`, `timed:${evt.id}`).catch(() => {});
   return { ok: true, choice: chosen.label };
 }
@@ -706,6 +735,78 @@ function resolveTimedChoice(io, instance, playerRow, choiceIndex) {
 /** Action 入队（串行处理）。 */
 function submitAction(io, room, instance, playerRow, text, clientActionId) {
   return enqueue(instance.id, () => processAction(io, room, instance, playerRow, text, clientActionId));
+}
+
+/**
+ * 阶段32：开场白进入实例串行队列——保证它先于开始后的任何玩家行动发出。
+ * （提示：开场白 prompt 内含 OPENING_NARRATION 标记，测试 mock 据此分流，
+ * 不消费脚本化回复队列。）
+ */
+function enqueueOpening(io, instance, definition, partyRows) {
+  return enqueue(instance.id, () => openingNarration(io, instance, definition, partyRows));
+}
+
+/**
+ * 阶段32：副本开场白——进入副本（实例开始）后 AI GM 主动发第一段话。
+ * 只叙述 + 给初始行动选项，不修改任何状态；AI 失败给出可用的静态开场白。
+ */
+async function openingNarration(io, instance, definition, partyRows) {
+  const scenes = [...(definition.scenes || [])].sort((a, b) => (a.order || 0) - (b.order || 0));
+  const firstScene = scenes[0] || {};
+  const dungeonName = definition.dungeon?.display_name || definition.dungeon?.name || '副本';
+  const partyNames = (partyRows || []).map((p) => p.name).join('、');
+
+  let narration = '';
+  let options = [];
+  try {
+    const context = buildRuntimeContext(im.getInstance(instance.id), definition, partyRows);
+    const { runAgentLoop } = require('../ai/agentRuntime');
+    const loop = await runAgentLoop({
+      provider: getProvider(),
+      system: RUNTIME_SYSTEM_PROMPT,
+      userContent: `${context}\n\n---\n【开场白任务（OPENING_NARRATION）】副本刚刚开始，队伍（${partyNames}）站在起始场景「${firstScene.name}」。请以 GM 身份主动说出第一段开场白：描绘环境与氛围、点出目标或紧张感，并给出 2~4 个初始行动选项。返回 JSON：{"narration":"…","options":[{"label":"…","action":"…"}]}。这是开场白，不能修改任何状态、不能发起战斗或场景跳转。`,
+      scope: 'dungeon',
+      useStream: require('../ai/providers/AiProvider').aiStreamEnabled(),
+      onEvent: (evt) => io.to(instance.room_id).emit('agent:event', evt),
+      toolCtx: {
+        io,
+        room: { id: instance.room_id, players: (partyRows || []).map((p) => ({ socketId: p.socket_id, name: p.name, uid: p.uid })) },
+        instance: im.getInstance(instance.id),
+        actingPlayerName: partyRows && partyRows[0] ? partyRows[0].name : null,
+        broadcast: (event, payload) => io.to(instance.room_id).emit(event, payload),
+      },
+    });
+    const raw = extractJson(loop.finalText);
+    if (raw && typeof raw === 'object') {
+      narration = String(raw.narration ?? raw.narrative ?? '').slice(0, 800);
+      options = (Array.isArray(raw.options) ? raw.options : [])
+        .slice(0, 4)
+        .map((o) => ({ label: String((o && o.label) || '').slice(0, 40), action: String((o && (o.action || o.label)) || '').slice(0, 200) }))
+        .filter((o) => o.action);
+    } else {
+      narration = String(loop.finalText || '').slice(0, 800);
+    }
+  } catch (err) {
+    narration = ''; // 走静态兜底
+    options = [];
+    im.logEvent(instance, 'OPENING_FAILED', 'ai_gm', { error: String(err.message || err).slice(0, 200) });
+  }
+  if (!narration) {
+    narration = `【开场】你们进入了「${dungeonName}」${firstScene.name ? `的「${firstScene.name}」` : ''}。${
+      firstScene.description || '环顾四周，一切尚未明朗。'
+    }在聊天框 @AI 描述你的行动。`;
+  }
+  const msgId = require('../../rooms/roomManager').saveMessage(instance.room_id, null, 'gm', narration);
+  im.logEvent(instance, 'OPENING', 'ai_gm', { msgId, options: options.length });
+  io.to(instance.room_id).emit('gm:response', {
+    id: msgId,
+    type: 'gm_response',
+    askerName: null,
+    narrative: narration,
+    options,
+    at: new Date().toISOString(),
+  });
+  return { narration, options };
 }
 
 module.exports = {
@@ -720,4 +821,7 @@ module.exports = {
   startTimedEvent,
   resolveTimedChoice,
   expireTimedEvent,
+  // 阶段32：开场白
+  openingNarration,
+  enqueueOpening,
 };

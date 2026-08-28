@@ -18,13 +18,23 @@ export default function App() {
   const [gmStatus, setGmStatus] = useState(''); // 「GM 掷骰中…」等（不含内部推理）
   const [hasOlder, setHasOlder] = useState(false); // 阶段31：还有更早的历史可上滑加载
   const sessionTokenRef = useRef(null); // 只存内存，不进 URL / localStorage
+  const roomRef = useRef(null); // 阶段32：重连自动回房用（当前房间）
+  const myNameRef = useRef(''); // 阶段32：重连回房用的名字
+  const everJoinedRef = useRef(false); // 阶段32：是否曾入房（区分首连与断线重连）
 
   // 建立连接 + 绑定全部服务端事件（只绑定一次）
   useEffect(() => {
     if (sessionTokenRef.current) socket.auth = { sessionToken: sessionTokenRef.current };
     socket.connect();
 
-    const onConnect = () => setConnected(true);
+    const onConnect = () => {
+      setConnected(true);
+      // 阶段32：断线重连（浏览器休眠唤醒/网络恢复）→ 自动回到原房间
+      // （服务端座位有保留期，同会话/同名复活原座位；room:joined 会重拉历史消息）
+      if (everJoinedRef.current && roomRef.current) {
+        socket.emit('room:join', { playerName: myNameRef.current, roomId: roomRef.current.id });
+      }
+    };
     const onDisconnect = () => setConnected(false);
     const onError = ({ message }) => setError(message);
 
@@ -35,6 +45,8 @@ export default function App() {
       setHasOlder(false);
       setError('');
       setScreen('room');
+      roomRef.current = r; // 阶段32：记录当前房间（断线重连自动回房）
+      everJoinedRef.current = true;
       if (pid) setPlayerId(pid);
       if (sessionToken) {
         sessionTokenRef.current = sessionToken;
@@ -93,17 +105,21 @@ export default function App() {
   const createRoom = (name) => {
     setError('');
     localStorage.setItem('rtp_name', name);
+    myNameRef.current = name; // 阶段32：重连回房用
     socket.emit('room:create', { playerName: name });
   };
 
   const joinRoom = (name, roomId) => {
     setError('');
     localStorage.setItem('rtp_name', name);
+    myNameRef.current = name; // 阶段32：重连回房用
     socket.emit('room:join', { playerName: name, roomId });
   };
 
   const leaveRoom = () => {
     socket.emit('room:leave');
+    everJoinedRef.current = false; // 阶段32：主动离开后不再自动回房
+    roomRef.current = null;
     setScreen('lobby');
     setRoom(null);
     setPlayers([]);

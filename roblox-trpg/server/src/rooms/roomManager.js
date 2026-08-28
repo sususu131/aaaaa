@@ -49,6 +49,10 @@ function getRoom(roomId) {
 
 /** 玩家列表（对外广播用，含公开头像信息，不暴露 socketId）。 */
 function publicPlayers(room) {
+  // 阶段32：断线保留座位的玩家带 disconnected 标记（前端显示 ⚠）
+  const disconnected = new Set(
+    (room.players || []).filter((p) => p.disconnectedAt).map((p) => p.name)
+  );
   const rows = getDb()
     .prepare(
       `SELECT p.name, p.uid, p.avatar_type, rp.roblox_user_id, rp.username, rp.display_name, rp.headshot_url
@@ -62,6 +66,7 @@ function publicPlayers(room) {
     uid: r.uid,
     avatarType: r.avatar_type || 'bacon',
     headshotUrl: r.headshot_url || null,
+    disconnected: disconnected.has(r.name),
     roblox: r.roblox_user_id
       ? { userId: r.roblox_user_id, username: r.username, displayName: r.display_name || r.username }
       : null,
@@ -79,34 +84,93 @@ function findRoomBySocket(socketId) {
 /**
  * 加入房间。成功返回 { room }，失败返回 { error }。
  * player: { socketId, name, existingRowId? }（existingRowId 用于会话重连复用玩家行）。
+ * 阶段32：断线保留座位的玩家重连 → 复活原座位（不占新名额、保留顺序与身份）。
  */
+function findRevivableSeat(room, player) {
+  return (
+    room.players.find(
+      (p) =>
+        p.disconnectedAt &&
+        ((player.existingRowId && p.rowId === player.existingRowId) || p.name === player.name)
+    ) || null
+  );
+}
+
 function joinRoom(roomId, player) {
   const room = rooms.get(roomId);
   if (!room) return { error: '房间不存在，请检查房间ID' };
 
+  // 阶段32：先找可复活的断线座位（浏览器休眠重连、刷新后重进）
+  const seat = findRevivableSeat(room, player);
+
   const alreadyIn = room.players.some((p) => p.socketId === player.socketId);
-  if (!alreadyIn && room.players.length >= room.maxPlayers) return { error: '房间已满（最多3人）' };
-  if (room.players.some((p) => p.name === player.name && p.socketId !== player.socketId)) {
+  if (!alreadyIn && !seat && room.players.length >= room.maxPlayers) return { error: '房间已满（最多3人）' };
+  if (
+    room.players.some((p) => p.name === player.name && p.socketId !== player.socketId && !p.disconnectedAt)
+  ) {
     return { error: '房间内已有同名玩家，请换个名字' };
+  }
+
+  const db = getDb();
+
+  // 复活断线座位：换绑新 socketId，清掉断线标记（DB 玩家行保持 room_id / joined_at 不变）
+  if (seat) {
+    const oldSocketId = seat.socketId;
+    seat.socketId = player.socketId;
+    seat.disconnectedAt = null;
+    if (player.existingRowId) {
+      db.prepare(
+        'UPDATE players SET socket_id = ?, name = ?, room_id = ?, left_at = NULL WHERE id = ?'
+      ).run(player.socketId, player.name, room.id, player.existingRowId);
+    } else if (oldSocketId) {
+      db.prepare(
+        'UPDATE players SET socket_id = ?, room_id = ?, left_at = NULL WHERE socket_id = ?'
+      ).run(player.socketId, room.id, oldSocketId);
+    }
+    return { room, revived: true };
   }
 
   // 重连场景：先移除旧记录再重新入房
   room.players = room.players.filter((p) => p.socketId !== player.socketId);
-  room.players.push({ socketId: player.socketId, name: player.name, joinedAt: new Date().toISOString() });
-
-  const db = getDb();
-  if (player.existingRowId) {
+  let rowId = player.existingRowId || null;
+  if (rowId) {
     db.prepare(
       'UPDATE players SET socket_id = ?, name = ?, room_id = ?, left_at = NULL WHERE id = ?'
-    ).run(player.socketId, player.name, room.id, player.existingRowId);
+    ).run(player.socketId, player.name, room.id, rowId);
   } else {
-    db.prepare(
-      `INSERT INTO players (socket_id, name, room_id) VALUES (?, ?, ?)
-       ON CONFLICT(socket_id) DO UPDATE SET name = excluded.name, room_id = excluded.room_id, left_at = NULL`
-    ).run(player.socketId, player.name, room.id);
+    const info = db
+      .prepare(
+        `INSERT INTO players (socket_id, name, room_id) VALUES (?, ?, ?)
+         ON CONFLICT(socket_id) DO UPDATE SET name = excluded.name, room_id = excluded.room_id, left_at = NULL`
+      )
+      .run(player.socketId, player.name, room.id);
+    rowId = info.lastInsertRowid;
   }
+  room.players.push({ socketId: player.socketId, name: player.name, rowId, joinedAt: new Date().toISOString() });
 
   return { room };
+}
+
+/**
+ * 阶段32：断线 → 标记座位保留，graceMs 后仍未恢复才真正移除。
+ * onExpire(roomId, name) 在真正移除后回调（用于广播）。
+ */
+function markDisconnected(socketId, graceMs, onExpire) {
+  const room = findRoomBySocket(socketId);
+  if (!room) return null;
+  const player = room.players.find((p) => p.socketId === socketId);
+  if (!player) return null;
+  player.disconnectedAt = Date.now();
+  setTimeout(() => {
+    const cur = rooms.get(room.id);
+    if (!cur) return; // 房间已销毁
+    const still = cur.players.find((p) => p.socketId === socketId);
+    if (still && still.disconnectedAt) {
+      leaveRoom(socketId);
+      if (typeof onExpire === 'function') onExpire(room.id, player.name);
+    }
+  }, graceMs);
+  return { room, player };
 }
 
 /** 从所在房间移除玩家；房间无人且无活跃副本实例时销毁（阶段5：实例独立于房主会话）。 */
@@ -166,6 +230,7 @@ module.exports = {
   findRoomBySocket,
   joinRoom,
   leaveRoom,
+  markDisconnected,
   setRoomExperience,
   clearRoomExperience,
   saveMessage,

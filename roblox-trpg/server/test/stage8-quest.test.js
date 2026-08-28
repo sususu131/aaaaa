@@ -44,6 +44,11 @@ const aiServer = http.createServer((req, res) => {
   let b = '';
   req.on('data', (c) => (b += c));
   req.on('end', () => {
+    if (b.includes('OPENING_NARRATION')) {
+      // 阶段32：副本开场白请求——直接回固定开场，不消费脚本化队列
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ narration: '（开场白）', options: [] }) }, finish_reason: 'stop' }] }));
+    }
     const item = aiQueue.shift() || {};
     const msg = {};
     if (item.content !== undefined) msg.content = typeof item.content === 'string' ? item.content : JSON.stringify(item.content);

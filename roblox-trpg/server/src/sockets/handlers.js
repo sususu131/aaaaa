@@ -564,9 +564,28 @@ module.exports = function registerSocketHandlers(io) {
       }
     });
 
-    /** 断线即离开房间（副本实例不受影响：座位保留，可重连恢复）。 */
+    /**
+     * 阶段32：断线不再立即移出房间——浏览器标签休眠/系统睡眠/网络抖动时
+     * socket.io 心跳会断开，但玩家往往很快回来。座位保留 PLAYER_DISCONNECT_GRACE_MS
+     * （默认 5 分钟）；期间重连（同会话/同名）自动复活原座位；超时才真正移除。
+     * 副本实例本就独立于房主会话，不受影响。
+     */
     socket.on('disconnect', () => {
-      leaveCurrentRoom(io, socket);
+      const room = roomManager.findRoomBySocket(socket.id);
+      if (!room) return;
+      const player = room.players.find((p) => p.socketId === socket.id);
+      const { PLAYER_DISCONNECT_GRACE_MS } = require('../config');
+      const marked = roomManager.markDisconnected(socket.id, PLAYER_DISCONNECT_GRACE_MS, (roomId, name) => {
+        const r2 = roomManager.getRoom(roomId);
+        if (r2) {
+          io.to(roomId).emit('player:left', { playerName: name, players: roomManager.publicPlayers(r2) });
+          broadcastSystem(io, r2, `${name} 掉线超过保留期，已离开房间`);
+        }
+      });
+      if (marked && player) {
+        broadcastPlayers(io, room); // 带 ⚠ 断线标记
+        broadcastSystem(io, room, `${player.name} 连接中断（座位保留 ${Math.round(PLAYER_DISCONNECT_GRACE_MS / 60000)} 分钟，重连自动回到房间）`);
+      }
     });
   });
 };

@@ -43,6 +43,11 @@ const aiServer = http.createServer((req, res) => {
   req.on('data', (c) => (b += c));
   req.on('end', () => {
     lastAiBody = b;
+    if (b.includes('OPENING_NARRATION')) {
+      // 阶段32：副本开场白请求——直接回固定开场，不消费脚本化队列
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ narration: '（开场白）', options: [] }) }, finish_reason: 'stop' }] }));
+    }
     const item = aiQueue.shift() || {};
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ choices: [{ message: { content: typeof item.out === 'string' ? item.out : JSON.stringify(item.out || {}) }, finish_reason: 'stop' }] }));

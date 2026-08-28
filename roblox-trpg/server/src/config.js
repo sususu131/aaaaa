@@ -4,6 +4,8 @@ module.exports = {
   PLAYER_NAME_MAX: 16,      // 名字长度上限
   MESSAGE_MAX: 2000,        // 单条消息长度上限（阶段2：防刷，2000字符）
   ROOM_CODE_LENGTH: 6,      // 房间码长度
+  // 阶段32：断线座位保留期（浏览器休眠/网络抖动重连不丢座位；超时才真正移除）
+  PLAYER_DISCONNECT_GRACE_MS: Number(process.env.PLAYER_DISCONNECT_GRACE_MS || 5 * 60 * 1000),
 
   // ── 阶段2：AI GM（OpenAI 兼容 API，Key 只存服务端环境变量）──
   AI_BASE_URL: process.env.AI_BASE_URL || process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',

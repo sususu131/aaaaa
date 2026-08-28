@@ -21,6 +21,11 @@ export default function PlayerList({ players, myName, maxPlayers }) {
                 <span className="player-name">
                   {p ? p.name : '等待加入…'}
                   {p && p.name === myName && <em>（我）</em>}
+                  {p && p.disconnected && (
+                    <em className="disc-tag" title="连接中断（座位保留中，重连自动回到房间）">
+                      ⚠ 断线
+                    </em>
+                  )}
                 </span>
                 {p && p.roblox ? (
                   <span className="roblox-tag" title={`Roblox User ID: ${p.roblox.userId}`}>

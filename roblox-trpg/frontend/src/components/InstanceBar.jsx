@@ -41,13 +41,22 @@ export default function InstanceBar({ getSessionToken, onOpenRuntime }) {
 
   // 挂载：同步房间活跃实例 + 监听实例事件（聊天框不需要打开副本面板也能看到进度）
   useEffect(() => {
-    socket.emit('instance:sync', {}, (res) => {
-      if (res && res.ok && res.instance) {
-        uidRef.current = res.instance.uid;
-        setUid(res.instance.uid);
-        refresh(res.instance.uid);
-      }
-    });
+    const syncInstance = () => {
+      socket.emit('instance:sync', {}, (res) => {
+        if (res && res.ok && res.instance) {
+          uidRef.current = res.instance.uid;
+          setUid(res.instance.uid);
+          refresh(res.instance.uid);
+        } else {
+          uidRef.current = null;
+          setUid(null);
+          setSnapshot(null);
+        }
+      });
+    };
+    syncInstance();
+    // 阶段32：断线重连自动回房后（room:joined）重新同步实例状态
+    socket.on('room:joined', syncInstance);
     const onUpdate = () => refresh();
     const onTimed = (d) => setTimedEvent({ ...d, receivedAt: Date.now() });
     const onTimedExpired = () => {
@@ -62,6 +71,7 @@ export default function InstanceBar({ getSessionToken, onOpenRuntime }) {
     socket.on('instance:timedEvent', onTimed);
     socket.on('instance:timedExpired', onTimedExpired);
     return () => {
+      socket.off('room:joined', syncInstance);
       socket.off('instance:update', onUpdate);
       socket.off('instance:scene', onUpdate);
       socket.off('instance:combat', onUpdate);

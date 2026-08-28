@@ -329,6 +329,7 @@ body {
 .avatar { font-size: 18px; }
 .player-name em { color: #6f7d9c; font-style: normal; font-size: 12px; }
 .muted { color: #67718a; }
+.disc-tag { color: #e0b34c; font-style: normal; font-size: 11px; margin-left: 4px; }
 
 /* ── 聊天区 ── */
 .chat-panel {

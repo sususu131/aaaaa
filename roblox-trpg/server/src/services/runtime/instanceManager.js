@@ -224,6 +224,14 @@ function startInstance(io, instance) {
     const dungeonName = definition.dungeon?.display_name || definition.dungeon?.name || '副本';
     chatNotify.notify(io, fresh.room_id, `⚔ 副本「${dungeonName}」开始：队伍（${party.length}人）进入「${firstScene.name}」。在聊天框 @AI 提交行动即可推进。`);
   } catch { /* 通知失败不阻塞开始 */ }
+  // 阶段32：进入副本 → AI GM 主动发开场白（进实例串行队列，先于玩家行动；
+  // 失败有静态兜底，不阻塞开始）
+  try {
+    const partyRows = party
+      .map((pid) => getDb().prepare('SELECT * FROM players WHERE id = ?').get(pid))
+      .filter(Boolean);
+    require('./runtimeEngine').enqueueOpening(io, fresh, definition, partyRows).catch(() => {});
+  } catch { /* 开场白失败不阻塞开始 */ }
   return getInstance(instance.id);
 }
 
