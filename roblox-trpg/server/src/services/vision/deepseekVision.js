@@ -2,7 +2,7 @@
  * VisionProvider：OpenAI 兼容 Chat Completions（image_url 消息）。
  * 只使用 VISION_BASE_URL / VISION_API_KEY / VISION_MODEL。
  */
-const { VisionError, getVisionRuntimeConfig, visionPostJson } = require('./visionProvider');
+const { VisionError, getVisionRuntimeConfig, visionPostJson, buildVisionChatUrl } = require('./visionProvider');
 const { VISION_SYSTEM_PROMPT, buildVisionUserText } = require('./visionPrompt');
 const { extractJson } = require('../ai/structuredOutput');
 
@@ -18,7 +18,6 @@ async function analyzeAvatar({ imageUrl, prompt, allowedTags, allowedSkillIds })
   }
   if (!imageUrl) throw new VisionError('no_image', '没有可用的 Roblox Avatar 图片');
 
-  // Admin 测试页可以提供自定义 Prompt；未提供时继续使用正式 Avatar 分析 Prompt。
   const userText = String(prompt || '').trim() || buildVisionUserText(allowedTags, allowedSkillIds);
 
   const body = {
@@ -37,8 +36,12 @@ async function analyzeAvatar({ imageUrl, prompt, allowedTags, allowedSkillIds })
     ],
   };
 
+  // 兼容 InferAI：如果后台填写的是 https://api.inferaiapi.com，自动补 /v1。
+  // 如果已经填写 /v1 或其它自定义路径，则保持原路径。
+  const endpoint = buildVisionChatUrl(cfg.baseUrl);
+
   const data = await visionPostJson(
-    `${cfg.baseUrl}/chat/completions`,
+    endpoint,
     { Authorization: `Bearer ${cfg.apiKey}` },
     body,
     cfg.timeoutMs
