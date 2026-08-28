@@ -12,7 +12,7 @@
 const crypto = require('crypto');
 const { getDb } = require('@roblox-trpg/database');
 const { ensurePlayerState } = require('../world/playerStates');
-const rules = require('./avatarRules');
+const rules = require('./visualRules');
 const visionService = require('./visionService');
 const { analyzeAvatar } = require('./deepseekVision');
 const { getVisionRuntimeConfig, VisionError } = require('./visionProvider');
@@ -124,9 +124,9 @@ function markFailed(playerRowId, robloxUserId, error) {
 
 /**
  * 主入口。
- * @param {{playerRowId:number, robloxUserId?:string, avatarUrl?:string, forceBacon?:boolean}} p
+ * @param {{playerRowId:number, robloxUserId?:string, avatarUrl?:string, avatarExtraViews?:string[], forceBacon?:boolean}} p
  */
-async function initializeAvatar({ playerRowId, robloxUserId = null, avatarUrl = null, forceBacon = false }) {
+async function initializeAvatar({ playerRowId, robloxUserId = null, avatarUrl = null, avatarExtraViews = [], forceBacon = false }) {
   const db = getDb();
   ensurePlayerState(playerRowId);
 
@@ -194,6 +194,7 @@ async function initializeAvatar({ playerRowId, robloxUserId = null, avatarUrl = 
 
     const { raw, provider, model, rawResponse, rawText, requestBody } = await analyzeAvatar({
       imageUrl: avatarUrl,
+      imageUrls: avatarExtraViews || [],
       allowedTags: rules.ALLOWED_AVATAR_TAGS,
       allowedSkillIds: allowedSkillKeys,
     });

@@ -14,8 +14,10 @@ export default function CharacterPanel({ onClose, getSessionToken, headshotUrl }
 
   const refresh = useCallback(async () => {
     try {
-      // 走 cookie 会话；同时附带 token 兜底
-      const r = await fetch('/api/character', { method: 'GET' });
+      // 走 cookie 会话；同时显式附带本标签页自己的 token（修复串号：多个标签页/玩家共用浏览器时
+      // HttpOnly cookie 会被互相覆盖，必须用各自持有的 sessionToken 精确定位身份）
+      const token = getSessionToken ? getSessionToken() : null;
+      const r = await fetch(`/api/character${token ? `?sessionToken=${encodeURIComponent(token)}` : ''}`, { method: 'GET' });
       if (r.ok) {
         setC((await r.json()).character);
         return;
@@ -25,7 +27,7 @@ export default function CharacterPanel({ onClose, getSessionToken, headshotUrl }
     } catch (e) {
       setError(e.message);
     }
-  }, []);
+  }, [getSessionToken]);
 
   useEffect(() => {
     refresh();

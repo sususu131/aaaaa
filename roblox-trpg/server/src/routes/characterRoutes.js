@@ -9,7 +9,12 @@ const cs = require('../services/character/characterService');
 const router = express.Router();
 
 function authPlayer(req, res) {
-  let token = req.body && req.body.sessionToken;
+  // 严格身份：显式 token（query / header / body / cookie）任一路径，优先显式 token。
+  // 修复串号：多个标签页/玩家共用一个浏览器时 HttpOnly cookie 会被互相覆盖，
+  // 只用 cookie 会把 A 的 /api/character 解析到 B 的会话。显式 token 来自各标签页自己持有的 sessionToken。
+  let token = (req.query && req.query.sessionToken) || (req.query && req.query.token) || '';
+  if (!token && req.headers && req.headers['x-session-token']) token = req.headers['x-session-token'];
+  if (!token && req.body && req.body.sessionToken) token = req.body.sessionToken;
   if (!token && req.headers.cookie) {
     const m = req.headers.cookie.match(/(?:^|;\s*)rtp_session=([^;]+)/);
     token = m && m[1];

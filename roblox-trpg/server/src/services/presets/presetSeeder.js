@@ -290,6 +290,14 @@ function importPreset(io, preset) {
   const presetRow = upsertPresetRow(preset);
   const dungeon = ensureDungeon(preset);
   const locations = ensureLocations(preset);
+  // 阶段34 fix：preset_dungeon_configs 须在 dodFate 播种前就位（dodDungeon 查询该表）
+  db.prepare('INSERT OR IGNORE INTO preset_dungeon_configs (preset_id, dungeon_id, config_json, status) VALUES (?, ?, ?, ?)').run(
+    presetRow.id,
+    dungeon.id,
+    JSON.stringify(preset),
+    'DRAFT'
+  );
+  db.prepare('UPDATE preset_dungeon_configs SET config_json = ?, dungeon_id = ? WHERE preset_id = ?').run(JSON.stringify(preset), dungeon.id, presetRow.id);
   const factions = ensureFactions(preset, dungeon.id);
   const factionRelationsSeeded = ensureFactionRelations(preset, dungeon);
   // 阶段22：DOD 世界档案随导入播种（幂等；只读 Lore 数据）

@@ -21,6 +21,44 @@ export default function App() {
   const roomRef = useRef(null); // 阶段32：重连自动回房用（当前房间）
   const myNameRef = useRef(''); // 阶段32：重连回房用的名字
   const everJoinedRef = useRef(false); // 阶段32：是否曾入房（区分首连与断线重连）
+  const hiddenAtRef = useRef(null); // 阶段33：标签页进入后台的时刻（休眠检测）
+  const leaveRoomRef = useRef(null); // 阶段33：休眠唤醒自动离开用的最新 leaveRoom
+
+  // 阶段34 修复串号：token 用 sessionStorage（按标签页隔离）持久化。
+  // HttpOnly cookie 是浏览器级共享的——同一浏览器开 su/idk 两个标签页时 cookie 会被后连接的覆盖，
+  // 若只靠 cookie/内存，刷新后会把 A 的身份解析成 B。sessionStorage 每个标签页独立，
+  // 刷新/重连后从本标签页恢复自己的 token，前端请求显式携带（后端 authPlayer 已支持显式 token 优先）。
+  const TOKEN_KEY = 'rtp_session_token';
+  const loadToken = () => {
+    try { return sessionStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; }
+  };
+  const saveToken = (token) => {
+    try { sessionStorage.setItem(TOKEN_KEY, token); } catch { /* sessionStorage 不可用时回落内存 */ }
+  };
+  // 初始恢复：本标签页自己的 token（如有）→ 设置 socket 握手 auth
+  if (!sessionTokenRef.current) {
+    const saved = loadToken();
+    if (saved) sessionTokenRef.current = saved;
+  }
+  if (sessionTokenRef.current) socket.auth = { sessionToken: sessionTokenRef.current };
+
+  // 阶段33：标签页休眠检测——休眠超过阈值后回到页面，自动离开房间（房间"自动消失"）。
+  // 与后端座位保留（PLAYER_DISCONNECT_GRACE_MS，默认 5 分钟）配合：
+  // 短时切标签页（< 阈值）仍走阶段32 自动回房；长时间休眠（≥ 阈值）回来后直接离开，
+  // 不再自动回到旧房间，房间若因此无人则被后端销毁。
+  const TAB_SLEEP_AUTO_LEAVE_MS = 5 * 60 * 1000; // 5 分钟（与后端座位保留期一致）
+
+  const onVisibilityChange = () => {
+    if (document.hidden) {
+      hiddenAtRef.current = Date.now();
+    } else if (hiddenAtRef.current) {
+      const slept = Date.now() - hiddenAtRef.current;
+      hiddenAtRef.current = null;
+      if (slept >= TAB_SLEEP_AUTO_LEAVE_MS && roomRef.current && leaveRoomRef.current) {
+        leaveRoomRef.current(`标签页休眠超过 ${Math.round(slept / 60000)} 分钟，已自动离开房间`);
+      }
+    }
+  };
 
   // 建立连接 + 绑定全部服务端事件（只绑定一次）
   useEffect(() => {
@@ -31,6 +69,7 @@ export default function App() {
       setConnected(true);
       // 阶段32：断线重连（浏览器休眠唤醒/网络恢复）→ 自动回到原房间
       // （服务端座位有保留期，同会话/同名复活原座位；room:joined 会重拉历史消息）
+      // 阶段33：若休眠超过阈值已由 leaveRoomRef 触发过离开，roomRef 已被清空，此处不再回房
       if (everJoinedRef.current && roomRef.current) {
         socket.emit('room:join', { playerName: myNameRef.current, roomId: roomRef.current.id });
       }
@@ -50,6 +89,7 @@ export default function App() {
       if (pid) setPlayerId(pid);
       if (sessionToken) {
         sessionTokenRef.current = sessionToken;
+        saveToken(sessionToken); // 阶段34：本标签页独立持久化，避免共享 cookie 串号
         socket.auth = { sessionToken }; // 重连/刷新后保持身份
         api.registerSessionCookie(sessionToken).catch(() => {}); // HttpOnly Cookie（服务端设置）
       }
@@ -116,7 +156,7 @@ export default function App() {
     socket.emit('room:join', { playerName: name, roomId });
   };
 
-  const leaveRoom = () => {
+  const leaveRoom = (notice) => {
     socket.emit('room:leave');
     everJoinedRef.current = false; // 阶段32：主动离开后不再自动回房
     roomRef.current = null;
@@ -125,7 +165,17 @@ export default function App() {
     setPlayers([]);
     setMessages([]);
     setModal(null);
+    if (notice) setError(notice); // 阶段33：休眠自动离开时给用户可见提示
   };
+
+  // 阶段33：始终引用最新 leaveRoom（休眠唤醒自动离开用；ref 避免事件闭包过期）
+  leaveRoomRef.current = leaveRoom;
+
+  // 阶段33：挂载标签页休眠检测（visibilitychange）；卸载时移除
+  useEffect(() => {
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, []);
 
   const sendMessage = (text) => {
     socket.emit('chat:send', { text });

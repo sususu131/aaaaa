@@ -58,15 +58,32 @@ confidence 必须反映直接视觉证据强度：
 
 所有输出均属于 UNTRUSTED_MODEL_OUTPUT，服务器会进行二次验证。
 
-只输出一个 JSON 对象，不要代码块，不要额外文字：
-{
-  "observations": ["客观视觉观察，例如：Roblox 方块人、黑色服装、绿色发光眼睛、手持剑"],
-  "themes": ["图片整体主题，仅用于辅助，不可单独作为能力证据"],
-  "candidate_tags": ["必须来自 allowed_tags"],
-  "candidate_skill_ids": ["必须来自 allowed_skill_ids"],
-  "skill_reasons": [{"id":"skill_id","reason":"直接视觉依据","confidence":0.0}],
-  "confidence": {"tag": 0.0-1.0}
-}`;
+【输出格式】
+	只输出一个 JSON 对象，不要代码块，不要额外文字：
+	{
+	  "observations": ["客观视觉观察，例如：Roblox 方块人、黑色服装、绿色发光眼睛、手持剑"],
+	  "themes": ["图片整体主题，仅用于辅助，不可单独作为能力证据"],
+	  "visual_tags": [
+	    {"id":"cat_ears","confidence":0.94,"evidence":"头顶可见黑色猫耳"},
+	    {"id":"cat_tail","confidence":0.90,"evidence":"身后可见猫尾"}
+	  ],
+	  "archetypes": [{"id":"feline","confidence":0.88}],
+	  "candidate_skill_ids": ["必须来自 allowed_skill_ids"],
+	  "skill_reasons": [{"id":"skill_id","reason":"直接视觉依据","confidence":0.0}],
+	  "confidence": {"tag": 0.0-1.0}
+	}
+
+	【visual_tags 规则（优先）】
+	- visual_tags 必须严格来自服务器提供的 allowed_tags；禁止创造库外 ID。
+	- 每个 visual_tag 必须带 confidence（0.0-1.0）与 evidence（直接视觉依据）。
+	- 同一特征可输出多个标签（如猫耳角色可同时输出 feline / cat_ears / animal_ears）。
+	- 背饰（翅膀、刀鞘、背包、尾巴等）在正面看不清时，若有背面/多角度图片需综合判断；
+	  仅正面可见证据不足时，背饰类标签置信度应 < 0.60 或省略。
+	- candidate_tags 已废弃，兼容旧版（仅在无法输出 visual_tags 时作为回退）。
+
+	【archetypes 规则】
+	- archetypes 必须来自 allowed_tags 中的原型类 ID，且需多个视觉特征共同支持（如猫耳+猫尾→feline）。
+	- 单个视觉特征不足以决定职业原型；不要用一个标签直接推断 archetype。`;
 
 function buildVisionUserText(allowedTags, allowedSkillIds) {
   return `分析这个 Roblox Avatar 图片，并根据 Avatar 外观推导技能和属性方向。\n\n` +

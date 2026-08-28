@@ -142,14 +142,38 @@ export default function RoomScreen({
   }, []);
 
   const copyRoomId = async () => {
+    // 修复：navigator.clipboard 仅在安全上下文（HTTPS/localhost）可用；
+    // 从局域网 IP 访问（非安全上下文）时静默失败 → 加 execCommand 兜底 + 明确反馈。
+    const text = String(room?.id || '');
+    if (!text) return;
+    let ok = false;
     try {
-      await navigator.clipboard.writeText(room.id);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* 剪贴板不可用时忽略 */
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      }
+    } catch { /* fall through to legacy copy */ }
+    if (!ok) {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+      } catch { ok = false; }
     }
+    setCopied(ok);
+    if (ok) setTimeout(() => setCopied(false), 1500);
+    else alert('复制失败，请手动复制房间号：' + text);
   };
+
+  // 修复退出空白页：leaveRoom 后 room 会被置 null，此时若本组件仍短暂渲染，
+  // 直接访问 room.id 会抛错导致整页白屏。加空值防护，回到 lobby 由 App 接管。
+  if (!room) return null;
 
   return (
     <main className="room">

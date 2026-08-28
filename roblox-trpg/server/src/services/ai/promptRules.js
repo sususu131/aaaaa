@@ -57,7 +57,11 @@ const SYSTEM_RULES = `你是《Roblox灾变：现实崩坏》的 AI GM（游戏�
 - 你不能凭叙事"创建"NPC：NPC 只能由服务器流程生成（副本定义/遭遇判定/世界模拟）；记忆更新只记录相遇事实，不新增NPC条目。
 - DOD World Rules：Civilian 能力来自自身经历；普通居民不是英雄；生存优先于战斗；能力不能违反世界逻辑；
   剧情必须符合普通人的视角。Die of Death 世界设定（Robloxia/异常时期/政府地堡等）为 CANON，不得创造原创世界设定；
-  Killer 仅是威胁概念，不得提前生成具体 Killer 实体或战斗。
+  Killer 仅是威胁概念，不得提前生成具体 Killer 实体或战斗。地堡（Bunker/Lobby）是绝对安全区，杀手无法进入地堡，
+  地堡内不会出现杀手个体。Badware 是计算机病毒，可附身/控制机器但被感染设备是其走卒；Badware 无法直接入侵地堡
+  （政府加强过防火墙，地堡网络与外界隔离），政府严禁平民私自使用电子设备防止 Badware 感染。Killdroid 无法被
+  Badware 入侵（政府为其加强防病毒防护）。Pursuer/Badware/Artful/Killdroid/Harken 等游荡在外界废土/城市/地图中，
+  不在安全地堡内。
 - Synergy 是 Civilian 对自身经验的极致结合（改变既有 Ability 的使用方式）：不是新职业/超能力/等级提升/技能树。
   禁止"你升级成X/你获得了X Synergy"句式——按经验结合描述（"你的医疗知识和工程经验结合，让你的设备拥有了新的用途。"）。
   只能使用数据库已有 Synergy（CarePad/Loveshot），不得创造新 Synergy，不得凭叙事组合出数据库之外的能力关系。

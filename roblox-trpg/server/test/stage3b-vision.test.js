@@ -150,20 +150,20 @@ async function main() {
   ({ result } = await runVisionScenario({ candidate_tags: ['warrior'], confidence: { warrior: 0.88 } }));
   assert.strictEqual(ATTRS(result).STR, 6);
   assert.strictEqual(ATTRS(result).CON, 6);
-  assert.deepStrictEqual(result.skills.map((s) => s.key), ['heavy_combat']);
-  ok('4. 战士：STR+1 CON+1 + heavy_combat');
+  assert.deepStrictEqual(result.skills.map((s) => s.key).sort(), ['heavy_combat'].sort());
+  ok('4. 战士：STR+1 CON+1 + heavy_combat（heavy_armor/melee_combat 属待实现词库技能，未入库不发放）');
 
   // 5. 忍者
   ({ result } = await runVisionScenario({ candidate_tags: ['ninja'], confidence: { ninja: 0.92 } }));
   assert.deepStrictEqual([ATTRS(result).DEX, ATTRS(result).PER, ATTRS(result).CON], [7, 6, 4]);
-  assert.deepStrictEqual(result.skills.map((s) => s.key), ['ninja_mobility']);
-  ok('5. 忍者：DEX+2 PER+1 CON-1 + ninja_mobility');
+  assert.deepStrictEqual(result.skills.map((s) => s.key).sort(), ['ninja_mobility', 'stealth'].sort());
+  ok('5. 忍者：DEX+2 PER+1 CON-1 + ninja_mobility/stealth（agility 属待实现词库技能，未入库不发放）');
 
   // 6. 海盗
   ({ result } = await runVisionScenario({ candidate_tags: ['pirate'], confidence: { pirate: 0.85 } }));
   assert.strictEqual(ATTRS(result).STR, 6);
-  assert.deepStrictEqual(result.skills.map((s) => s.key), ['pirate_instinct']);
-  ok('6. 海盗：STR+1 PER+1 + pirate_instinct');
+  assert.deepStrictEqual(result.skills.map((s) => s.key).sort(), ['intimidation', 'swordsmanship'].sort());
+  ok('6. 海盗：STR+1 PER+1 + intimidation/swordsmanship（navigation 未入库被拒；pirate_instinct 超技能上限被拒；阶段34词库升级）');
 
   // 7. 机器人
   ({ result } = await runVisionScenario({ candidate_tags: ['robot'], confidence: { robot: 0.97 } }));
@@ -180,15 +180,15 @@ async function main() {
   // 9. 翅膀
   ({ result } = await runVisionScenario({ candidate_tags: ['wings'], confidence: { wings: 0.93 } }));
   assert.strictEqual(ATTRS(result).DEX, 6);
-  assert.deepStrictEqual(result.skills.map((s) => s.key), ['aerial_adaptation']);
-  ok('9. 翅膀：DEX+1 + aerial_adaptation');
+  assert.deepStrictEqual(result.skills.map((s) => s.key).sort(), ['aerial_adaptation'].sort());
+  ok('9. 翅膀：DEX+1 + aerial_adaptation（aerial_mobility 属待实现词库技能，未入库不发放）');
 
   // 10. 魔法
   ({ result } = await runVisionScenario({ candidate_tags: ['magic'], confidence: { magic: 0.9 } }));
   assert.strictEqual(ATTRS(result).INT, 6);
   assert.strictEqual(ATTRS(result).PER, 6);
-  assert.deepStrictEqual(result.skills.map((s) => s.key), ['magic_affinity']);
-  ok('10. 魔法：INT+1 PER+1 + magic_affinity');
+  assert.deepStrictEqual(result.skills.map((s) => s.key).sort(), ['magic_affinity', 'spellcasting'].sort());
+  ok('10. 魔法：INT+1 PER+1 + magic_affinity/spellcasting（阶段34词库升级）');
 
   // 11. 剑
   ({ result } = await runVisionScenario({ candidate_tags: ['sword'], confidence: { sword: 0.91 } }));
@@ -205,8 +205,8 @@ async function main() {
   ({ result } = await runVisionScenario({ candidate_tags: ['bow'], confidence: { bow: 0.94 } }));
   assert.strictEqual(ATTRS(result).DEX, 6);
   assert.strictEqual(ATTRS(result).PER, 6);
-  assert.deepStrictEqual(result.skills.map((s) => s.key), ['marksman']);
-  ok('13. 弓：DEX+1 PER+1 + marksman');
+  assert.deepStrictEqual(result.skills.map((s) => s.key).sort(), ['archery', 'marksman'].sort());
+  ok('13. 弓：DEX+1 PER+1 + archery/marksman（阶段34词库升级）');
 
   // 14. 盾牌
   ({ result } = await runVisionScenario({ candidate_tags: ['shield'], confidence: { shield: 0.9 } }));
@@ -342,8 +342,8 @@ async function main() {
   assert.deepStrictEqual(second.attributes, first.attributes);
   assert.strictEqual(
     db.prepare('SELECT COUNT(*) c FROM player_skills WHERE player_id = ?').get(dupPlayer.id).c,
-    0,
-    '重复初始化不得重复写入技能'
+    1,
+    '重复初始化不得重复写入技能（首次 init 写入 1 个 sword→swordsmanship；第二次 duplicate 不变）'
   );
   ok('29. 重复初始化：刷新/重连不重复发放');
 

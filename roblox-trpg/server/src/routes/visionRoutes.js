@@ -8,13 +8,15 @@ const { resolveSession } = require('../sessions/sessionManager');
 const { initializeAvatar, getInitRow } = require('../services/vision/initializeAvatar');
 const { getVisionRuntimeConfig } = require('../services/vision/visionProvider');
 const robloxThumbnails = require('../services/roblox/robloxThumbnails');
-const rules = require('../services/vision/avatarRules');
+const rules = require('../services/vision/visualRules');
 
 const router = express.Router();
 
 /** 从 cookie 或 body 解析会话。 */
 function authPlayer(req) {
-  let token = req.body && req.body.sessionToken;
+  let token = (req.query && req.query.sessionToken) || (req.query && req.query.token) || '';
+  if (!token && req.headers && req.headers['x-session-token']) token = req.headers['x-session-token'];
+  if (!token && req.body && req.body.sessionToken) token = req.body.sessionToken;
   if (!token && req.headers.cookie) {
     const m = req.headers.cookie.match(/(?:^|;\s*)rtp_session=([^;]+)/);
     token = m && m[1];
@@ -44,6 +46,7 @@ router.post('/api/vision/avatar/analyze', async (req, res) => {
     if (!player) return res.status(404).json({ error: '玩家不存在' });
 
     let avatarUrl = player.fullbody_url || player.headshot_url || null;
+    let avatarExtraViews = [];
     // 优先全身，其次 headshot；两者都无 → 服务端再尝试拉一次公开缩略图
     if (!avatarUrl && player.roblox_user_id) {
       try {
@@ -56,11 +59,24 @@ router.post('/api/vision/avatar/analyze', async (req, res) => {
         avatarUrl = null;
       }
     }
+    // 阶段34：附加多视角（正面全身 + headshot + 3D 渲染，能看到背饰/侧面）
+    if (player.roblox_user_id) {
+      try {
+        const t = await robloxThumbnails.getUserThumbnails(player.roblox_user_id);
+        const extra = [];
+        if (t.fullbody && t.fullbody.state !== 'Blocked' && t.fullbody.imageUrl && t.fullbody.imageUrl !== avatarUrl) extra.push(t.fullbody.imageUrl);
+        if (t.headshot && t.headshot.state !== 'Blocked' && t.headshot.imageUrl) extra.push(t.headshot.imageUrl);
+        const render3d = await robloxThumbnails.getUserRender3D(player.roblox_user_id);
+        if (render3d && render3d.imageUrl) extra.push(render3d.imageUrl);
+        avatarExtraViews = extra;
+      } catch { /* 附加视角获取失败不影响主流程 */ }
+    }
 
     const result = await initializeAvatar({
       playerRowId: player.id,
       robloxUserId: player.roblox_user_id,
       avatarUrl,
+      avatarExtraViews,
     });
     res.json(result);
   } catch (err) {

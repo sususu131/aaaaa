@@ -11,7 +11,9 @@ const { getDb } = require('@roblox-trpg/database');
 const router = express.Router();
 
 function authPlayer(req, res) {
-  let token = (req.body && req.body.sessionToken) || (req.query && req.query.sessionToken);
+  let token = (req.query && req.query.sessionToken) || (req.query && req.query.token) || '';
+  if (!token && req.headers && req.headers['x-session-token']) token = req.headers['x-session-token'];
+  if (!token && req.body && req.body.sessionToken) token = req.body.sessionToken;
   if (!token && req.headers.cookie) {
     const m = req.headers.cookie.match(/(?:^|;\s*)rtp_session=([^;]+)/);
     token = m && m[1];

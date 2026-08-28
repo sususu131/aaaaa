@@ -56,6 +56,26 @@ INSERT OR IGNORE INTO skills (name, description, source_dungeon_id, source_type,
   ('beast_sense',        '野兽感知：动物的直觉，察觉危险更早。',            NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
   ('military_drill',     '军事训练：纪律化的战斗动作，稳定可靠。',          NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved');
 
+-- 阶段34：Vision 词库基础技能（INITIAL_AVATAR；由 visualSkillMappings.json 视觉标签映射发放）
+INSERT OR IGNORE INTO skills (name, description, source_dungeon_id, source_type, skill_type, rarity, status) VALUES
+  ('feline_instinct',     '猫科本能：敏锐的猫科感知与反应能力。',          NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('swordsmanship',       '剑术：使用剑类武器进行战斗的能力。',            NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('archery',             '弓术：擅长使用弓类远程武器。',                  NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('firearms',            '枪械：具备使用枪械进行战斗的能力。',            NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('quick_draw',          '快速拔枪：能够快速拔出并使用腰间枪械。',        NULL, 'INITIAL_AVATAR', 'passive', 'rare', 'approved'),
+  ('stealth',             '潜行：擅长隐藏自己的行动和位置。',              NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('tracking',            '追踪：能够根据环境与目标留下的痕迹追踪目标。',  NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('investigation',       '调查：擅长寻找线索、分析现场和调查目标。',      NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('intimidation',        '威吓：利用外貌、装备或身份施加心理压力。',      NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('medicine',            '医疗：具备治疗伤势和处理医疗问题的能力。',      NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('spellcasting',        '施法：能够使用魔法类能力。',                    NULL, 'INITIAL_AVATAR', 'passive', 'rare', 'approved'),
+  ('shield_mastery',      '盾牌掌握：擅长使用盾牌进行防御。',              NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('dual_wield',          '双持：能够同时使用两把单手武器。',              NULL, 'INITIAL_AVATAR', 'passive', 'rare', 'approved'),
+  ('knife_mastery',       '短刀掌握：擅长使用匕首和短刀。',                NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('spear_mastery',       '长枪掌握：擅长使用长枪、矛等长柄刺击武器。',    NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('axe_mastery',         '斧术：擅长使用斧类武器。',                      NULL, 'INITIAL_AVATAR', 'passive', 'common', 'approved'),
+  ('greatsword_mastery',  '巨剑掌握：擅长使用大型双手剑。',                NULL, 'INITIAL_AVATAR', 'passive', 'rare', 'approved');
+
 -- 阶段6：技能声明式效果（effect_data）+ 冷却/次数（数据驱动，禁止代码执行）
 UPDATE skills SET effect_data = '{"effects":[{"type":"ADVANTAGE","when":"danger_sense"}]}', cooldown_turns = 0 WHERE name = '危险感知' AND (effect_data IS NULL OR effect_data = '');
 UPDATE skills SET effect_data = '{"effects":[{"type":"UNLOCK_ACTION","action":"pick_lock"}]}', cooldown_turns = 0 WHERE name = '开锁能力' AND (effect_data IS NULL OR effect_data = '');

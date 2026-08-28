@@ -14,19 +14,19 @@
       {
         "key": "dod:bunker_entrance",
         "name": "地堡入口（Bunker Entrance）",
-        "description": "厚重的防爆门半开着。",
-        "is_safe": 0
+        "description": "厚重的防爆门。地堡是绝对安全区，杀手无法进入。",
+        "is_safe": 1
       },
       {
         "key": "dod:bunker_hall",
         "name": "地堡通道（Bunker Hall）",
-        "description": "应急灯忽明忽暗。",
-        "is_safe": 0
+        "description": "地堡内部安全区，应急灯照明。",
+        "is_safe": 1
       },
       {
         "key": "dod:safe_room",
         "name": "安全屋",
-        "description": "临时加固的房间。",
+        "description": "加固的房间，地堡内绝对安全。",
         "is_safe": 1
       }
     ]
@@ -176,7 +176,7 @@
       {
         "id": "scene_entrance",
         "name": "地堡入口",
-        "description": "防爆门在你们身后缓缓合上。",
+        "description": "防爆门在你们身后缓缓合上。这里是安全的，但地堡之外的世界充满了危险。",
         "order": 1,
         "exits": [
           "scene_hall"
@@ -189,69 +189,41 @@
       {
         "id": "scene_hall",
         "name": "地堡通道",
-        "description": "应急灯忽明忽暗，墙上有抓痕。",
+        "description": "地堡内部是安全区。但你们听到外面隐约传来怪异的声响——那是外界废土中游荡的杀手。",
         "order": 2,
         "exits": [
           "scene_safe",
           "scene_entrance"
         ],
-        "encounters": [
-          "enc_pursuer",
-          "enc_badware"
-        ],
-        "events": []
+        "encounters": [],
+        "events": [
+          "evt_outside_threat"
+        ]
       },
       {
         "id": "scene_safe",
         "name": "安全屋",
-        "description": "加固的铁门，暂时的安宁。",
+        "description": "加固的铁门，地堡内绝对安全。",
         "order": 3,
         "exits": [],
-        "encounters": [
-          "enc_harken"
-        ],
+        "encounters": [],
         "events": []
       }
     ],
-    "encounters": [
-      {
-        "id": "enc_pursuer",
-        "name": "Pursuer 出现",
-        "type": "COMBAT",
-        "description": "追踪者堵住了通道。",
-        "participants": [
-          "pursuer"
-        ],
-        "difficulty": 3
-      },
-      {
-        "id": "enc_badware",
-        "name": "Badware 伏击",
-        "type": "COMBAT",
-        "description": "屏幕亮起，Badware 扑来。",
-        "participants": [
-          "badware"
-        ],
-        "difficulty": 3
-      },
-      {
-        "id": "enc_harken",
-        "name": "Harken 回声",
-        "type": "COMBAT",
-        "description": "回声凝聚成形。",
-        "participants": [
-          "harken"
-        ],
-        "difficulty": 5
-      }
-    ],
+    "encounters": [],
     "events": [
       {
         "id": "evt_anomaly",
         "name": "异常",
-        "description": "灯灭了。有什么东西在地堡里。"
+        "description": "灯灭了。地堡之外有什么东西在游荡。"
+      },
+      {
+        "id": "evt_outside_threat",
+        "name": "外界威胁",
+        "description": "地堡内是安全的，但外界废土中有杀手（Pursuer/Badware/Artful/Killdroid/Harken）游荡。Badware 是计算机病毒，可附身/控制机器（电脑、发电机等），被感染设备会成为其蜂巢意识的走卒；Badware 本体（以窃取机甲为身体）不会以物理实体出现在地堡内。政府严禁平民私自使用电子设备（只有高层能少量使用），正是为了防止 Badware 经设备感染地堡。"
       }
-    ]
+    ],
+    "note": "地堡（Bunker/Lobby）是绝对安全区：杀手无法进入地堡。副本剧情聚焦于地堡外的外界废土与城市中的威胁，地堡内不出现杀手个体遭遇。"
   },
   "rewards": [
     {
@@ -280,22 +252,23 @@
   "world_lore": {
     "table": "experience_world_profiles",
     "name": "Die of Death World",
-    "description": "Robloxia：一个由普通居民组成的世界。居民包括普通市民、工作人员、研究人员、建设者、商人——大多数人没有战斗能力。",
-    "setting": "Robloxia（普通城市世界：依靠居民各自的生活技能运转）",
-    "era": "Killers出现后的异常时期",
+    "description": "Robloxia：一个由普通居民组成的世界。居民包括普通市民、工作人员、研究人员、建设者、商人——大多数人没有战斗能力。政府建造的避难所地堡（Bunker/Lobby）是绝对安全区，杀手无法进入地堡。",
+    "setting": "Robloxia（普通城市世界：依靠居民各自的生活技能运转；地堡是政府建造的绝对安全避难所，杀手无法进入地堡内部）",
+    "era": "Killers出现后的异常时期（杀手在外界游荡，地堡是安全区）",
     "civilian_life": {
       "城市": "Robloxia 的城市由普通居民共同维持运转",
       "住宅区": "居民居住的街区，灾变后成为互助据点",
       "商业区域": "商店与市集，物资交换的中心",
       "公共设施": "政府建造的避难所（如安全地堡）等公共空间",
+      "地堡（Bunker）": "政府建造的绝对安全避难所，有剧院、花园、自助餐厅、厨房、街机厅、传送门。由管理员 Blackiron 维护。杀手无法进入地堡。",
       "工作场所": "居民各自凭借职业与生活技能工作",
       "note": "Civilian 不是战士。他们只是拥有不同人生经验的人。"
     },
-    "threat_concept": "Killer 当前只作为世界威胁概念（居民需要逃离/隐藏/合作/利用自身能力生存）；不实现具体 Killer。",
+    "threat_concept": "Killer 当前只作为世界威胁概念（居民需要逃离/隐藏/合作/利用自身能力生存）；不实现具体 Killer。杀手游荡在外界废土/城市中，无法进入地堡（Bunker）。Badware 是计算机病毒，可附身/控制机器（电脑、发电机等），被感染设备会成为其蜂巢意识的走卒；Badware 本体（以窃取机甲为身体）不会以物理实体出现在地堡内。Badware 无法直接入侵地堡（政府加强过几次防火墙，地堡网络与外界隔离）。Killdroid 无法被 Badware 入侵（政府为其防火墙/防护加固），Killdroid 有自己的独立防护。",
     "government_interface": {
       "name": "Robloxian Government",
       "description": "Robloxia 的统治者，积极保护平民",
-      "public_information": "建造并维护安全地堡；制造过机器人保镖原型；追踪异常存在信号并警告居民",
+      "public_information": "建造并维护安全地堡（地堡是绝对安全区，杀手无法进入；地堡有剧院/花园/自助餐厅/厨房/街机厅/传送门，管理员 Blackiron）；制造过机器人保镖原型（Killdroid）；为地堡加强过几次防火墙（Badware 无法直接入侵地堡），并为 Killdroid 做了防病毒加固（无法被 Badware 入侵）；追踪异常存在信号并警告居民",
       "secret_information": "reserved（本阶段只创建 Lore 接口，不实现具体剧情）"
     },
     "world_rules": [
@@ -303,7 +276,12 @@
       "普通居民不是英雄。",
       "生存优先于战斗。",
       "能力不能违反世界逻辑。",
-      "AI 生成剧情必须符合普通人的视角。"
+      "AI 生成剧情必须符合普通人的视角。",
+      "地堡（Bunker/Lobby）是绝对安全区：杀手无法进入地堡，地堡内不会出现杀手个体。",
+      "Badware 是计算机病毒：可附身/控制机器（电脑、发电机、机甲等），被感染设备会成为其蜂巢意识的走卒；Badware 本体（以窃取机甲为身体）不会以物理实体出现在地堡内。Badware 无法直接入侵地堡（政府加强过几次防火墙，地堡网络与外界隔离）。",
+      "Killdroid 无法被 Badware 入侵（政府为 Killdroid 加强了防火墙/防病毒防护），Killdroid 有独立的防病毒加固。",
+      "政府严禁平民私自使用电子设备（只有高层能少量使用），原因正是为了防止 Badware 经设备感染地堡。",
+      "Pursuer/Badware/Artful/Killdroid/Harken 等游荡在外界废土/城市中，不在安全地堡内。"
     ],
     "lore_source": "CANON",
     "killer_titles": {

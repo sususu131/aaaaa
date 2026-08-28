@@ -61,6 +61,24 @@ async function getUserAvatarType(robloxUserId) {
   }
 }
 
+/**
+ * 阶段34：Avatar 3D 渲染视角（可看到背饰/侧面细节，正面全身图常被遮挡）。
+ * 官方端点 /v1/users/avatar-3d 返回 3D 渲染缩略图；失败时返回 null（调用方兜底用正面图）。
+ */
+async function getUserRender3D(robloxUserId) {
+  const id = String(robloxUserId);
+  try {
+    const { value } = await cache.getOrFetch(`thumb:render3d:${id}`, ROBLOX_TTL_THUMBNAIL, () =>
+      robloxJson(`https://thumbnails.roblox.com/v1/users/avatar-3d?userId=${id}`)
+    );
+    const first = value && value.data && value.data[0];
+    if (!first) return null;
+    return { imageUrl: first.imageUrl, state: first.state || null };
+  } catch {
+    return null; // 3D 渲染不可用 → 调用方用正面图兜底
+  }
+}
+
 /** 体验图标（按 universeId）。 */
 async function getGameIcon(universeId, size = '512x512') {
   return thumb(

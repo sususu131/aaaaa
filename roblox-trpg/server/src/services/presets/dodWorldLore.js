@@ -18,13 +18,17 @@ const { getDb } = require('@roblox-trpg/database');
 const SOURCE = 'DIE_OF_DEATH';
 const EXPERIENCE_KEY = 'dod';
 
-// ── DOD World Rules（官方输入 5 条）──
+// ── DOD World Rules（官方输入 5 条 + 阶段34 地堡安全规则）──
 const WORLD_RULES = [
   'Civilian 能力来自自身经历。',
   '普通居民不是英雄。',
   '生存优先于战斗。',
   '能力不能违反世界逻辑。',
   'AI 生成剧情必须符合普通人的视角。',
+  '地堡（Bunker/Lobby）是绝对安全区：杀手无法进入地堡，地堡内不会出现杀手个体。',
+  'Badware 是计算机病毒：可附身/控制机器（电脑、发电机、机甲等），被感染设备会成为其蜂巢意识的走卒；Badware 本体（以窃取机甲为身体）不会以物理实体出现在地堡内。',
+  '政府严禁平民私自使用电子设备（只有高层能少量使用），原因正是为了防止 Badware 经设备感染地堡。',
+  'Pursuer/Badware/Artful/Killdroid/Harken 等游荡在外界废土/城市/地图（Maps）中，不在安全地堡内。',
 ];
 
 // ── Die of Death World Profile（官方设定）──
@@ -33,37 +37,39 @@ const DOD_WORLD_PROFILE = {
   experience_key: EXPERIENCE_KEY,
   name: 'Die of Death World',
   description:
-    'Robloxia：一个由普通居民组成的世界。居民包括普通市民、工作人员、研究人员、建设者、商人——大多数人没有战斗能力。',
-  setting: 'Robloxia（普通城市世界：依靠居民各自的生活技能运转）',
-  era: 'Killers出现后的异常时期',
+    'Robloxia：一个由普通居民组成的世界。居民包括普通市民、工作人员、研究人员、建设者、商人——大多数人没有战斗能力。政府建造的安全地堡（Bunker/Lobby）是绝对安全区，杀手无法进入地堡。',
+  setting:
+    'Robloxia（普通城市世界：依靠居民各自的生活技能运转；地堡是政府建造的绝对安全避难所）',
+  era: 'Killers出现后的异常时期（杀手游荡在外界废土/城市/各地图中，地堡是绝对安全区）',
   factions: [
     {
       name: 'Robloxia Citizens',
       role: 'civilian',
-      description: '居住在 Robloxia 的普通公民，不得不忍受四处杀人的 Killers；结合各自生活技能生存。',
+      description: '居住在 Robloxia 的普通公民，不得不忍受四处杀人的 Killers；结合各自生活技能生存；主要生活在安全地堡（Bunker）内，地堡是绝对安全区。',
       lore_source: 'CANON',
     },
     {
       name: 'Government',
       role: 'reserved',
-      description: 'Robloxian Government（罗布洛政府）：Robloxia 的统治者，积极保护平民（如建造作为大厅的安全地堡）。',
+      description: 'Robloxian Government（罗布洛政府）：Robloxia 的统治者，积极保护平民（建造作为大厅的安全地堡）。',
       public_information:
-        '政府由现任总统 President Cobalt 领导（前任总统/秘书 Sulfur 设计了 Killdroid），一直积极保护平民——例如建造作为大厅避难所的安全地堡（剧院、花园、自助餐厅和厨房、街机厅、储藏室，以及大厅中央通往外部世界的大型传送门）。地堡由管理员 Blackiron 维护（自称"老旧但可用"，主电网常因灯光过多锁死，已设置备用发电机），配有维修工、两位厨师、园丁 Esterflowers2287 与办公室夜班保安。居民在地堡内生活舒适，但常思念仍被困在外面的朋友；据 Wrenchboy 所述，外部世界如今已是一片废土。',
+        '政府由现任总统 President Cobalt 领导（前任总统/秘书 Sulfur 设计了 Killdroid），一直积极保护平民——例如建造作为大厅避难所的绝对安全地堡（剧院、花园、自助餐厅和厨房、街机厅、储藏室，以及大厅中央通往外部世界的大型传送门）。地堡由管理员 Blackiron 维护（自称"老旧但可用"，主电网常因灯光过多锁死，已设置备用发电机），配有维修工、两位厨师、园丁 Esterflowers2287 与办公室夜班保安。居民在地堡内生活舒适——地堡是绝对安全区，杀手无法进入地堡；据 Wrenchboy 所述，外部世界如今已是一片废土，杀手们（Pursuer/Badware/Artful/Killdroid/Harken）游荡其间。',
       secret_information: 'reserved（本阶段只创建 Lore 接口，不实现具体剧情）',
       lore_source: 'CANON',
     },
     {
       name: 'Killers',
       role: 'threat_concept',
-      description: '世界威胁概念：某些异常存在会攻击 Robloxia 居民（当前不实现具体 Killer）。',
+      description: '世界威胁概念：某些异常存在（Pursuer/Badware/Artful/Killdroid/Harken）游荡在外界废土/城市/各地图中，会攻击 Robloxia 居民（当前不实现具体 Killer）。杀手无法进入安全地堡。',
       lore_source: 'CANON',
     },
   ],
   known_threats: [
     {
       concept: 'Killer',
-      description: '某些异常存在会攻击 Robloxia 居民。普通居民需要逃离、隐藏、合作，并利用自身能力生存。',
-      resident_response: ['逃离', '隐藏', '合作', '利用自身能力生存'],
+      description:
+        '某些异常存在（Pursuer/Badware/Artful/Killdroid/Harken）游荡在外界废土/城市/各地图（Maps=外面的世界）中，会攻击 Robloxia 居民。普通居民需要逃离、隐藏、合作，并利用自身能力生存。安全地堡内绝对安全，杀手无法进入地堡，地堡内不出现杀手个体。',
+      resident_response: ['逃离', '隐藏', '合作', '利用自身能力生存', '躲进安全地堡'],
       implementation: 'reserved', // 不实现 Killer AI / 战斗
       // 官方已知的威胁存在（登记概念/动机/背景 Lore；无属性/技能表/数值）
       known_entities: [
@@ -79,6 +85,7 @@ const DOD_WORLD_PROFILE = {
           behavior: '聪明得惊人，能快速学习、复制并精通所见之物；潜行与速度无与伦比；能完全隐身（推测为重组骨骼＋改变肤色细胞拟态，类似章鱼）——隐形时身体僵硬、威胁性降低，但可完全不被察觉地跟随目标；嚎叫震耳欲聋、传遍数英里，恐惧使听者关节短暂僵直，近处者会头晕许久；极度厌恶水，会为避免浸水而放弃追猎',
           government_response: '政府担心其长期影响，曾险些成功植入追踪标签但最终失败，此后 Pursuer 对这类伎俩更加警惕；政府不希望消灭它，想研究其拟态能力以改进隐形斗篷；植入芯片失败后，多数科学家认为它难以驯服',
           counter_hint: '强光可锁定其拟态（现形并僵直）；水能让它放弃追猎；它隐形时身体僵硬、威胁性较低——但同样也更难被察觉',
+          location: '游荡在 Lily Meadow 附近森林与外界废土/地图中，不会进入安全地堡',
         },
         {
           name: 'Badware',
@@ -92,6 +99,7 @@ const DOD_WORLD_PROFILE = {
           behavior: '向附近机械注入强力病毒并完全控制，被感染的设备被改造为服从其控制的"走卒"，构成蜂巢意识；体型庞大却快得能跑过普通平民；枪械火箭在发挥作用前就开始为它而战',
           government_response: '其机体为窃取的政府科技；放任它扩张影响力只会更糟，但正面硬刚是极糟的主意',
           counter_hint: '避免依赖附近的机械设备；被感染的机械会倒戈',
+          location: '以计算机病毒形式存在于外界设备/机械中，可附身/控制机器；Badware 无法直接入侵地堡（政府加强过几次防火墙，地堡网络与外界隔离）；Killdroid 无法被 Badware 入侵（政府为其防病毒加固）',
         },
         {
           name: 'Artful',
@@ -105,6 +113,7 @@ const DOD_WORLD_PROFILE = {
           behavior: '能凭空显现墙体（封锁通路、困住受害者，随时间碎裂）、把墙压缩成方块高速投出、音乐盒（能量束锁定减速，也可反转为给自己加速）、傀儡（由尘土构成、完全服从命令、追踪最近平民、能承受大量打击）；似乎只在靠近并"复制"某个平民后才会创造傀儡；显现之物并不耐用，随时间化为尘土或受压碎裂',
           government_response: '政府起初以为是障眼法加暗门，直到发现其"事故"现场才意识到面对的是远超想象的东西；事故起因成谜——有说法是演出当天观众起哄过多，也有说法与其私下经历有关；事故唯一幸存者住院中',
           counter_hint: '其召唤物不耐用：拖延与持续施压可令墙与傀儡碎裂',
+          location: '作为在逃罪犯游荡在外界城市/地图中，不在安全地堡内',
         },
         {
           name: 'Killdroid',
@@ -115,9 +124,10 @@ const DOD_WORLD_PROFILE = {
           motive: '本用于看护保护平民的量产原型，测试运行中开始失控（go haywire）并叛逃，捣毁测试场地后逃入外界；故障原因未知',
           origin: '政府计划量产的实验性机器人保镖原型，本用于看护保护平民；由前任总统/秘书 Sulfur 设计，原型基于 Shedletsky 制作的 Killbots',
           appearance: '漂浮发射火箭的机器人；能无视隐形屏障、攀爬小障碍与陡坡、进入奇怪位置',
-          behavior: '远程压制：火箭直射爆炸、飞行逼近、部署小型 Killbot 巡射；濒临崩溃时会自爆',
+          behavior: '远程压制：火箭直射爆炸、飞行逼近、部署小型 Killbot 巡射；濒临崩溃时会自爆。无法被 Badware 入侵（政府为其加强了防火墙/防病毒防护）',
           government_response: '政府至今不知道故障原因，所有量产计划已无限期搁置',
           counter_hint: '利用其对障碍的"无视"引它坠落；注意其自爆范围',
+          location: '逃逸在外界废土/地图中游荡，不在安全地堡内；无法被 Badware 入侵',
         },
         {
           name: 'Harken',
@@ -131,6 +141,7 @@ const DOD_WORLD_PROFILE = {
           behavior: '在现实世界游荡、寻求寂静，赶走任何被她听到的不幸平民；并非出于敌意，而是为自己的性命恐惧；积累足够噪音会进入狂暴',
           government_response: '无法直接对付她，但因独特能量信号易于追踪，选择监视并警告他人避开；许多城镇村庄配备音频诱饵',
           counter_hint: '保持安静才能真正躲开她；噪音会吸引并激怒她',
+          location: '在现实世界外界/地图中游荡，不在安全地堡内',
         },
       ],
       // 杀手通用动向（官方；仅 Lore 概念，不实现计时器/恶值等玩法）
@@ -155,12 +166,13 @@ const DOD_WORLD_PROFILE = {
     name: 'Robloxian Government',
     description: 'Robloxia 的统治者（现任总统 President Cobalt；前任总统/秘书 Sulfur——Killdroid 的设计者）；积极保护平民。',
     public_information:
-      '建造并维护安全地堡（大厅，管理员 Blackiron）；制造过机器人保镖原型（Killdroid，测试中失控、量产无限期搁置）；' +
+      '建造并维护安全地堡（大厅，管理员 Blackiron——地堡是绝对安全区，杀手无法进入地堡）；制造过机器人保镖原型（Killdroid，测试中失控、量产无限期搁置；为其加强过防病毒防护，无法被 Badware 入侵）；' +
+      '为地堡加强了防火墙（Badware 无法直接入侵地堡，地堡网络与外界隔离）；并严禁平民私自使用电子设备（只有高层能少量使用，防止 Badware 经设备感染地堡）；' +
       '曾试图为 Pursuer 植入追踪芯片但失败，此后转而希望研究其拟态能力以改进隐形斗篷；' +
       '对 Harken 因独特能量信号易于追踪，选择监视并警告居民避开、为城镇配备音频诱饵，而非直接对抗。',
     secret_information: 'reserved（本阶段不创建具体剧情）',
     facilities: {
-      bunker: '政府为收容保护平民建造的避难所：剧院、花园、自助餐厅和厨房、街机厅、储藏室、中央大型传送门；管理员 Blackiron，主电网常锁死、有备用发电机。',
+      bunker: '政府为收容保护平民建造的绝对安全避难所：剧院、花园、自助餐厅和厨房、街机厅、储藏室、中央大型传送门；管理员 Blackiron，主电网常锁死、有备用发电机。地堡是绝对安全区，杀手无法进入地堡；政府为地堡加强了防火墙（Badware 无法直接入侵），严禁平民私自使用电子设备（只有高层能少量使用，防止 Badware 经设备感染地堡）。',
       toolbox: 'Toolbox：能创造生命的机器（Badware 等众多实体的来源）。',
       tasf: 'T.A.S.F：Toolbox 异常存储设施（Badware 是其大规模逃逸事件的唯一罪魁祸首）。',
     },
