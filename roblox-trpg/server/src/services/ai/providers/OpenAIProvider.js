@@ -98,6 +98,10 @@ class OpenAIProvider extends AiProvider {
         session.messages.push(msg);
         return normalize(msg, data);
       }
+      // 阶段29加固：返回 HTML（Base URL 错误被首页/404页兜底）→ 明确报错而非流解析炸裂
+      if (/text\/html/i.test(ctype)) {
+        throw new AiError('bad_base_url', 'AI服务返回了HTML页面而非JSON/SSE——Base URL 很可能不正确（请检查是否缺少 /v1，端点应为 {Base URL}/chat/completions）');
+      }
       // SSE 逐行解析
       let content = '';
       let reasoning = '';

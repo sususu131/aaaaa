@@ -1,6 +1,10 @@
 /**
  * 阶段25：后端 Admin Web UI + 设置 API。
- * 本地/个人测试项目：Admin 接口不启用鉴权。
+ * - GET  /admin                     → 管理页（无构建步骤的纯 HTML）
+ * - GET  /api/admin/settings        → 当前生效配置（密钥打码）
+ * - POST /api/admin/settings        → 批量保存（白名单键；空值=清除回落 env）
+ * - POST /api/admin/ai/test         → 测试 AI 连通性（GET {base}/models，不发对话请求）
+ * 鉴权：设置了 ADMIN_TOKEN 环境变量时要求 X-Admin-Token / ?admin_token=。
  */
 const express = require('express');
 const path = require('path');
@@ -8,8 +12,18 @@ const settingsService = require('../services/settingsService');
 
 const router = express.Router();
 
-// 本地/个人测试项目：Admin 接口完全开放。
-function guard(_req, _res) {
+function authorized(req) {
+  const token = process.env.ADMIN_TOKEN;
+  if (!token) return true; // 未配置 = 开发模式开放
+  const provided = req.get('X-Admin-Token') || req.query.admin_token || '';
+  return provided === token;
+}
+
+function guard(req, res) {
+  if (!authorized(req)) {
+    res.status(401).json({ error: '需要管理员令牌（X-Admin-Token）', code: 'ADMIN_UNAUTHORIZED' });
+    return false;
+  }
   return true;
 }
 
@@ -32,6 +46,7 @@ router.get('/api/admin/settings', (req, res) => {
         anthropic: { baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4-20250514', format: 'anthropic' },
         openrouter: { baseUrl: 'https://openrouter.ai/api/v1', model: 'openai/gpt-4o-mini' },
         gemini_compat: { baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.0-flash' },
+        inferai: { baseUrl: 'https://api.inferaiapi.com/v1', model: 'gemini-3.7-flash' },
       },
     });
   } catch (err) {
@@ -57,6 +72,7 @@ router.post('/api/admin/settings', (req, res) => {
       if (ai[field] !== undefined) patch[key] = ai[field];
     }
     if (context.budget !== undefined) patch['ai.context_budget'] = context.budget;
+    // 阶段26：Vision / 搜索
     for (const [section, fieldMap] of Object.entries(FIELD_MAP_EXTRA)) {
       const body = section === 'vision' ? vision : search;
       for (const [field, key] of Object.entries(fieldMap)) {
@@ -70,6 +86,7 @@ router.post('/api/admin/settings', (req, res) => {
   }
 });
 
+/** POST /api/admin/settings 中 vision/search 字段映射。 */
 const FIELD_MAP_EXTRA = {
   vision: {
     base_url: 'vision.base_url',
@@ -86,6 +103,7 @@ const FIELD_MAP_EXTRA = {
   },
 };
 
+/** GET /api/admin/status —— 服务器状态（uptime/DB/计数/世界调度器/配置概览）。 */
 router.get('/api/admin/status', (req, res) => {
   if (!guard(req, res)) return;
   try {
@@ -118,18 +136,22 @@ router.get('/api/admin/status', (req, res) => {
   }
 });
 
+/** GET /api/admin/events?limit=20 —— 最近游戏事件（Live 日志面板）。 */
 router.get('/api/admin/events', (req, res) => {
   if (!guard(req, res)) return;
   try {
     const { getDb } = require('@roblox-trpg/database');
     const limit = Math.min(Number(req.query.limit || 20) || 20, 100);
-    const rows = getDb().prepare('SELECT uid, type, actor, data, created_at FROM game_events ORDER BY id DESC LIMIT ?').all(limit);
+    const rows = getDb()
+      .prepare('SELECT uid, type, actor, data, created_at FROM game_events ORDER BY id DESC LIMIT ?')
+      .all(limit);
     res.json({ events: rows });
   } catch (err) {
     res.status(500).json({ error: err.message, code: 'ADMIN_ERROR' });
   }
 });
 
+/** POST /api/admin/world/pause | /api/admin/world/resume —— 世界模拟调度器开关。 */
 for (const [action, fn] of [['pause', 'pause'], ['resume', 'resume']]) {
   router.post(`/api/admin/world/${action}`, (req, res) => {
     if (!guard(req, res)) return;
@@ -144,6 +166,7 @@ for (const [action, fn] of [['pause', 'pause'], ['resume', 'resume']]) {
   });
 }
 
+/** POST /api/admin/presets/reimport —— 重跑官方预设导入（幂等）。 */
 router.post('/api/admin/presets/reimport', (req, res) => {
   if (!guard(req, res)) return;
   try {
@@ -155,27 +178,46 @@ router.post('/api/admin/presets/reimport', (req, res) => {
   }
 });
 
+/** POST /api/admin/vision/test —— Vision 连通性测试（GET {base}/models；需已配置 Base URL + Key）。 */
 router.post('/api/admin/vision/test', async (req, res) => {
   if (!guard(req, res)) return;
   try {
     const { getVisionRuntimeConfig } = require('../services/vision/visionProvider');
     const cfg = getVisionRuntimeConfig();
     if (!cfg.baseUrl || !cfg.apiKey) return res.json({ ok: false, reason: '未配置 Vision Base URL 或 API Key' });
+    // 阶段29：真实链路探测（chat/completions·max_tokens=1）；HTML → Base URL 诊断
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 15000);
     try {
-      const r = await fetch(`${cfg.baseUrl}/models`, { headers: { Authorization: `Bearer ${cfg.apiKey}` }, signal: controller.signal });
+      const r = await fetch(`${cfg.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1, stream: false }),
+        signal: controller.signal,
+      });
       clearTimeout(timer);
-      res.json({ ok: r.ok, status: r.status, baseUrl: cfg.baseUrl, model: cfg.model });
+      const text = await r.text();
+      if (!r.ok) return res.json({ ok: false, status: r.status, baseUrl: cfg.baseUrl, model: cfg.model, reason: `HTTP ${r.status}（${String(text || '').replace(/\s+/g, ' ').slice(0, 160) || '无响应体'}）` });
+      const t = String(text || '').trim();
+      if (t.startsWith('<!') || /^<html/i.test(t)) {
+        return res.json({ ok: false, baseUrl: cfg.baseUrl, model: cfg.model, reason: '返回HTML而非JSON——Base URL 很可能不正确（请检查是否缺少 /v1）' });
+      }
+      try {
+        JSON.parse(t);
+      } catch {
+        return res.json({ ok: false, baseUrl: cfg.baseUrl, model: cfg.model, reason: '响应不是合法JSON（前120字符：' + t.replace(/\s+/g, ' ').slice(0, 120) + '）' });
+      }
+      res.json({ ok: true, status: r.status, baseUrl: cfg.baseUrl, model: cfg.model, via: 'chat/completions' });
     } catch (err) {
       clearTimeout(timer);
-      res.json({ ok: false, reason: err.name === 'AbortError' ? '超时（8s）' : err.message, baseUrl: cfg.baseUrl });
+      res.json({ ok: false, reason: err.name === 'AbortError' ? '超时（15s）' : err.message, baseUrl: cfg.baseUrl });
     }
   } catch (err) {
     res.status(500).json({ error: err.message, code: 'ADMIN_ERROR' });
   }
 });
 
+/** POST /api/admin/search/test —— Web 搜索配置测试（发一次真实查询 "roblox"）。 */
 router.post('/api/admin/search/test', async (req, res) => {
   if (!guard(req, res)) return;
   try {
@@ -192,24 +234,44 @@ router.post('/api/admin/search/test', async (req, res) => {
   }
 });
 
+/**
+ * 阶段29：AI 连通性测试升级——直接探测真实链路 POST {base}/chat/completions（max_tokens=1，
+ * 与游戏内 run action 完全同路）；HTML/非 JSON 响应给出 Base URL 诊断而非 SyntaxError。
+ */
 router.post('/api/admin/ai/test', async (req, res) => {
   if (!guard(req, res)) return;
   try {
     const cfg = settingsService.aiRuntimeConfig();
     if (!cfg.apiKey) return res.json({ ok: false, reason: '未配置 API Key' });
+    const { snippet, parseJsonBody } = require('../services/ai/providers/AiProvider');
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 15000);
     try {
-      const r = await fetch(`${cfg.baseUrl}/models`, { headers: { Authorization: `Bearer ${cfg.apiKey}` }, signal: controller.signal });
+      const r = await fetch(`${cfg.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: cfg.model, messages: [{ role: 'user', content: 'ping' }], max_tokens: 1, stream: false }),
+        signal: controller.signal,
+      });
       clearTimeout(timer);
-      res.json({ ok: r.ok, status: r.status, baseUrl: cfg.baseUrl, model: cfg.model });
+      const text = await r.text();
+      if (!r.ok) {
+        return res.json({ ok: false, status: r.status, baseUrl: cfg.baseUrl, model: cfg.model, reason: `HTTP ${r.status}（${snippet(text) || '无响应体'}）` });
+      }
+      try {
+        parseJsonBody(text);
+      } catch (e) {
+        return res.json({ ok: false, baseUrl: cfg.baseUrl, model: cfg.model, reason: e.message });
+      }
+      res.json({ ok: true, status: r.status, baseUrl: cfg.baseUrl, model: cfg.model, via: 'chat/completions' });
     } catch (err) {
       clearTimeout(timer);
-      res.json({ ok: false, reason: err.name === 'AbortError' ? '超时（8s）' : err.message, baseUrl: cfg.baseUrl });
+      res.json({ ok: false, baseUrl: cfg.baseUrl, reason: err.name === 'AbortError' ? '超时（15s）' : err.message });
     }
   } catch (err) {
     res.status(500).json({ error: err.message, code: 'ADMIN_ERROR' });
   }
 });
 
+module.exports = router;
 module.exports = router;

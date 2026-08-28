@@ -51,6 +51,31 @@ function aiStreamEnabled() {
   }
 }
 
+/** 响应体片段（错误信息附加；截断并压平换行）。 */
+function snippet(text, max = 160) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  return t ? t.slice(0, max) : '';
+}
+
+/**
+ * 阶段29：解析 AI 响应体。HTML / 非 JSON / 空体 → 明确的 AiError（bad_base_url 提示）。
+ */
+function parseJsonBody(text, url = '') {
+  const t = String(text || '').trim();
+  if (!t) throw new AiError('bad_format', 'AI服务返回空响应（模型或路径可能不正确）');
+  if (t.startsWith('<!') || /^<html/i.test(t)) {
+    throw new AiError(
+      'bad_base_url',
+      `AI服务返回了HTML页面而非JSON——Base URL 很可能不正确（请检查是否缺少 /v1，端点应为 {Base URL}/chat/completions）`
+    );
+  }
+  try {
+    return JSON.parse(t);
+  } catch {
+    throw new AiError('bad_format', `AI服务响应不是合法JSON（前160字符：${snippet(t)}）`);
+  }
+}
+
 /** HTTP 状态码 → 统一错误分类。 */
 function classifyStatus(status) {
   if (status === 401 || status === 403) return new AiError('auth', 'AI服务鉴权失败（API Key 无效）');
@@ -60,7 +85,11 @@ function classifyStatus(status) {
   return new AiError('server_error', `AI服务返回异常状态（${status}）`);
 }
 
-/** 统一 fetch（超时 + 错误分类）。返回已解析 JSON。 */
+/**
+ * 统一 fetch（超时 + 错误分类）。返回已解析 JSON。
+ * 阶段29 加固：网关返回 HTML（Base URL 缺 /v1、路径错误、被首页兜底）时，
+ * 明确报"HTML 而非 JSON"而不是裸 SyntaxError: Unexpected token '<'。
+ */
 async function postJson(url, headers, body, timeoutMs) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -71,8 +100,14 @@ async function postJson(url, headers, body, timeoutMs) {
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });
-    if (!res.ok) throw classifyStatus(res.status);
-    return await res.json();
+    const text = await res.text();
+    if (!res.ok) {
+      const detail = snippet(text);
+      const err = classifyStatus(res.status);
+      if (detail) err.message = `${err.message}（服务端响应：${detail}）`;
+      throw err;
+    }
+    return parseJsonBody(text, url);
   } catch (err) {
     if (err instanceof AiError) throw err;
     if (err.name === 'AbortError') throw new AiError('timeout', 'GM暂时无法回应，请稍后再试（请求超时）');
@@ -105,4 +140,4 @@ class AiProvider {
   }
 }
 
-module.exports = { AiProvider, AiError, getAiRuntimeConfig, aiStreamEnabled, classifyStatus, postJson, safeParseArgs };
+module.exports = { AiProvider, AiError, getAiRuntimeConfig, aiStreamEnabled, classifyStatus, postJson, parseJsonBody, snippet, safeParseArgs };

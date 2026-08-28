@@ -1121,3 +1121,50 @@ Synergy 预留（候选保存、逻辑未新增、Loveshot 不触发）/ 边界�
 ## 测试
 
 - 新增阶段28（30 项）；全套 **1725 项**通过
+
+---
+
+# 阶段29：AI/Vision 网关响应加固（HTML 诊断）+ 测试端点真实链路探测
+
+## 问题：run action 报 `SyntaxError: Unexpected token '<', "<!DOCTYPE "...`
+
+OpenAI 兼容网关（如 api.inferaiapi.com）对错误路径/缺 `/v1` 的 Base URL 返回 **HTML 页面**，
+而 `postJson`/`visionPostJson` 直接 `res.json()` → 裸 SyntaxError。
+
+修复：
+
+- **postJson / visionPostJson / OpenAIProvider 流式分支**：先读文本再解析——HTML（`<!DOCTYPE`/
+  `<html`）→ `bad_base_url` 错误并提示"检查 Base URL 是否缺少 /v1（端点应为 {Base URL}/chat/
+  completions）"；坏 JSON → `bad_format` 带响应片段；空响应 → 明确报错；非 2xx 附带服务端
+  错误细节（如 model overloaded）
+- **/api/admin/ai/test 与 /api/admin/vision/test 升级**：从 `GET /models`（很多网关不支持）
+  改为**真实链路探测**——`POST {base}/chat/completions`（`max_tokens:1`，与游戏内 run action
+  完全同一路径），HTML/非 JSON 同样给出 Base URL 诊断
+- **Admin UI**：Vision 卡片新增"一键填入：InferAI（api.inferaiapi.com/v1 + gemini-3.7-flash）"
+  预设（AI 卡片预设由后端下发，已含 inferai）
+- Vision 请求格式与用户验证的 PowerShell 示例一致（OpenAI 兼容 image_url + data:image/png;base64）
+
+## 测试
+
+- 新增阶段29（26 项：parseJsonBody 单元/postJson 与流式 HTML 诊断/Vision 同链路/测试端点
+  真实探测与错误透传/InferAI 预设/回归）
+- 全套 **1751 项**通过
+
+---
+
+# 阶段29（续）：融合用户 InferAI 修复 + ai-test 实测页端点
+
+用户提交（3689b46/00a82a2/0a80d3c）与阶段29 加固合并：
+
+- **`buildVisionChatUrl`**：Base URL 自动补 `/v1`（`https://api.inferaiapi.com` → `.../v1/chat/
+  completions`；已含 /v1 或自定义路径保持不变）——deepseekVision 真实分析端点采用
+- **express JSON 体上限 25MB**（`JSON_BODY_LIMIT` 可覆盖）+ **JSON 错误中间件**：请求体过大/
+  JSON 损坏返回 JSON 错误（REQUEST_ENTITY_TOO_LARGE/INVALID_JSON），不再返回 HTML 页
+- **`/admin/ai-test.html` 实测页端点补齐**（此前 404→HTML 即 `Unexpected token '<'` 来源）：
+  - `GET /api/admin/ai-test/config` —— 配置概览
+  - `POST /api/admin/ai-test/text` —— 真实 AI 对话链路（与 run action 同路），返回完整网关响应
+  - `POST /api/admin/ai-test/vision` —— 真实 Vision 链路（支持 data:image/png;base64 本地图；
+    经 buildVisionChatUrl 自动补 /v1）
+- Vision 请求体与用户 PowerShell 验证格式一致（OpenAI 兼容 image_url + base64 data URL）
+
+全套 **1762 项**通过（阶段29 扩至 37 项）
