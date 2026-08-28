@@ -1,10 +1,6 @@
 /**
- * DeepSeekVisionProvider：OpenAI 兼容 Chat Completions（image_url 消息）。
+ * VisionProvider：OpenAI 兼容 Chat Completions（image_url 消息）。
  * 只使用 VISION_BASE_URL / VISION_API_KEY / VISION_MODEL。
- * 绝不假设普通文字模型支持图片；只有配置的 VISION_MODEL 负责图片。
- *
- * LLM_NO_TOOLS: 多模态图像分析路径（image_url 输入）不支持工具调用，且分析对象是图片本身——
- * 无外部检索需求；websearch 能力由文字路径统一提供（aiAgent/agentRuntime/searchEnabledChat）。
  */
 const { VisionError, getVisionRuntimeConfig, visionPostJson } = require('./visionProvider');
 const { VISION_SYSTEM_PROMPT, buildVisionUserText } = require('./visionPrompt');
@@ -13,7 +9,7 @@ const { extractJson } = require('../ai/structuredOutput');
 /**
  * 分析 Avatar 图片。
  * @param {{imageUrl:string, allowedTags:string[], allowedSkillIds:string[]}} p
- * @returns {{raw:object, provider:string, model:string}} raw = Vision 原始输出
+ * @returns {{raw:object, provider:string, model:string}}
  */
 async function analyzeAvatar({ imageUrl, allowedTags, allowedSkillIds }) {
   const cfg = getVisionRuntimeConfig();
@@ -22,17 +18,18 @@ async function analyzeAvatar({ imageUrl, allowedTags, allowedSkillIds }) {
   }
   if (!imageUrl) throw new VisionError('no_image', '没有可用的 Roblox Avatar 图片');
 
+  // 保持低随机性，避免同一张 Avatar 因语义联想产生完全不同的标签。
   const body = {
     model: cfg.model,
-    temperature: 0.2,
-    max_tokens: 800,
+    temperature: 0.1,
+    max_tokens: 1000,
     messages: [
       { role: 'system', content: VISION_SYSTEM_PROMPT },
       {
         role: 'user',
         content: [
           { type: 'text', text: buildVisionUserText(allowedTags, allowedSkillIds) },
-          { type: 'image_url', image_url: { url: imageUrl } },
+          { type: 'image_url', image_url: { url: imageUrl, detail: 'high' } },
         ],
       },
     ],
