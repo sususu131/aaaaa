@@ -1,0 +1,105 @@
+name: Run TRPG Server
+
+on:
+  workflow_dispatch:
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check project
+        run: |
+          echo "Current branch:"
+          git branch --show-current
+
+          echo "Project:"
+          ls -la roblox-trpg
+
+          echo "Server:"
+          ls -la roblox-trpg/server
+
+      - name: Install dependencies
+        working-directory: roblox-trpg/server
+        run: npm install
+
+      - name: Start server
+        working-directory: roblox-trpg/server
+        env:
+          NODE_ENV: production
+          PORT: 3000
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          VISION_BASE_URL: ${{ secrets.VISION_BASE_URL }}
+          VISION_API_KEY: ${{ secrets.VISION_API_KEY }}
+          VISION_MODEL: ${{ secrets.VISION_MODEL }}
+        run: |
+          npm start > server.log 2>&1 &
+
+          echo $! > server.pid
+
+          echo "Waiting for server..."
+
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:3000/ >/dev/null 2>&1; then
+              echo "Server started successfully!"
+              break
+            fi
+
+            sleep 2
+          done
+
+          echo "===== SERVER LOG ====="
+          cat server.log
+
+      - name: Install cloudflared
+        run: |
+          curl -L \
+            --output cloudflared.deb \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+
+          sudo dpkg -i cloudflared.deb
+
+          cloudflared --version
+
+      - name: Start Cloudflare Tunnel
+        run: |
+          cloudflared tunnel \
+            --url http://127.0.0.1:3000 \
+            --no-autoupdate \
+            > tunnel.log 2>&1 &
+
+          echo "Waiting for Cloudflare Tunnel..."
+
+          for i in {1..30}; do
+            URL=$(grep -oE 'https://[-a-zA-Z0-9]+\.trycloudflare\.com' tunnel.log | head -1 || true)
+
+            if [ -n "$URL" ]; then
+              echo ""
+              echo "=========================================="
+              echo "TRPG SERVER:"
+              echo "$URL"
+              echo ""
+              echo "ADMIN:"
+              echo "$URL/admin/ai-test"
+              echo "=========================================="
+              break
+            fi
+
+            sleep 2
+          done
+
+          echo "===== TUNNEL LOG ====="
+          cat tunnel.log
+
+      - name: Keep server alive
+        run: |
+          echo "Server is running."
+          tail -f roblox-trpg/server/server.log
