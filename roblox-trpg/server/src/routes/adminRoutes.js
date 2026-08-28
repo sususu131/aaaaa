@@ -3,8 +3,8 @@
  * - GET  /admin                     → 管理页（无构建步骤的纯 HTML）
  * - GET  /api/admin/settings        → 当前生效配置（密钥打码）
  * - POST /api/admin/settings        → 批量保存（白名单键；空值=清除回落 env）
- * - POST /api/admin/ai/test         → 测试 AI 连通性（GET {base}/models，不发对话请求）
- * 鉴权：设置了 ADMIN_TOKEN 环境变量时要求 X-Admin-Token / ?admin_token=。
+ * - POST /api/admin/ai/test         → 测试 AI 连通性（真实 chat 探测）
+ * 本地/个人测试项目：Admin 接口不启用鉴权（用户 1b2e439 移除，此处保持）。
  */
 const express = require('express');
 const path = require('path');
@@ -12,20 +12,11 @@ const settingsService = require('../services/settingsService');
 
 const router = express.Router();
 
-function authorized(req) {
-  const token = process.env.ADMIN_TOKEN;
-  if (!token) return true; // 未配置 = 开发模式开放
-  const provided = req.get('X-Admin-Token') || req.query.admin_token || '';
-  return provided === token;
-}
-
-function guard(req, res) {
-  if (!authorized(req)) {
-    res.status(401).json({ error: '需要管理员令牌（X-Admin-Token）', code: 'ADMIN_UNAUTHORIZED' });
-    return false;
-  }
+// 本地/个人测试项目：Admin 接口完全开放（用户已移除管理员验证）。
+function guard(_req, _res) {
   return true;
 }
+
 
 /** GET /admin —— 管理页。 */
 router.get('/admin', (req, res) => {
