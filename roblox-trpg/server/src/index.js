@@ -29,7 +29,10 @@ const io = new Server(server, {
   cors: { origin: '*' },
 });
 
-app.use(express.json({ limit: '8mb' }));
+// Vision 测试页面会把本地图片转换成 Base64 data URL，再放进 JSON。
+// 8MB 对稍大的 PNG/JPEG 很容易不够（Base64 还会膨胀约 33%），导致
+// express.json() 直接返回默认 HTML 413 页面，前端随后报 Unexpected token '<'。
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '25mb' }));
 app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 16 }));
 app.use('/api', apiRoutes);
 app.use(require('./routes/adminRoutes'));
@@ -44,6 +47,20 @@ app.use(worldRoutes);
 app.use(partyDecisionRoutes);
 app.use(inventoryRoutes);
 app.use(presetRoutes);
+
+// 不让 Express 在 JSON 解析失败（例如请求体过大/JSON 损坏）时返回 HTML。
+// Admin Test 页面可以据此显示真正的错误，而不是 SyntaxError: Unexpected token '<'。
+app.use((err, _req, res, next) => {
+  if (err && (err.type === 'entity.too.large' || err instanceof SyntaxError || err.type === 'entity.parse.failed')) {
+    const status = err.status || (err.type === 'entity.too.large' ? 413 : 400);
+    return res.status(status).json({
+      ok: false,
+      error: status === 413 ? '请求图片过大，请压缩图片后重试' : '请求 JSON 无效',
+      code: status === 413 ? 'REQUEST_ENTITY_TOO_LARGE' : 'INVALID_JSON',
+    });
+  }
+  return next(err);
+});
 
 registerSocketHandlers(io);
 require('./services/npcs/npcListener').registerNpcListener();
