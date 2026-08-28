@@ -1,10 +1,6 @@
 /**
  * 阶段25：后端 Admin Web UI + 设置 API。
- * - GET  /admin                     → 管理页（无构建步骤的纯 HTML）
- * - GET  /api/admin/settings        → 当前生效配置（密钥打码）
- * - POST /api/admin/settings        → 批量保存（白名单键；空值=清除回落 env）
- * - POST /api/admin/ai/test         → 测试 AI 连通性（GET {base}/models，不发对话请求）
- * 鉴权：设置了 ADMIN_TOKEN 环境变量时要求 X-Admin-Token / ?admin_token=。
+ * 本地/个人测试项目：Admin 接口不启用鉴权。
  */
 const express = require('express');
 const path = require('path');
@@ -12,18 +8,8 @@ const settingsService = require('../services/settingsService');
 
 const router = express.Router();
 
-function authorized(req) {
-  const token = process.env.ADMIN_TOKEN;
-  if (!token) return true; // 未配置 = 开发模式开放
-  const provided = req.get('X-Admin-Token') || req.query.admin_token || '';
-  return provided === token;
-}
-
-function guard(req, res) {
-  if (!authorized(req)) {
-    res.status(401).json({ error: '需要管理员令牌（X-Admin-Token）', code: 'ADMIN_UNAUTHORIZED' });
-    return false;
-  }
+// 本地/个人测试项目：Admin 接口完全开放。
+function guard(_req, _res) {
   return true;
 }
 
@@ -71,7 +57,6 @@ router.post('/api/admin/settings', (req, res) => {
       if (ai[field] !== undefined) patch[key] = ai[field];
     }
     if (context.budget !== undefined) patch['ai.context_budget'] = context.budget;
-    // 阶段26：Vision / 搜索
     for (const [section, fieldMap] of Object.entries(FIELD_MAP_EXTRA)) {
       const body = section === 'vision' ? vision : search;
       for (const [field, key] of Object.entries(fieldMap)) {
@@ -85,7 +70,6 @@ router.post('/api/admin/settings', (req, res) => {
   }
 });
 
-/** POST /api/admin/settings 中 vision/search 字段映射。 */
 const FIELD_MAP_EXTRA = {
   vision: {
     base_url: 'vision.base_url',
@@ -102,7 +86,6 @@ const FIELD_MAP_EXTRA = {
   },
 };
 
-/** GET /api/admin/status —— 服务器状态（uptime/DB/计数/世界调度器/配置概览）。 */
 router.get('/api/admin/status', (req, res) => {
   if (!guard(req, res)) return;
   try {
@@ -135,22 +118,18 @@ router.get('/api/admin/status', (req, res) => {
   }
 });
 
-/** GET /api/admin/events?limit=20 —— 最近游戏事件（Live 日志面板）。 */
 router.get('/api/admin/events', (req, res) => {
   if (!guard(req, res)) return;
   try {
     const { getDb } = require('@roblox-trpg/database');
     const limit = Math.min(Number(req.query.limit || 20) || 20, 100);
-    const rows = getDb()
-      .prepare('SELECT uid, type, actor, data, created_at FROM game_events ORDER BY id DESC LIMIT ?')
-      .all(limit);
+    const rows = getDb().prepare('SELECT uid, type, actor, data, created_at FROM game_events ORDER BY id DESC LIMIT ?').all(limit);
     res.json({ events: rows });
   } catch (err) {
     res.status(500).json({ error: err.message, code: 'ADMIN_ERROR' });
   }
 });
 
-/** POST /api/admin/world/pause | /api/admin/world/resume —— 世界模拟调度器开关。 */
 for (const [action, fn] of [['pause', 'pause'], ['resume', 'resume']]) {
   router.post(`/api/admin/world/${action}`, (req, res) => {
     if (!guard(req, res)) return;
@@ -165,7 +144,6 @@ for (const [action, fn] of [['pause', 'pause'], ['resume', 'resume']]) {
   });
 }
 
-/** POST /api/admin/presets/reimport —— 重跑官方预设导入（幂等）。 */
 router.post('/api/admin/presets/reimport', (req, res) => {
   if (!guard(req, res)) return;
   try {
@@ -177,7 +155,6 @@ router.post('/api/admin/presets/reimport', (req, res) => {
   }
 });
 
-/** POST /api/admin/vision/test —— Vision 连通性测试（GET {base}/models；需已配置 Base URL + Key）。 */
 router.post('/api/admin/vision/test', async (req, res) => {
   if (!guard(req, res)) return;
   try {
@@ -199,7 +176,6 @@ router.post('/api/admin/vision/test', async (req, res) => {
   }
 });
 
-/** POST /api/admin/search/test —— Web 搜索配置测试（发一次真实查询 "roblox"）。 */
 router.post('/api/admin/search/test', async (req, res) => {
   if (!guard(req, res)) return;
   try {
@@ -216,7 +192,6 @@ router.post('/api/admin/search/test', async (req, res) => {
   }
 });
 
-/** POST /api/admin/ai/test —— 连通性测试（对 {base}/models 发 GET；不消耗对话 token）。 */
 router.post('/api/admin/ai/test', async (req, res) => {
   if (!guard(req, res)) return;
   try {
@@ -225,10 +200,7 @@ router.post('/api/admin/ai/test', async (req, res) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     try {
-      const r = await fetch(`${cfg.baseUrl}/models`, {
-        headers: { Authorization: `Bearer ${cfg.apiKey}` },
-        signal: controller.signal,
-      });
+      const r = await fetch(`${cfg.baseUrl}/models`, { headers: { Authorization: `Bearer ${cfg.apiKey}` }, signal: controller.signal });
       clearTimeout(timer);
       res.json({ ok: r.ok, status: r.status, baseUrl: cfg.baseUrl, model: cfg.model });
     } catch (err) {
