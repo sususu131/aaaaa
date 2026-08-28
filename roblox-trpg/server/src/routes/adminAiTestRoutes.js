@@ -47,6 +47,7 @@ router.post('/api/admin/ai-test/vision', async (req, res) => {
   if (!guard(req, res)) return;
   try {
     const imageUrl = String(req.body && req.body.imageUrl || '').trim();
+    const prompt = String(req.body && req.body.prompt || '').trim();
     if (!imageUrl) return res.status(400).json({ error: '图片不能为空' });
     const cfg = getVisionRuntimeConfig();
     if (!cfg.baseUrl || !cfg.apiKey) return res.status(400).json({ error: 'Vision API 未配置 Base URL 或 API Key' });
@@ -56,6 +57,7 @@ router.post('/api/admin/ai-test/vision', async (req, res) => {
     const started = Date.now();
     const result = await analyzeAvatar({
       imageUrl,
+      prompt,
       allowedTags: rules.ALLOWED_AVATAR_TAGS,
       allowedSkillIds: allowedSkillKeys,
     });
