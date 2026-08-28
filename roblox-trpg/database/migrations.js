@@ -9,6 +9,32 @@ function hasColumn(db, table, column) {
 
 const migrations = [
   {
+    name: '026_stage30_avatar_r6_logs',
+    up(db) {
+      // ── 阶段30：绑定固定 R6 渲染 + Vision 日志增强 ──
+      const cols = db.prepare('PRAGMA table_info(roblox_profiles)').all().map((c) => c.name);
+      if (!cols.includes('avatar_type')) {
+        db.exec("ALTER TABLE roblox_profiles ADD COLUMN avatar_type TEXT");
+      }
+      if (!cols.includes('fullbody_r6_url')) {
+        db.exec('ALTER TABLE roblox_profiles ADD COLUMN fullbody_r6_url TEXT');
+      }
+      if (!cols.includes('fullbody_r15_url')) {
+        db.exec('ALTER TABLE roblox_profiles ADD COLUMN fullbody_r15_url TEXT');
+      }
+      const vcols = db.prepare('PRAGMA table_info(vision_analysis_log)').all().map((c) => c.name);
+      if (!vcols.includes('raw_response')) {
+        db.exec('ALTER TABLE vision_analysis_log ADD COLUMN raw_response TEXT');
+      }
+      if (!vcols.includes('request_meta')) {
+        db.exec('ALTER TABLE vision_analysis_log ADD COLUMN request_meta TEXT');
+      }
+      if (!vcols.includes('image_url')) {
+        db.exec('ALTER TABLE vision_analysis_log ADD COLUMN image_url TEXT');
+      }
+    },
+  },
+  {
     name: '025_stage25_settings_threats',
     up(db) {
       // ── 阶段25：后端管理（系统设置持久化）+ 威胁互动（Ability↔Threat 官方对策）──

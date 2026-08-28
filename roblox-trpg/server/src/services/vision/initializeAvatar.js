@@ -31,8 +31,8 @@ function logAnalysis(entry) {
       .prepare(
         `INSERT INTO vision_analysis_log (player_id, roblox_user_id, vision_provider, vision_model,
           candidate_tags, accepted_tags, rejected_tags, candidate_skills, accepted_skills, rejected_skills,
-          final_attributes, final_skills, status, error)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          final_attributes, final_skills, status, error, raw_response, request_meta, image_url)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         entry.player_id ?? null,
@@ -48,10 +48,14 @@ function logAnalysis(entry) {
         JSON.stringify(entry.final_attributes ?? null),
         JSON.stringify(entry.final_skills ?? []),
         entry.status,
-        entry.error ?? null
+        entry.error ?? null,
+        entry.raw_response ? JSON.stringify(entry.raw_response) : null,
+        entry.request_meta ? JSON.stringify(entry.request_meta) : null,
+        entry.image_url ?? null
       );
-  } catch {
-    /* 日志失败不影响主流程 */
+  } catch (logErr) {
+    // 阶段30：日志写入失败不再静默——控制台可见（便于发现列缺失等问题）
+    console.error('[vision] 日志写入失败:', logErr.message);
   }
 }
 
@@ -187,14 +191,26 @@ async function initializeAvatar({ playerRowId, robloxUserId = null, avatarUrl = 
       .all()
       .map((r) => r.name);
 
-    const { raw, provider, model } = await analyzeAvatar({
+    const { raw, provider, model, rawResponse, rawText, requestBody } = await analyzeAvatar({
       imageUrl: avatarUrl,
       allowedTags: rules.ALLOWED_AVATAR_TAGS,
       allowedSkillIds: allowedSkillKeys,
     });
 
+    // 阶段30：Vision AI 真实输出日志（服务器控制台，便于实时排查）
+    console.log('[vision] ── AI 原始输出 ──');
+    console.log('[vision] 请求:', JSON.stringify(requestBody));
+    console.log('[vision] 模型回复原文:', String(rawText || '').slice(0, 2000));
+    console.log('[vision] 解析后 JSON:', JSON.stringify(raw));
+
     // 服务器验证（UNTRUSTED_MODEL_OUTPUT 二次验证）
     const validated = visionService.validateVisionOutput(raw, { allowedSkillKeys });
+    console.log(
+      '[vision] 服务器验证: 接受 tags =', JSON.stringify(validated.acceptedTags),
+      '| 拒绝 tags =', JSON.stringify(validated.rejectedTags),
+      '| 接受技能 =', JSON.stringify(validated.acceptedSkillKeys),
+      '| 拒绝技能 =', JSON.stringify(validated.rejectedSkills)
+    );
 
     const skillRows = db
       .prepare("SELECT id, name FROM skills WHERE source_type = 'INITIAL_AVATAR' AND status = 'approved'")
@@ -202,6 +218,7 @@ async function initializeAvatar({ playerRowId, robloxUserId = null, avatarUrl = 
     const byName = new Map(skillRows.map((r) => [r.name, r]));
 
     const final = visionService.computeFinalState(validated.acceptedTags, validated.acceptedSkillKeys, byName);
+    console.log('[vision] 最终数值: attributes =', JSON.stringify(final.attributes), '| 技能 =', JSON.stringify(final.acceptedSkills.map((x) => x.key)));
 
     commitInitialization(db, playerRowId, {
       robloxUserId,
@@ -222,6 +239,9 @@ async function initializeAvatar({ playerRowId, robloxUserId = null, avatarUrl = 
       roblox_user_id: robloxUserId,
       vision_provider: provider,
       vision_model: model,
+      image_url: avatarUrl,
+      raw_response: { gateway: rawResponse, modelText: String(rawText || '').slice(0, 8000), parsed: raw },
+      request_meta: requestBody,
       candidate_tags: raw.candidate_tags || [],
       accepted_tags: validated.acceptedTags,
       rejected_tags: validated.rejectedTags,

@@ -154,6 +154,12 @@
     <div class="msg" id="stMsg"></div>
   </div>
 
+  <h2>Vision 分析日志（AI 真实输出 / 服务器验证 / 最终数值）</h2>
+  <div class="card">
+    <div class="btns"><button onclick="loadVisionLogs()">刷新 Vision 日志</button></div>
+    <div id="visionLogs" class="hint" style="max-height:340px;overflow:auto;line-height:1.6;white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px"></div>
+  </div>
+
   <h2>最近游戏事件</h2>
   <div class="card">
     <div id="events" class="hint" style="max-height:220px;overflow:auto;line-height:1.7"></div>
@@ -377,6 +383,29 @@ async function loadEvents() {
   } catch (e) { $('events').textContent = '读取失败：' + e.message; }
 }
 
+async function loadVisionLogs() {
+  try {
+    const { logs } = await safeJson(await fetch('/api/admin/vision-logs?limit=10'));
+    const el = $('visionLogs');
+    if (!logs || !logs.length) { el.textContent = '（暂无 Vision 分析日志——绑定 Roblox 头像或到 AI/Vision 实测页测图后刷新）'; return; }
+    el.textContent = logs.map((l) => {
+      const lines = [
+        '■ #' + l.id + ' [' + l.status + '] ' + (l.createdAt || '') + '  player=' + l.playerId + ' roblox=' + l.robloxUserId,
+        '  图片: ' + (l.imageUrl || '（无）'),
+        '  请求: ' + JSON.stringify(l.requestMeta || {}),
+      ];
+      const rr = l.rawResponse || {};
+      if (rr.modelText) lines.push('  ── Vision AI 原始输出 ──\n' + String(rr.modelText).slice(0, 1500));
+      if (rr.parsed) lines.push('  解析 JSON: ' + JSON.stringify(rr.parsed));
+      lines.push('  服务器验证: 接受tags=' + JSON.stringify(l.acceptedTags) + ' 拒绝tags=' + JSON.stringify(l.rejectedTags));
+      lines.push('  技能: 候选=' + JSON.stringify(l.candidateSkills) + ' 接受=' + JSON.stringify(l.acceptedSkills) + ' 拒绝=' + JSON.stringify(l.rejectedSkills));
+      lines.push('  最终数值: ' + JSON.stringify(l.finalAttributes) + ' 技能=' + JSON.stringify(l.finalSkills));
+      if (l.error) lines.push('  错误: ' + l.error);
+      return lines.join('\n');
+    }).join('\n\n');
+  } catch (e) { $('visionLogs').textContent = '读取失败：' + e.message; }
+}
+
 async function testConn() {
   flash('aiMsg', true, '测试中…（GET {base}/models，8s 超时）');
   const r = await fetch('/api/admin/ai/test', { method: 'POST' });
@@ -384,7 +413,7 @@ async function testConn() {
   flash('aiMsg', data.ok, data.ok ? '连接成功 ✓（HTTP ' + data.status + '）' : '连接失败：' + (data.reason || 'HTTP ' + data.status));
 }
 
-load(); loadStatus(); loadEvents();
+load(); loadStatus(); loadEvents(); loadVisionLogs();
 </script>
 </body>
 </html>

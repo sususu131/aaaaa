@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node src/index.js",
     "start": "node src/index.js",
-    "test": "node test/smoke.test.js && node test/stage3.test.js && node test/stage3b-vision.test.js && node test/stage4-pipeline.test.js && node test/stage5-runtime.test.js && node test/stage6-character.test.js && node test/stage7-agent.test.js && node test/stage8-quest.test.js && node test/stage9-npc.test.js && node test/stage10-legend.test.js && node test/stage11-encounter.test.js && node test/stage12-world.test.js && node test/stage13-party.test.js && node test/stage14-inventory.test.js && node test/stage15-playable.test.js && node test/stage16-presets.test.js && node test/stage17-dod-civilian.test.js && node test/stage18-dod-lore.test.js && node test/stage19-dod-ability-lore.test.js && node test/stage20-dod-background-profile.test.js && node test/stage21-dod-identity.test.js && node test/stage22-dod-world-lore.test.js && node test/stage23-dod-synergy-lore.test.js && node test/stage24-dod-fate.test.js && node test/stage25-dod-lore-admin.test.js && node test/stage26-dod-admin-ext.test.js && node test/stage27-dod-search-providers.test.js && node test/stage28-dod-lore-complete.test.js && node test/stage29-ai-html-diagnostic.test.js",
+    "test": "node test/smoke.test.js && node test/stage3.test.js && node test/stage3b-vision.test.js && node test/stage4-pipeline.test.js && node test/stage5-runtime.test.js && node test/stage6-character.test.js && node test/stage7-agent.test.js && node test/stage8-quest.test.js && node test/stage9-npc.test.js && node test/stage10-legend.test.js && node test/stage11-encounter.test.js && node test/stage12-world.test.js && node test/stage13-party.test.js && node test/stage14-inventory.test.js && node test/stage15-playable.test.js && node test/stage16-presets.test.js && node test/stage17-dod-civilian.test.js && node test/stage18-dod-lore.test.js && node test/stage19-dod-ability-lore.test.js && node test/stage20-dod-background-profile.test.js && node test/stage21-dod-identity.test.js && node test/stage22-dod-world-lore.test.js && node test/stage23-dod-synergy-lore.test.js && node test/stage24-dod-fate.test.js && node test/stage25-dod-lore-admin.test.js && node test/stage26-dod-admin-ext.test.js && node test/stage27-dod-search-providers.test.js && node test/stage28-dod-lore-complete.test.js && node test/stage29-ai-html-diagnostic.test.js && node test/stage30-avatar-r6-vision-logs.test.js",
     "test:stage12": "node test/stage12-world.test.js",
     "test:stage13": "node test/stage13-party.test.js",
     "test:stage14": "node test/stage14-inventory.test.js",
@@ -26,6 +26,7 @@
     "test:stage27": "node test/stage27-dod-search-providers.test.js",
     "test:stage28": "node test/stage28-dod-lore-complete.test.js",
     "test:stage29": "node test/stage29-ai-html-diagnostic.test.js",
+    "test:stage30": "node test/stage30-avatar-r6-vision-logs.test.js",
     "test:stage3": "node test/stage3.test.js",
     "test:stage3b": "node test/stage3b-vision.test.js",
     "test:stage4": "node test/stage4-pipeline.test.js",

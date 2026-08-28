@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout selected branch
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -18,13 +18,10 @@ jobs:
 
       - name: Check project
         run: |
-          echo "Current directory:"
-          pwd
+          echo "Current branch:"
+          git branch --show-current
 
-          echo "Project files:"
-          ls -la
-
-          echo "TRPG:"
+          echo "Project:"
           ls -la roblox-trpg
 
           echo "Server:"
@@ -39,16 +36,11 @@ jobs:
         env:
           NODE_ENV: production
           PORT: 3000
-
           ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
-
           VISION_BASE_URL: ${{ secrets.VISION_BASE_URL }}
           VISION_API_KEY: ${{ secrets.VISION_API_KEY }}
           VISION_MODEL: ${{ secrets.VISION_MODEL }}
-
         run: |
-          echo "Starting server..."
-
           npm start > server.log 2>&1 &
 
           echo $! > server.pid
@@ -77,7 +69,7 @@ jobs:
 
           cloudflared --version
 
-      - name: Start public tunnel
+      - name: Start Cloudflare Tunnel
         run: |
           cloudflared tunnel \
             --url http://127.0.0.1:3000 \
@@ -87,7 +79,6 @@ jobs:
           echo "Waiting for Cloudflare Tunnel..."
 
           for i in {1..30}; do
-
             URL=$(grep -oE 'https://[-a-zA-Z0-9]+\.trycloudflare\.com' tunnel.log | head -1 || true)
 
             if [ -n "$URL" ]; then
@@ -99,8 +90,6 @@ jobs:
               echo "ADMIN:"
               echo "$URL/admin/ai-test"
               echo "=========================================="
-              echo ""
-
               break
             fi
 
@@ -110,9 +99,7 @@ jobs:
           echo "===== TUNNEL LOG ====="
           cat tunnel.log
 
-      - name: Keep server running
+      - name: Keep server alive
         run: |
           echo "Server is running."
-          echo "Keep this GitHub Actions job alive."
-
           tail -f roblox-trpg/server/server.log

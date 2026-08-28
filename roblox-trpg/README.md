@@ -1168,3 +1168,32 @@ OpenAI 兼容网关（如 api.inferaiapi.com）对错误路径/缺 `/v1` 的 Bas
 - Vision 请求体与用户 PowerShell 验证格式一致（OpenAI 兼容 image_url + base64 data URL）
 
 全套 **1762 项**通过（阶段29 扩至 37 项）
+
+---
+
+# 阶段30：绑定固定 R6 + Vision 全链路日志
+
+## 绑定固定 R6、区分 R6/R15
+
+- 官方缩略图端点带 `thumbnailFormat=r6 / r15` 参数：**绑定统一取 R6 渲染**（经典六部件体型），
+  R15 渲染同时保存作对照；R6 不可用（Blocked）时回落 R15
+- `roblox_profiles` 新列：`fullbody_r6_url / fullbody_r15_url / avatar_type`；
+  `avatar_type` 经 `avatar.roblox.com/v1/users/{id}/avatar` 探测用户**实际体型**（R6/R15）
+- `getUserThumbnails` 返回 `{ headshot, fullbodyR6, fullbodyR15, fullbody }`（fullbody=R6 优先）
+
+## Vision 全链路日志（AI 真实输出 + 服务器输出）
+
+- **控制台**（每次分析四段）：`[vision] 请求（端点/模型/图片）` → `[vision] 模型回复原文` →
+  `[vision] 解析后 JSON` → `[vision] 服务器验证（接受/拒绝 tags·技能）` → `[vision] 最终数值（attributes+技能）`
+- **vision_analysis_log 新列**：`raw_response`（网关完整响应+模型文本+解析 JSON）、
+  `request_meta`（端点/模型，不含密钥）、`image_url`
+- **GET /api/admin/vision-logs?limit=**：日志查询 API
+- **管理页新面板「Vision 分析日志」**：AI 原始输出 / 服务器验证 / 最终数值逐条展示——
+  "绑定什么都默认数值"一类问题可直接看到：AI 认出了什么 tags、服务器接受了哪些、最终属性如何计算
+- `/api/admin/ai-test/vision` 现返回 `rawText`（模型原文）/ `gatewayResponse`（网关完整响应）/
+  `request`（请求元数据）
+- 日志写入失败不再静默（控制台报错）
+
+## 测试
+
+- 新增阶段30（32 项）；全套 **1797 项**通过

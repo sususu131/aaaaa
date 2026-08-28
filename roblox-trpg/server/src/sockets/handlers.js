@@ -319,25 +319,34 @@ module.exports = function registerSocketHandlers(io) {
         const profile = userId
           ? await robloxUsers.getUserById(userId)
           : await robloxUsers.getUserByUsername(username);
-        const thumbs = await robloxThumbnails
-          .getUserThumbnails(profile.userId)
-          .catch(() => ({ headshot: null, fullbody: null }));
+        // 阶段30：R6/R15 双渲染 + 实际体型探测（绑定固定使用 R6 渲染）
+        const [thumbs, avatarType] = await Promise.all([
+          robloxThumbnails.getUserThumbnails(profile.userId).catch(() => ({ headshot: null, fullbody: null, fullbodyR6: null, fullbodyR15: null })),
+          robloxThumbnails.getUserAvatarType(profile.userId).catch(() => null),
+        ]);
 
         const db = getDb();
         db.prepare(
-          `INSERT INTO roblox_profiles (roblox_user_id, username, display_name, description, headshot_url, fullbody_url)
-           VALUES (?, ?, ?, ?, ?, ?)
+          `INSERT INTO roblox_profiles (roblox_user_id, username, display_name, description, headshot_url, fullbody_url, fullbody_r6_url, fullbody_r15_url, avatar_type)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(roblox_user_id) DO UPDATE SET
              username = excluded.username, display_name = excluded.display_name,
              description = excluded.description, headshot_url = excluded.headshot_url,
-             fullbody_url = excluded.fullbody_url, fetched_at = datetime('now')`
+             fullbody_url = excluded.fullbody_url, fullbody_r6_url = excluded.fullbody_r6_url,
+             fullbody_r15_url = excluded.fullbody_r15_url, avatar_type = excluded.avatar_type,
+             fetched_at = datetime('now')`
         ).run(
           profile.userId,
           profile.username,
           profile.displayName,
           profile.description,
           thumbs.headshot && thumbs.headshot.state !== 'Blocked' ? thumbs.headshot.imageUrl : null,
-          thumbs.fullbody && thumbs.fullbody.state !== 'Blocked' ? thumbs.fullbody.imageUrl : null
+          // 绑定固定 R6：fullbody_url 存 R6 渲染（R6 不可用回落 R15）
+          (thumbs.fullbodyR6 && thumbs.fullbodyR6.state !== 'Blocked' && thumbs.fullbodyR6.imageUrl) ||
+            (thumbs.fullbodyR15 && thumbs.fullbodyR15.state !== 'Blocked' ? thumbs.fullbodyR15.imageUrl : null),
+          thumbs.fullbodyR6 && thumbs.fullbodyR6.state !== 'Blocked' ? thumbs.fullbodyR6.imageUrl : null,
+          thumbs.fullbodyR15 && thumbs.fullbodyR15.state !== 'Blocked' ? thumbs.fullbodyR15.imageUrl : null,
+          avatarType || null
         );
         const profileRow = db.prepare('SELECT id FROM roblox_profiles WHERE roblox_user_id = ?').get(profile.userId);
         db.prepare('UPDATE players SET roblox_profile_id = ?, avatar_type = ? WHERE socket_id = ?').run(

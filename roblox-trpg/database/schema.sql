@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS roblox_profiles (
   headshot_url    TEXT,
   fullbody_url    TEXT,
   data_source     TEXT NOT NULL DEFAULT 'roblox_api',
+  fullbody_r6_url TEXT,  -- 阶段30：R6 渲染（绑定固定使用）
+  fullbody_r15_url TEXT, -- 阶段30：R15 渲染（对照）
+  avatar_type     TEXT,  -- 阶段30：用户实际体型（R6/R15，avatar.roblox.com 探测）
   fetched_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -330,5 +333,8 @@ CREATE TABLE IF NOT EXISTS vision_analysis_log (
   final_skills       TEXT,
   status             TEXT,
   error              TEXT,
+  raw_response       TEXT,       -- 阶段30：网关原文 + 模型文本 + 解析 JSON
+  request_meta       TEXT,       -- 阶段30：请求元数据（端点/模型；不含密钥）
+  image_url          TEXT,       -- 阶段30：分析的图片 URL
   created_at         TEXT NOT NULL DEFAULT (datetime('now'))
 );

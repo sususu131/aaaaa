@@ -51,9 +51,20 @@ async function analyzeAvatar({ imageUrl, allowedTags, allowedSkillIds }) {
   const text = msg && (msg.content || '');
   const raw = extractJson(text);
   if (!raw || typeof raw !== 'object') {
-    throw new VisionError('bad_response', 'Vision 输出无法解析为 JSON');
+    // 阶段30：解析失败也带出原文，日志可见 Vision 真实输出
+    const err = new VisionError('bad_response', 'Vision 输出无法解析为 JSON');
+    err.rawText = text;
+    throw err;
   }
-  return { raw, provider: cfg.providerName, model: cfg.model };
+  return {
+    raw,
+    provider: cfg.providerName,
+    model: cfg.model,
+    // 阶段30：完整日志材料——网关原文与本次请求体（不含密钥）
+    rawResponse: data,
+    rawText: text,
+    requestBody: { endpoint, model: cfg.model, temperature: body.temperature, max_tokens: body.max_tokens, image_url: String(imageUrl).slice(0, 120) + '…' },
+  };
 }
 
 module.exports = { analyzeAvatar };
