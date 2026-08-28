@@ -19,6 +19,7 @@ const im = require('./instanceManager');
 const combatEngine = require('./combatEngine');
 const rewardEngine = require('./rewardEngine');
 const gameEvents = require('../quests/gameEvents');
+const chatNotify = require('./chatNotify'); // 阶段31：副本进程 → 大聊天框
 
 const RUNTIME_PROMPT_VERSION = 'dungeon-runtime-gm-v1';
 
@@ -445,6 +446,7 @@ async function applyOutput(io, instance, definition, output, playerRows, gmCtx) 
       applied.push({ type: 'SCENE_TRANSITION', from, to: target.id });
       im.logEvent(instance, 'SCENE_TRANSITION', 'ai_gm', { from, to: target.id, reason: output.scene_transition.reason });
       io.to(instance.room_id).emit('instance:scene', { from, to: target.id, name: target.name });
+      chatNotify.notify(io, instance.room_id, `🚪 场景切换：${from || '（起点）'} → 「${target.name}」${output.scene_transition.reason ? `（${output.scene_transition.reason}）` : ''}`);
       // 阶段8：场景事件驱动任务目标（REACH_LOCATION）
       const sceneActor = playerRows && playerRows[0] ? playerRows[0].name : null;
       gameEvents.emit(io, instance.room_id, { type: 'PLAYER_ENTERED_SCENE', actor: sceneActor, data: { scene: target.id, sceneName: target.name }, instanceId: instance.id });
@@ -470,6 +472,9 @@ async function applyOutput(io, instance, definition, output, playerRows, gmCtx) 
       im.setStatus(fresh, 'COMPLETED');
       im.logEvent(fresh, 'COMPLETE', 'server', { rewards: rewards.grants.length, skipped: rewards.skipped.length });
       io.to(instance.room_id).emit('instance:completed', { uid: fresh.uid, grants: rewards.grants });
+      // 阶段31：通关结算进大聊天框（奖励明细仍见副本面板）
+      const grantLine = rewards.grants.map((g) => `${g.player || ''}·${g.name || g.type}${g.amount ? ` +${g.amount}` : ''}`).join('；');
+      chatNotify.notify(io, instance.room_id, `🏁 副本通关！奖励 ${rewards.grants.length} 项${grantLine ? `：${grantLine}` : ''}${rewards.skipped.length ? `（跳过 ${rewards.skipped.length} 项）` : ''}`);
       // 阶段8：副本完成事件驱动任务（COMPLETE_DUNGEON / SURVIVE / ESCAPE）
       const doneActor = playerRows && playerRows[0] ? playerRows[0].name : null;
       gameEvents.emit(io, instance.room_id, { type: 'DUNGEON_COMPLETED', actor: doneActor, data: {}, instanceId: instance.id });
@@ -566,6 +571,7 @@ async function processAction(io, room, instance, playerRow, text, clientActionId
       im.logEvent(instance, 'FAILED', 'server', { reason: '全队倒下' });
       io.to(instance.room_id).emit('instance:failed', { uid: instance.uid });
       gameEvents.emit(io, instance.room_id, { type: 'DUNGEON_FAILED', actor: playerRow.name, data: { reason: '全队倒下' }, instanceId: instance.id });
+      chatNotify.notify(io, instance.room_id, '💀 全队倒下，副本失败……角色进度与永久物品已保留。');
     }
   }
 
@@ -637,6 +643,8 @@ function startTimedEvent(io, instance, playerRow, te) {
     expiresAt,
     deadlineMs: te.deadline_ms,
   });
+  // 阶段31：限时抉择同步进大聊天框（在聊天区也能看到并选择）
+  chatNotify.notify(io, instance.room_id, `⚠ 限时抉择：${te.prompt}（${te.deadline_ms / 1000 || '?'}秒内选择，超时全队受伤）`);
 }
 
 /** 超时未选择：服务器执行失败后果（伤害全队未倒下成员；可能致死）。 */

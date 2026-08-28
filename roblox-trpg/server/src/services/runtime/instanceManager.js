@@ -218,6 +218,12 @@ function startInstance(io, instance) {
 
   applySceneEntryEvents(io, fresh, definition, firstScene.id);
   broadcastUpdate(io, fresh);
+  // 阶段31：副本开始同步进大聊天框（主战场是聊天框，面板是详情台）
+  try {
+    const chatNotify = require('./chatNotify');
+    const dungeonName = definition.dungeon?.display_name || definition.dungeon?.name || '副本';
+    chatNotify.notify(io, fresh.room_id, `⚔ 副本「${dungeonName}」开始：队伍（${party.length}人）进入「${firstScene.name}」。在聊天框 @AI 提交行动即可推进。`);
+  } catch { /* 通知失败不阻塞开始 */ }
   return getInstance(instance.id);
 }
 

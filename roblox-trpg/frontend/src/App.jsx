@@ -16,6 +16,7 @@ export default function App() {
   const [modal, setModal] = useState(null); // null | context | dungeon | avatar
   const [chatDraft, setChatDraft] = useState(''); // 输入框内容（AI选项点击后填入，可编辑）
   const [gmStatus, setGmStatus] = useState(''); // 「GM 掷骰中…」等（不含内部推理）
+  const [hasOlder, setHasOlder] = useState(false); // 阶段31：还有更早的历史可上滑加载
   const sessionTokenRef = useRef(null); // 只存内存，不进 URL / localStorage
 
   // 建立连接 + 绑定全部服务端事件（只绑定一次）
@@ -31,6 +32,7 @@ export default function App() {
       setRoom(r);
       setPlayers(ps);
       setMessages([]);
+      setHasOlder(false);
       setError('');
       setScreen('room');
       if (pid) setPlayerId(pid);
@@ -39,12 +41,22 @@ export default function App() {
         socket.auth = { sessionToken }; // 重连/刷新后保持身份
         api.registerSessionCookie(sessionToken).catch(() => {}); // HttpOnly Cookie（服务端设置）
       }
+      // 阶段31：入房拉取最近历史（服务器持久消息），实时消息再增量追加
+      socket.emit('chat:history', { limit: 50 }, (res) => {
+        if (res && res.ok && res.messages) {
+          setMessages(res.messages);
+          setHasOlder(res.hasMore);
+        }
+      });
     };
     const onPlayers = ({ players: ps }) => setPlayers(ps);
-    const onChatMessage = (msg) => setMessages((prev) => [...prev, msg]);
+    // 阶段31：按 id 去重（历史分页加载与实时推送可能交叠）
+    const appendMessage = (msg) =>
+      setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
+    const onChatMessage = (msg) => appendMessage(msg);
     const onGmResponse = (gm) => {
       setGmStatus('');
-      setMessages((prev) => [...prev, { ...gm, type: 'gm' }]);
+      appendMessage({ ...gm, type: 'gm' });
     };
     const onDungeonSet = ({ experience, dungeon }) =>
       setRoom((prev) => (prev ? { ...prev, experience, dungeon } : prev));
@@ -104,11 +116,32 @@ export default function App() {
     setChatDraft('');
   };
 
-  /** AI 行动选项：只填入输入框，玩家可编辑后自行发送（不直接发送）。 */
+  /**
+   * AI 行动选项：填入输入框并自动带上 @AI（阶段31 修复：以前不带 @AI，
+   * 发送后不会触发 GM/副本运行时）。玩家仍可编辑后自行发送，不直接发送。
+   */
   const pickOption = (action) => {
-    setChatDraft(action);
+    const text = String(action || '').trim();
+    setChatDraft(/^\s*@AI\b/i.test(text) ? text : `@AI ${text}`);
     setModal(null);
   };
+
+  /** 阶段31：上滑加载更早的历史消息（ChatPanel 调用；返回结果供其恢复滚动位置）。 */
+  const loadOlderHistory = (beforeId) =>
+    new Promise((resolve) => {
+      socket.emit('chat:history', { beforeId, limit: 50 }, (res) => {
+        if (res && res.ok && res.messages) {
+          setMessages((prev) => {
+            const known = new Set(prev.map((m) => m.id));
+            return [...res.messages.filter((m) => !known.has(m.id)), ...prev];
+          });
+          setHasOlder(res.hasMore);
+          resolve({ ok: true, hasMore: res.hasMore });
+        } else {
+          resolve({ ok: false, hasMore: false });
+        }
+      });
+    });
 
   return (
     <div className="app">
@@ -137,6 +170,8 @@ export default function App() {
           onLeave={leaveRoom}
           onSend={sendMessage}
           onPickOption={pickOption}
+          onLoadOlder={loadOlderHistory}
+          hasOlder={hasOlder}
           gmStatus={gmStatus}
           modal={modal}
           onOpenModal={setModal}

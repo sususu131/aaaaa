@@ -130,11 +130,12 @@ async function initializeAvatar({ playerRowId, robloxUserId = null, avatarUrl = 
   const db = getDb();
   ensurePlayerState(playerRowId);
 
-  // 重复初始化防线（刷新/重连不重复）
+  // 重复初始化防线（刷新/重连不重复；同一用户重复绑定 → 返回缓存，Vision 只调一次）
   const existing = getInitRow(playerRowId);
   if (existing && existing.status === 'INITIALIZED') {
-    const baconUpgrade = existing.roblox_user_id === 'bacon' && robloxUserId; // 培根→Roblox 的一次性升级
-    if (!baconUpgrade) {
+    // 阶段31：绑定的 Roblox 用户变化（培根→X，或 A→B 换绑）→ 允许重新识别
+    const userChanged = robloxUserId && String(existing.roblox_user_id) !== String(robloxUserId);
+    if (!userChanged) {
       return {
         status: 'INITIALIZED',
         duplicate: true,
@@ -143,7 +144,7 @@ async function initializeAvatar({ playerRowId, robloxUserId = null, avatarUrl = 
         skills: JSON.parse(existing.accepted_skills || '[]'),
       };
     }
-    // 升级路径：清掉旧的培根初始技能，重新按 Vision 结果事务写入
+    // 重新识别路径：清掉旧的初始技能，重新按新 Vision 结果事务写入
     db.prepare(
       `DELETE FROM player_skills WHERE player_id = ? AND skill_id IN
        (SELECT id FROM skills WHERE source_type = 'INITIAL_AVATAR')`
@@ -271,4 +272,34 @@ async function initializeAvatar({ playerRowId, robloxUserId = null, avatarUrl = 
   }
 }
 
-module.exports = { initializeAvatar, getInitRow };
+/**
+ * 阶段31：解绑 → 彻底重置为培根头。
+ * 旧实现只清 players.roblox_profile_id，avatar_initialization 仍保留旧角色的
+ * 属性/标签 → AI Context 继续引用旧身份；且换绑新用户会被幂等防线挡住。
+ * 这里事务清理初始化痕迹（init 行 + 初始技能 + 属性回落全 5），再重写干净的培根行。
+ */
+function resetToBacon(playerRowId) {
+  const db = getDb();
+  ensurePlayerState(playerRowId);
+  db.exec('BEGIN');
+  try {
+    db.prepare('DELETE FROM avatar_initialization WHERE player_id = ?').run(playerRowId);
+    db.prepare(
+      `DELETE FROM player_skills WHERE player_id = ? AND skill_id IN
+       (SELECT id FROM skills WHERE source_type = 'INITIAL_AVATAR')`
+    ).run(playerRowId);
+    const { attributes } = rules.baconDefaults();
+    db.prepare("UPDATE player_states SET attributes = ?, updated_at = datetime('now') WHERE player_id = ?").run(
+      JSON.stringify(attributes),
+      playerRowId
+    );
+    db.exec('COMMIT');
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+  // 重写干净的培根初始化行（Bacon 路径绝不调 Vision）
+  return initializeAvatar({ playerRowId, forceBacon: true });
+}
+
+module.exports = { initializeAvatar, getInitRow, resetToBacon };

@@ -300,6 +300,12 @@ router.post('/api/dungeon-instances/:id/combat/start', (req, res) => {
     const { definition } = im.getDefinition(g.instance);
     const { io } = require('../index.js');
     const combat = battleSystem.startEncounter(io, g.instance, definition, String((req.body || {}).encounterId || ''));
+    // 阶段31：开战进大聊天框
+    try {
+      const chatNotify = require('../services/runtime/chatNotify');
+      const enc = (definition.encounters || []).find((e) => e.id === String((req.body || {}).encounterId));
+      chatNotify.notify(io, g.instance.room_id, `⚔ ${g.player.name} 迎战「${enc ? enc.name : (req.body || {}).encounterId}」！战斗开始——打开副本面板操作战斗。`, g.player.id);
+    } catch { /* 通知失败不阻塞 */ }
     res.json({ ok: true, combat: battleSystem.combatView(g.instance, combat) });
   } catch (err) {
     fail(res, err);
@@ -351,6 +357,11 @@ router.post('/api/dungeon-instances/:id/move', (req, res) => {
     const { io } = require('../index.js');
     gameEvents.emit(io, g.instance.room_id, { type: 'PLAYER_ENTERED_SCENE', actor: g.player.name, actorPlayerId: g.player.id, data: { scene: target, sceneName: dest.name }, instanceId: g.instance.id });
     io.to(g.instance.room_id).emit('instance:scene', { instanceUid: g.instance.uid, sceneId: target, sceneName: dest.name, at: new Date().toISOString() });
+    // 阶段31：场景移动进大聊天框
+    try {
+      const chatNotify = require('../services/runtime/chatNotify');
+      chatNotify.notify(io, g.instance.room_id, `🚪 ${g.player.name} 带队前往「${dest.name}」${dest.description ? `——${dest.description}` : ''}`, g.player.id);
+    } catch { /* 通知失败不阻塞 */ }
     res.json({ ok: true, sceneId: target, sceneName: dest.name, encounters: dest.encounters || [] });
   } catch (err) {
     fail(res, err);

@@ -64,8 +64,16 @@ export default function RobloxBindPanel({ players, myName, onClose, getSessionTo
     });
   };
 
+  /** 阶段31：解绑 = 彻底重置（服务器清初始化痕迹 → 培根头；再绑任何新名字都会重新识别）。 */
   const unbind = () => {
-    socket.emit('player:unbindRoblox', {}, () => {});
+    socket.emit('player:unbindRoblox', {}, (res) => {
+      if (!res || !res.ok) {
+        setError((res && res.error) || '解绑失败');
+        return;
+      }
+      setPreview(null);
+      setVisionResult(res.result ? { ...res.result, bacon: true } : null);
+    });
   };
 
   const attrLine = (attrs) =>

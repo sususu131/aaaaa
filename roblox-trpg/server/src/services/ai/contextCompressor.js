@@ -48,6 +48,13 @@ async function maybeCompress(room, io, summarizeFn) {
   const ratio = ctx.totalTokens / budget();
   const flags = room.contextFlags || (room.contextFlags = {});
 
+  // 阶段31：预算上调（Admin 后台改 ai.context_budget）后比例回落 → 清掉粘滞的阈值标记，
+  // 否则房间会永远停留在"已警告/已准备"状态，不再随新预算重新提示。
+  if (ratio < CONTEXT_WARN_RATIO && (flags.warned70 || flags.prepared80)) {
+    flags.warned70 = false;
+    flags.prepared80 = false;
+  }
+
   if (ratio >= CONTEXT_COMPRESS_RATIO) {
     const db = getDb();
     const last = db

@@ -5,6 +5,13 @@
   padding: 0;
 }
 
+/* 阶段31：聊天软件式布局——页面不随消息无限延长，聊天区内部滚动 */
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   background: #14161c;
@@ -15,9 +22,11 @@ body {
   max-width: 960px;
   margin: 0 auto;
   padding: 16px;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .app-header {
@@ -171,12 +180,118 @@ body {
   flex: 1;
   display: grid;
   grid-template-columns: 220px 1fr;
-  gap: 12px;
-  min-height: 420px;
+  gap: 12px 12px;
+  min-height: 0; /* 阶段31：允许子项收缩 → 聊天区内部滚动而不是撑高页面 */
 }
 
+/* 玩家列表过长也内部滚动 */
+.player-panel {
+  overflow-y: auto;
+}
+
+/* 阶段31：右列 = 副本状态条 + 聊天区 */
+.chat-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+/* 窄屏回退：允许页面滚动，聊天区给固定视高 */
 @media (max-width: 640px) {
+  .app {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
   .room-body { grid-template-columns: 1fr; }
+  .chat-messages { min-height: 320px; max-height: 55vh; }
+}
+
+/* ── 副本状态条（阶段31：副本主要在大聊天框运行）── */
+.instance-bar {
+  background: #1d212b;
+  border: 1px solid #3a415a;
+  border-left: 3px solid #e0b34c;
+  border-radius: 10px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.instance-bar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.instance-bar-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.instance-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.instance-bar-scene {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.instance-bar-error {
+  color: #ff9d9d;
+  font-size: 12px;
+}
+
+.inst-status {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #2c3242;
+  color: #9aa3b8;
+}
+.inst-status.running { background: #1f3a2a; color: #7ed9a0; }
+.inst-status.completed { background: #2a2f1f; color: #d9cd7e; }
+.inst-status.failed { background: #3a1f1f; color: #e08c8c; }
+
+/* ── 聊天滚动（阶段31）── */
+.chat-loadline {
+  text-align: center;
+  color: #67718a;
+  font-size: 12px;
+  padding: 2px 0;
+}
+
+.jump-latest {
+  position: absolute;
+  right: 18px;
+  bottom: 76px;
+  background: #2c3242;
+  color: #e6e8ee;
+  border: 1px solid #454e6b;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.jump-latest:hover {
+  background: #3a4258;
+}
+
+.btn.tiny.warn {
+  border-color: #a3542a;
+  color: #f0b98a;
 }
 
 /* ── 玩家列表 ── */
@@ -223,6 +338,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  position: relative; /* 阶段31：「↓ 最新消息」跳转钮定位 */
 }
 
 .chat-messages {
@@ -232,6 +348,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0; /* 阶段31：flex 子项可收缩 → 固定视口内滚动 */
 }
 
 .chat-empty {

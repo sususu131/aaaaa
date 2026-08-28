@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import PlayerList from './PlayerList.jsx';
 import ChatPanel from './ChatPanel.jsx';
+import InstanceBar from './InstanceBar.jsx';
 import ContextViewer from './ContextViewer.jsx';
 import DungeonPanel from './DungeonPanel.jsx';
 import DungeonDesigner from './DungeonDesigner.jsx';
@@ -30,6 +31,8 @@ export default function RoomScreen({
   onLeave,
   onSend,
   onPickOption,
+  onLoadOlder,
+  hasOlder,
   gmStatus,
   modal,
   onOpenModal,
@@ -247,15 +250,21 @@ export default function RoomScreen({
 
       <div className="room-body">
         <PlayerList players={players} myName={myName} maxPlayers={room.maxPlayers} />
-        <ChatPanel
-          messages={messages}
-          myName={myName}
-          players={players}
-          chatDraft={chatDraft}
-          onChatDraftChange={onChatDraftChange}
-          onSend={onSend}
-          onPickOption={onPickOption}
-        />
+        <div className="chat-column">
+          {/* 阶段31：副本主要在大聊天框运行——常驻状态条（场景/出口/遭遇/限时抉择） */}
+          <InstanceBar getSessionToken={getSessionToken} onOpenRuntime={() => onOpenModal('runtime')} />
+          <ChatPanel
+            messages={messages}
+            myName={myName}
+            players={players}
+            chatDraft={chatDraft}
+            onChatDraftChange={onChatDraftChange}
+            onSend={onSend}
+            onPickOption={onPickOption}
+            onLoadOlder={onLoadOlder}
+            hasOlder={hasOlder}
+          />
+        </div>
       </div>
 
       {modal === 'context' && <ContextViewer onClose={() => onOpenModal(null)} />}

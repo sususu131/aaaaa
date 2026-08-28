@@ -13,13 +13,13 @@ const { validateName } = require('../players/playerManager');
 const { createSession, resolveSession } = require('../sessions/sessionManager');
 const aiAgent = require('../services/ai/aiAgent');
 const rateLimiter = require('../services/ai/rateLimiter');
-const { maybeCompress } = require('../services/ai/contextCompressor');
+const { maybeCompress, budget: effectiveContextBudget } = require('../services/ai/contextCompressor');
 const { buildContext } = require('../services/ai/contextBuilder');
 const robloxUsers = require('../services/roblox/robloxUsers');
 const robloxThumbnails = require('../services/roblox/robloxThumbnails');
 const robloxExperiences = require('../services/roblox/robloxExperiences');
 const robloxSearch = require('../services/roblox/robloxSearch');
-const { initializeAvatar } = require('../services/vision/initializeAvatar');
+const { initializeAvatar, resetToBacon } = require('../services/vision/initializeAvatar');
 
 /**
  * Bacon Head 默认初始化（阶段3b）：无 Roblox 账号 → 全属性5 + 0技能，
@@ -309,6 +309,51 @@ module.exports = function registerSocketHandlers(io) {
       }
     });
 
+    /**
+     * 聊天历史分页（阶段31：聊天框改为固定高度可滚动，上滑从服务器拉取更早消息）。
+     * { beforeId?, limit? } → { ok, messages（升序）, hasMore }；limit 上限 100，默认 50。
+     */
+    socket.on('chat:history', ({ beforeId, limit } = {}, ack) => {
+      const room = roomManager.findRoomBySocket(socket.id);
+      if (!room) return typeof ack === 'function' && ack({ ok: false, error: '不在房间中' });
+      const cap = Math.min(Math.max(Number(limit) || 50, 1), 100);
+      const db = getDb();
+      const rows = (
+        beforeId
+          ? db.prepare('SELECT * FROM messages WHERE room_id = ? AND id < ? ORDER BY id DESC LIMIT ?').all(room.id, Number(beforeId), cap)
+          : db.prepare('SELECT * FROM messages WHERE room_id = ? ORDER BY id DESC LIMIT ?').all(room.id, cap)
+      ).reverse(); // 升序返回（旧 → 新）
+
+      const nameCache = new Map();
+      const playerNameOf = (pid) => {
+        if (pid == null) return null;
+        if (!nameCache.has(pid)) {
+          const r = db.prepare('SELECT name FROM players WHERE id = ?').get(pid);
+          nameCache.set(pid, r ? r.name : '未知玩家');
+        }
+        return nameCache.get(pid);
+      };
+      // SQLite UTC 时间（'YYYY-MM-DD HH:MM:SS'）→ ISO（前端只取时分，必须标 Z 避免时区漂移）
+      const toIso = (s) => {
+        const t = String(s || '').replace(' ', 'T');
+        const d = /Z$/.test(t) ? new Date(t) : new Date(`${t}Z`);
+        return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+      };
+      const messages = rows.map((r) => {
+        if (r.type === 'gm') return { id: r.id, type: 'gm', narrative: r.content, at: toIso(r.created_at) };
+        if (r.type === 'system') return { id: r.id, type: 'system', text: r.content, at: toIso(r.created_at) };
+        if (r.type === 'chat')
+          return { id: r.id, type: 'chat', playerName: playerNameOf(r.player_id), text: r.content, at: toIso(r.created_at) };
+        // dice / skill_check / gain / world / dungeon 事件条（内容为 JSON 或纯文本）
+        return { id: r.id, type: r.type, text: r.content, at: toIso(r.created_at) };
+      });
+      const oldest = rows.length ? rows[0].id : 0;
+      const hasMore = oldest
+        ? Boolean(db.prepare('SELECT 1 FROM messages WHERE room_id = ? AND id < ? LIMIT 1').get(room.id, oldest))
+        : false;
+      if (typeof ack === 'function') ack({ ok: true, messages, hasMore });
+    });
+
     // ── Roblox 身份绑定（公开信息，无登录）──
 
     /** 绑定：提供 Roblox User ID 或 username，服务端抓取公开资料。 */
@@ -365,16 +410,38 @@ module.exports = function registerSocketHandlers(io) {
       }
     });
 
-    /** 解绑 → 培根头。 */
-    socket.on('player:unbindRoblox', (_data, ack) => {
+    /**
+     * 解绑 → 培根头（阶段31：彻底重置）。
+     * 旧实现只清 roblox_profile_id → AI Context 仍引用旧角色，且换绑新用户被幂等防线挡住。
+     * 现在：清 avatar_initialization/初始技能 + 属性回落全 5，重写培根行（不调 Vision）。
+     */
+    socket.on('player:unbindRoblox', async (_data, ack) => {
       const room = roomManager.findRoomBySocket(socket.id);
-      if (!room) return;
-      getDb().prepare('UPDATE players SET roblox_profile_id = NULL, avatar_type = ? WHERE socket_id = ?').run(
-        'bacon',
-        socket.id
-      );
-      if (typeof ack === 'function') ack({ ok: true });
-      broadcastPlayers(io, room);
+      if (!room) return typeof ack === 'function' && ack({ ok: false, error: '不在房间中' });
+      try {
+        const row = getDb().prepare('SELECT id FROM players WHERE socket_id = ?').get(socket.id);
+        getDb().prepare('UPDATE players SET roblox_profile_id = NULL, avatar_type = ? WHERE socket_id = ?').run(
+          'bacon',
+          socket.id
+        );
+        let result = null;
+        if (row) {
+          result = await resetToBacon(row.id);
+          const player = room.players.find((p) => p.socketId === socket.id);
+          io.to(room.id).emit('avatar:initialized', {
+            playerName: player ? player.name : '',
+            bacon: true,
+            attributes: result.attributes,
+            skills: [],
+          });
+        }
+        if (typeof ack === 'function') ack({ ok: true, reset: true, result });
+        broadcastPlayers(io, room);
+        const player = room.players.find((p) => p.socketId === socket.id);
+        broadcastSystem(io, room, `${player ? player.name : '玩家'} 解绑了 Roblox 形象，重置为培根头（全属性 5，无技能）`);
+      } catch (err) {
+        if (typeof ack === 'function') ack({ ok: false, error: err.message || '解绑失败' });
+      }
     });
 
     // ── 副本（Roblox Experience）选择（多结果不自动选定）──
@@ -475,7 +542,8 @@ module.exports = function registerSocketHandlers(io) {
             content: s.content.length > 8000 ? `${s.content.slice(0, 8000)}\n…（已截断显示）` : s.content,
           })),
           totalTokens: ctx.totalTokens,
-          budget: require('../config').AI_CONTEXT_BUDGET,
+          // 阶段31：Context 上限随 Admin 后台设置（ai.context_budget > env > 默认）实时生效
+          budget: effectiveContextBudget(),
         });
       }
     });
