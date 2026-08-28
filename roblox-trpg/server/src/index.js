@@ -50,6 +50,11 @@ app.use(partyDecisionRoutes); // 阶段13：Party & Narrative Decision
 app.use(inventoryRoutes); // 阶段14：Persistent Inventory
 app.use(presetRoutes); // 阶段16：Preset Experience Dungeon Library
 
+// 未匹配的路由返回 JSON 404（默认 HTML "Cannot POST /xxx" 会让前端报 Unexpected token '<'）。
+app.use((req, res) => {
+  res.status(404).json({ ok: false, error: `路径不存在：${req.method} ${req.path}（后端可能未重启到最新版本）`, code: 'NOT_FOUND' });
+});
+
 // 不让 Express 在 JSON 解析失败（请求体过大/JSON 损坏）时返回 HTML——统一 JSON 错误。
 app.use((err, _req, res, next) => {
   if (err && (err.type === 'entity.too.large' || err instanceof SyntaxError || err.type === 'entity.parse.failed')) {

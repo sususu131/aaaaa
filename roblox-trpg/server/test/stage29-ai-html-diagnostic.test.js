@@ -234,10 +234,25 @@ async function main() {
   assert.ok(/JSON_BODY_LIMIT \|\| '25mb'/.test(idxSrc));
   ok('37. JSON 体上限 25MB（base64 图片不再 413 HTML）');
 
+  // ══ K. 404 也返回 JSON（未重启旧后端/路径错误时不再 HTML）══
+  const res404 = await fetch(url('/api/admin/ai-test/nonexistent'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  const d404 = await res404.json();
+  assert.ok(res404.status === 404 && d404.code === 'NOT_FOUND' && /路径不存在/.test(d404.error));
+  ok('38. 未匹配路由 → JSON 404（不再是 HTML "Cannot POST"）');
+  const res404b = await fetch(url('/api/definitely/not/a/route'));
+  const ct = res404b.headers.get('content-type') || '';
+  assert.ok(ct.includes('application/json'));
+  ok('39. 任意未知 API 路径 → content-type JSON');
+  const adminHtml = fs.readFileSync(path.join(__dirname, '../src/admin/index.html'), 'utf8');
+  const aiTestHtml = fs.readFileSync(path.join(__dirname, '../src/admin/ai-test.html'), 'utf8');
+  assert.ok(/function safeJson/.test(adminHtml) && (adminHtml.match(/r\.json\(\)/g) || []).length === 0);
+  assert.ok(/function safeJson/.test(aiTestHtml));
+  ok('40. Admin 页面 safeJson：HTML 响应 → 明确提示重启后端（不再裸 SyntaxError）');
+
   mock.close();
   server.close();
   console.log(`\n[阶段29] 通过 ${passed} 项测试`);
-  if (passed < 30) {
+  if (passed < 36) {
     console.error('测试数量不足！');
     process.exit(1);
   }

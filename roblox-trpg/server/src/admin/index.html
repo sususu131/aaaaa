@@ -174,11 +174,17 @@ function fillVision(base, model) {
   if (model) $('vModel').value = model;
 }
 
+async function safeJson(r) {
+  const t = (await r.text()).trim();
+  if (t.startsWith('<!') || /^<html/i.test(t)) throw new Error('后端返回了HTML页面（接口不存在或后端未重启到最新版本）——请重启后端服务');
+  try { return JSON.parse(t); } catch { throw new Error('响应不是JSON：' + t.slice(0, 120)); }
+}
+const __rawFetch = window.fetch;
 async function load() {
   try {
     const r = await fetch('/api/admin/settings');
     if (!r.ok) throw new Error('读取失败 ' + r.status);
-    const { view, presets } = await r.json();
+    const { view, presets } = await safeJson(r);
     // Vision / 搜索
     $('vBaseUrl').value = view.vision.baseUrl || '';
     $('vModel').value = view.vision.model || '';
@@ -241,7 +247,7 @@ async function save() {
   }};
   if ($('apiKey').value.trim()) body.ai.api_key = $('apiKey').value.trim();
   const r = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const data = await r.json();
+  const data = await safeJson(r);
   flash('aiMsg', r.ok, r.ok ? '已保存 ✓（数据库设置即时生效）' : data.error || '保存失败');
   $('apiKey').value = '';
   load();
@@ -250,7 +256,7 @@ async function save() {
 async function saveBudget() {
   const body = { context: { budget: Number($('budget').value) || 100000 } };
   const r = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const data = await r.json();
+  const data = await safeJson(r);
   flash('ctxMsg', r.ok, r.ok ? 'Context 上限已保存 ✓：' + $('budget').value + ' tokens' : data.error || '保存失败');
   load();
 }
@@ -263,7 +269,7 @@ async function saveVision() {
   }};
   if ($('vApiKey').value.trim()) body.vision.api_key = $('vApiKey').value.trim();
   const r = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const data = await r.json();
+  const data = await safeJson(r);
   flash('vMsg', r.ok, r.ok ? 'Vision 配置已保存 ✓' : data.error || '保存失败');
   $('vApiKey').value = '';
   load();
@@ -272,7 +278,7 @@ async function saveVision() {
 async function testVision() {
   flash('vMsg', true, '测试中…（GET {base}/models，8s 超时）');
   const r = await fetch('/api/admin/vision/test', { method: 'POST' });
-  const data = await r.json();
+  const data = await safeJson(r);
   flash('vMsg', data.ok, data.ok ? '连接成功 ✓（HTTP ' + data.status + '）' : '连接失败：' + (data.reason || 'HTTP ' + data.status));
 }
 
@@ -302,7 +308,7 @@ async function saveSearch() {
   const field = SEARCH_KEY_FIELDS[$('sProvider').value];
   if (field && $('sSerperKey').value.trim()) body.search[field] = $('sSerperKey').value.trim();
   const r = await fetch('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const data = await r.json();
+  const data = await safeJson(r);
   flash('sMsg', r.ok, r.ok ? '搜索配置已保存 ✓' : data.error || '保存失败');
   $('sSerperKey').value = '';
   load();
@@ -311,14 +317,14 @@ async function saveSearch() {
 async function testSearch() {
   flash('sMsg', true, '测试中…（真实查询 "roblox"）');
   const r = await fetch('/api/admin/search/test', { method: 'POST' });
-  const data = await r.json();
+  const data = await safeJson(r);
   flash('sMsg', data.ok, data.ok ? '搜索可用 ✓（' + data.provider + '，' + data.resultCount + ' 条结果）' : '不可用：' + data.reason + '（' + data.provider + '）');
 }
 
 async function loadStatus() {
   try {
     const r = await fetch('/api/admin/status');
-    const st = await r.json();
+    const st = await safeJson(r);
     const chips = $('statusChips');
     chips.innerHTML = '';
     const mb = st.db.sizeBytes ? Math.round(st.db.sizeBytes / 1024) + ' KB' : '—';
@@ -348,7 +354,7 @@ async function loadStatus() {
 
 async function toggleWorld(pause) {
   const r = await fetch('/api/admin/world/' + (pause ? 'pause' : 'resume'), { method: 'POST' });
-  const data = await r.json();
+  const data = await safeJson(r);
   flash('stMsg', r.ok, r.ok ? (pause ? '世界模拟已暂停 ⏸' : '世界模拟已恢复 ▶') : data.error || '失败');
   loadStatus();
 }
@@ -356,7 +362,7 @@ async function toggleWorld(pause) {
 async function reimportPresets() {
   flash('stMsg', true, '重导入中…');
   const r = await fetch('/api/admin/presets/reimport', { method: 'POST' });
-  const data = await r.json();
+  const data = await safeJson(r);
   const errs = (data.results || []).filter((x) => x.error);
   flash('stMsg', r.ok && errs.length === 0, errs.length ? '部分失败：' + errs.map((e) => e.key + ' ' + e.error).join('；') : '预设重导入完成 ✓（' + (data.results || []).map((x) => x.key).join(', ') + '）');
 }
@@ -364,7 +370,7 @@ async function reimportPresets() {
 async function loadEvents() {
   try {
     const r = await fetch('/api/admin/events?limit=20');
-    const { events } = await r.json();
+    const { events } = await safeJson(r);
     $('events').innerHTML = (events || []).length
       ? events.map((e) => '<div><code>' + (e.created_at || '') + '</code> [' + e.type + '] ' + (e.actor || '') + ' ' + String(e.data || '').slice(0, 120) + '</div>').join('')
       : '（暂无事件）';
@@ -374,7 +380,7 @@ async function loadEvents() {
 async function testConn() {
   flash('aiMsg', true, '测试中…（GET {base}/models，8s 超时）');
   const r = await fetch('/api/admin/ai/test', { method: 'POST' });
-  const data = await r.json();
+  const data = await safeJson(r);
   flash('aiMsg', data.ok, data.ok ? '连接成功 ✓（HTTP ' + data.status + '）' : '连接失败：' + (data.reason || 'HTTP ' + data.status));
 }
 
