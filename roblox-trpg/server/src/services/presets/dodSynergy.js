@@ -6,12 +6,15 @@
  * 定义：Civilian 拥有多个高度相关能力时，这些能力会产生特殊使用方式。
  * Synergy 不是：新职业 / 超能力 / 等级提升 / 技能树；
  * 它代表：一个 Civilian 对自身经验的极致结合。
+ * 官方设定（阶段28 补全）：拥有 Synergy 的平民被视为其领域的大师，被赋予更强、更强大的
+ * 工具作为交换；只要特质与技能相符，任何平民都可以成为协同者。
  *
  * 纪律：
  *  - 只使用数据库已有组合（官方 Canon：CarePad / Loveshot），不创造新 Synergy；
  *  - Synergy"改变"既有 Ability 的使用方式（changed_ability），不发放新能力、不写 player_skills；
  *  - 无任何数值字段（无伤害/冷却/等级/解锁链）；
- *  - GM 描述禁止"你升级成CarePad"式句式（见 AI_DESCRIPTIONS 正确示例）。
+ *  - GM 描述禁止"你升级成CarePad"式句式（见 AI_DESCRIPTIONS 正确示例）；
+ *  - "领域大师/更强的工具"按经验造诣叙述，不是系统升级。
  */
 const { getDb } = require('@roblox-trpg/database');
 

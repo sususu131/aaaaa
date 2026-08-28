@@ -305,7 +305,15 @@
       "能力不能违反世界逻辑。",
       "AI 生成剧情必须符合普通人的视角。"
     ],
-    "lore_source": "CANON"
+    "lore_source": "CANON",
+    "killer_titles": {
+      "Pursuer": "执着的（The Persistent）",
+      "Badware": "零号病人（Patient Zero）",
+      "Artful": "法国魔术师",
+      "Killdroid": "失控的保镖原型",
+      "Harken": "噪音猎人"
+    },
+    "civilian_synergy": "拥有协同（Synergy）的居民被视为其领域的大师，被赋予更强、更强大的工具作为交换；只要特质与技能相符，任何居民都可以成为协同者。"
   },
   "synergy_lore": {
     "table": "ability_synergies",

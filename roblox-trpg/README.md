@@ -1095,3 +1095,29 @@ Synergy 预留（候选保存、逻辑未新增、Loveshot 不触发）/ 边界�
 - 新增阶段27（36 项：Provider 解析与 Key 优先级、adminView 概览、六个 Provider 的请求头/body
   构造与结果归一化（mock 服务）、DDG 解析单元、web_search 工具链路、REST/UI）
 - 全套 **1695 项**通过
+
+---
+
+# 阶段28：Die of Death Lore 全量核对补全（杀手称号/台词/细节 + Synergy 大师设定）
+
+对照 2026-08-28 官方 Wiki 输入逐条核对阶段25 已入库内容，补齐缺口：
+
+- **杀手称号（title）与游戏内台词（quote）**：Pursuer 执着的（The Persistent）/ Badware 零号病人
+  （Patient Zero）/ Artful 法国魔术师 / Killdroid 失控的保镖原型 / Harken 噪音猎人；五段游戏内
+  描述台词原文入库（"…already too late."、"Your computer seems to have been infected! ;)"、
+  "VANISH!"、"BLAST TARGET TO SMITHEREENS."、"A beautiful view."）
+- **Pursuer**：隐形时身体僵硬、威胁性降低（可完全不被察觉地跟随，对策提示同步）；多种起源传说
+  （稀有物种/突变科学家/外星人）；植入芯片失败后多数科学家认为难以驯服；嚎叫近处者头晕
+- **Badware**：并不特别针对平民、但绝不让人阻止感染（驱逐阻碍者）
+- **Artful**：事故起因两类说法（观众起哄过多/私下经历）；音乐盒可反转为给自己加速
+- **Harken**：父母为其设计一切工具（其构造体类型无法长期存活）；纠缠手法=追忆父亲（对抗水栖
+  构造体彩蛋）；挚友制陶花瓶细节与"形影不离"；驱赶平民并非敌意
+- **Synergy 官方大师设定**：拥有 Synergy 的居民是其领域的大师、被赋予更强的工具——任何特质
+  相符的居民都可成为协同者（入世界档案 civilian_life.synergy 与 SYNERGY_LORE_CONTEXT：
+  按"经验造诣"叙述，非系统升级）
+- **WORLD_LORE_CONTEXT** 新增 Known Threats 行：杀手称号+官方代词（GM 叙事称呼用）
+- 预设 dod.json 镜像同步（killer_titles / civilian_synergy）；红线不变：无属性/技能数值表
+
+## 测试
+
+- 新增阶段28（30 项）；全套 **1725 项**通过

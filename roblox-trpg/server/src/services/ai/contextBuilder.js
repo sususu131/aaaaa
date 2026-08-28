@@ -448,6 +448,10 @@ function worldLoreContextContent(room) {
       .join('；');
     const threat = p.knownThreats[0] || {};
     const gov = p.government || {};
+    // 阶段28：杀手称号与官方代词（GM 叙事称呼用；仅 Lore，无玩法数据）
+    const threatList = (threat.known_entities || [])
+      .map((e) => `${e.name}（${e.title || ''}·${e.pronouns}）`)
+      .join(' / ');
     // Civilian 与世界关联：房间内每位居民的背景 → 生活场所
     const dodLore = require('../presets/dodLore');
     const ties = [];
@@ -461,6 +465,7 @@ function worldLoreContextContent(room) {
       `World: ${p.description}\nSetting: ${p.setting}\nEra: ${p.era}\n` +
       `Civilian Society: ${life}${p.civilianLife.note ? `（${p.civilianLife.note}）` : ''}\n` +
       `Threat: ${threat.description || ''}（居民应对：${(threat.resident_response || []).join('、')}；Killer 仅威胁概念，未实现具体个体/AI/战斗）\n` +
+      (threatList ? `Known Threats: ${threatList}\n` : '') +
       `Government: ${gov.name || ''}——${(gov.public_information || '').slice(0, 120)}${gov.secret_information ? `（机密：${gov.secret_information}）` : ''}\n` +
       `World Rules（DOD）:\n${dodWorldLore.worldRulesText()}\n` +
       (ties.length ? `Active Civilians: ${ties.join('、')}` : 'Active Civilians: （房间内暂无 Civilian）') +
@@ -492,7 +497,7 @@ function synergyLoreContextContent(room) {
       }
     }
     const rules =
-      'Synergy 规则：Synergy 是 Civilian 对自身经验的极致结合，产生特殊使用方式；不是新职业、不是超能力、不是等级提升、不是技能树（无解锁链）。' +
+      'Synergy 规则：Synergy 是 Civilian 对自身经验的极致结合，产生特殊使用方式；官方称之为其领域的"大师"（以更强、更强大的工具著称），但叙述为经验造诣，不是系统升级；不是新职业、不是超能力、不是等级提升、不是技能树（无解锁链）。' +
       '禁止"你升级成X/你获得了X"句式——按经验结合描述（如"你的医疗知识和工程经验结合，让你的设备拥有了新的用途。"）。' +
       '只能使用数据库已有 Synergy（CarePad/Loveshot），不得创造新 Synergy，不得把组合之外的 Ability 说成 Synergy。';
     return parts.length
