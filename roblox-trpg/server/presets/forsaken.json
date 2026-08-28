@@ -4,57 +4,215 @@
   "roblox_universe_id": null,
   "roblox_place_id": null,
   "lore_note": "官方 universe/place ID 待 Roblox Service 在线解析补充（不伪造来源）。",
-  "description": "非对称恐怖：一名 Killer 追逐多名 Survivor。机制转换为跑团：追逐 / 隐藏 / 逃生。角色概念为 CANON，数值与事件为 TRPG_EXTENSION。",
+  "description": "非对称恐怖：The Spectre 创造的领域中，Survivor 与 Killer 的对决。机制转换为跑团：追逐 / 隐藏 / 逃生 / 目标。角色概念为 CANON，数值与事件为 TRPG_EXTENSION。",
   "genre": "Asymmetric Horror",
   "difficulty": 4,
   "world": {
-    "name": "Forsaken Arena",
+    "name": "The Spectre's Realm",
     "lore_source": "CANON",
     "locations": [
-      { "key": "forsaken:arena", "name": "竞技场", "description": "开阔的场地，无处藏身。", "is_safe": 0 },
+      { "key": "forsaken:lobby", "name": "大厅（The Lobby）", "description": "被森林环绕的小岛，有木屋，外围有生物出没。幸存者与 NPC 在此生活。", "is_safe": 1 },
+      { "key": "forsaken:arena", "name": "竞技场", "description": "Spectre 拉入的地图，开阔而危险的场地，无处藏身。", "is_safe": 0 },
       { "key": "forsaken:hideout", "name": "藏匿点", "description": "杂物堆与阴影。屏住呼吸。", "is_safe": 1 },
-      { "key": "forsaken:exit", "name": "逃生出口", "description": "铁丝网后的自由。", "is_safe": 0 }
+      { "key": "forsaken:exit", "name": "逃生出口", "description": "Spectre 领域的边缘，铁丝网后的自由。", "is_safe": 0 }
     ]
   },
+  "factions": [
+    { "uid_suffix": "spectre", "name": "The Spectre", "description": "领域的无形主宰，操控一切，以他人的痛苦为食。", "lore_source": "CANON" },
+    { "uid_suffix": "survivor", "name": "Survivor", "description": "被困在 Spectre 领域中的平民，互相保护求生。", "lore_source": "CANON" },
+    { "uid_suffix": "killer", "name": "Killer", "description": "被 Spectre 绑架的暴力存在，猎杀幸存者。", "lore_source": "CANON" },
+    { "uid_suffix": "admin", "name": "Roblox Admin", "description": "罗布洛西亚的统治者，被 Spectre 逐一绑架。", "lore_source": "CANON" },
+    { "uid_suffix": "hacker", "name": "Hacker", "description": "拥有强大脚本，与管理员对抗的破坏者。", "lore_source": "CANON" },
+    { "uid_suffix": "spawn_cult", "name": "Family Home for The Reborn", "description": "崇拜 Spawn 符号的宗教，相信献身可获得重生。", "lore_source": "CANON" }
+  ],
+  "faction_relations": [
+    { "faction_a_suffix": "survivor", "faction_b_suffix": "killer", "relation": "HOSTILE", "reason": "杀手猎杀幸存者（官方设定）：天生敌对" },
+    { "faction_a_suffix": "spectre", "faction_b_suffix": "survivor", "relation": "HOSTILE", "reason": "Spectre 以幸存者的痛苦为食，操控对局" },
+    { "faction_a_suffix": "spectre", "faction_b_suffix": "killer", "relation": "HOSTILE", "reason": "Spectre 给杀手 buff，但杀手也只是其玩具" },
+    { "faction_a_suffix": "survivor", "faction_b_suffix": "admin", "relation": "ALLIED", "reason": "管理员保护平民（Roblox Admins 统治者设定）" },
+    { "faction_a_suffix": "hacker", "faction_b_suffix": "admin", "relation": "HOSTILE", "reason": "黑客破坏系统，与管理员对抗" },
+    { "faction_a_suffix": "spawn_cult", "faction_b_suffix": "survivor", "relation": "NEUTRAL", "reason": "神秘宗教，成员中有人是幸存者（Two Time/Azure）" }
+  ],
   "npcs": [
-    { "uid_suffix": "survivor", "name": "幸存者", "nature": "neutral", "description": "和你一样被困在这里的人。也许可以互相帮助。", "lore_source": "TRPG_EXTENSION" }
+    { "uid_suffix": "jane_doe", "name": "Jane Doe", "nature": "neutral", "faction_suffix": "survivor", "description": "bug 报告者，见证 Spectre 起源，藏身大厅地下室，正在寻找被腐化的丈夫 John Doe。", "lore_source": "CANON" },
+    { "uid_suffix": "builderman", "name": "Builderman", "nature": "friendly", "faction_suffix": "admin", "description": "负责建造的 Roblox 领袖（基于 David Baszucki），可提供哨兵和补给器。因忽视服务器 bug 而间接导致 Spectre 诞生。", "lore_source": "CANON" },
+    { "uid_suffix": "dusekkar", "name": "Dusekkar", "nature": "friendly", "faction_suffix": "admin", "description": "退休的 Roblox 管理员、魔法师，进入领域后魔法被 Spectre 大幅剥夺。", "lore_source": "CANON" },
+    { "uid_suffix": "shedletsky", "name": "Shedletsky", "nature": "friendly", "faction_suffix": "admin", "description": "罗布乐克管理员，1x1x1x1 的宿敌，与 Builderman 有互相帮助的承诺。", "lore_source": "CANON" },
+    { "uid_suffix": "007n7", "name": "007n7", "nature": "friendly", "faction_suffix": "hacker", "description": "改过自新的黑客、c00lkidd 的养父，沉默寡言，希望与养子重聚。", "lore_source": "CANON" },
+    { "uid_suffix": "two_time", "name": "Two Time", "nature": "neutral", "faction_suffix": "spawn_cult", "description": "Spawn Cult 教徒、重生信徒，隐藏着杀死教徒 Azure 的秘密。", "lore_source": "CANON" },
+    { "uid_suffix": "survivor", "name": "幸存者", "nature": "neutral", "faction_suffix": "survivor", "description": "和你一样被困在这里的人。也许可以互相帮助。", "lore_source": "TRPG_EXTENSION" },
+    { "uid_suffix": "phosphorus", "name": "Phosphorus", "nature": "hostile", "faction_suffix": "killer", "description": "Spectre 的代理人，带 Nosferatu 和 Azure 入领域。", "lore_source": "CANON" },
+    { "uid_suffix": "spawn_cultist", "name": "重生信徒", "nature": "neutral", "faction_suffix": "spawn_cult", "description": "崇拜 Spawn 符号的神秘信徒，可提供特殊任务或交易。", "lore_source": "CANON" }
   ],
   "enemies": [
     {
       "id": "killer_1",
-      "name": "Killer",
-      "description": "沉默的追逐者。",
-      "stats": { "hp": 46, "damage": 6 },
-      "behaviour": "attack|attack|chase|defend",
+      "name": "C00lkidd",
+      "description": "007n7 的养子，team c00lkidd 的领导者，红色血肉般的人形杀手。",
+      "stats": { "hp": 1000, "damage": 26 },
+      "behaviour": "attack|attack|chase|special",
+      "abilities": ["Punch", "Corrupt Nature", "Walkspeed Override", "Pizza Delivery"],
+      "loot": [{ "type": "currency", "amount": 150 }],
+      "lore_source": "CANON"
+    },
+    {
+      "id": "slasher",
+      "name": "Slasher",
+      "description": "Project 13，被 Necrobloxicon 复活的培根头士兵实验体，母亲的声音指引他。",
+      "stats": { "hp": 2000, "damage": 20 },
+      "behaviour": "attack|attack|chase|special",
+      "abilities": ["Slash", "Behead", "Gashing Wound", "Raging Pace"],
       "loot": [{ "type": "currency", "amount": 120 }],
+      "lore_source": "CANON"
+    },
+    {
+      "id": "nosferatu",
+      "name": "Nosferatu",
+      "description": "源自 Necrobloxicon 的罗布乐克吸血鬼，与 Spectre 达成交易进入领域。",
+      "stats": { "hp": 1750, "damage": 24 },
+      "behaviour": "attack|special|attack|chase",
+      "abilities": ["Lacerate", "Blood Hook", "Cataclysm"],
+      "loot": [{ "type": "item", "item": "治疗药水", "chance": 0.5 }],
       "lore_source": "CANON"
     }
   ],
   "quest": {
     "uid": "quest_preset_forsaken",
     "name": "逃出猎场",
-    "description": "躲过 Killer，找到出口，活着离开。",
+    "description": "躲过 Spectre 派来的杀手，完成目标，找到领域边缘的出口。",
     "objectives": [
-      { "key": "hide_once", "name": "隐藏一次", "type": "REACH_LOCATION", "order_index": 1, "event_type": "PLAYER_ENTERED_SCENE", "match": { "scene": "scene_hideout" } },
-      { "key": "survive_killer", "name": "击退或躲过 Killer", "type": "DEFEAT_ENEMY", "order_index": 2, "event_type": "ENEMY_DEFEATED", "match": { "enemy": "killer_1" } },
-      { "key": "escape_arena", "name": "逃离竞技场", "type": "ESCAPE", "order_index": 3 }
+      { "key": "enter_realm", "name": "进入 Spectre 领域", "type": "ENTER_DUNGEON", "order_index": 1 },
+      { "key": "meet_npc", "name": "接触 Jane Doe 或 Builderman", "type": "TALK_TO_NPC", "order_index": 2, "event_type": "NPC_TALKED" },
+      { "key": "escape_realm", "name": "逃离 Spectre 领域", "type": "ESCAPE", "order_index": 3 }
     ]
   },
   "dungeon": {
-    "dungeon_name": "Forsaken 猎场",
+    "dungeon_name": "Spectre 猎场",
     "scenes": [
-      { "id": "scene_arena", "name": "竞技场", "description": "开阔而危险的场地。", "order": 1, "exits": ["scene_hideout"], "encounters": [], "events": ["evt_hunt_begin"] },
-      { "id": "scene_hideout", "name": "藏匿点", "description": "可以暂时喘息的地方。", "order": 2, "exits": ["scene_exit", "scene_arena"], "encounters": ["enc_killer"], "events": [] },
-      { "id": "scene_exit", "name": "逃生出口", "description": "出口就在眼前。", "order": 3, "exits": [], "encounters": ["enc_killer"], "events": [] }
+      { "id": "scene_arena", "name": "竞技场", "description": "Spectre 拉入的地图，开阔而危险的场地，无处藏身。", "order": 1, "exits": ["scene_hideout"], "encounters": ["enc_c00lkidd"], "events": ["evt_spectre_watch"] },
+      { "id": "scene_hideout", "name": "藏匿点", "description": "杂物堆与阴影，屏住呼吸。", "order": 2, "exits": ["scene_exit", "scene_arena"], "encounters": ["enc_slasher"], "events": ["evt_objective"] },
+      { "id": "scene_exit", "name": "逃生出口", "description": "Spectre 领域的边缘，自由就在眼前。", "order": 3, "exits": [], "encounters": ["enc_nosferatu"], "events": [] }
     ],
     "encounters": [
-      { "id": "enc_killer", "name": "Killer 来袭", "type": "COMBAT", "description": "Killer 找到了你们。", "participants": ["killer_1"], "difficulty": 4 }
+      { "id": "enc_killer", "name": "C00lkidd 来袭", "type": "COMBAT", "description": "红色身影撕裂空间，C00lkidd 扑来。", "participants": ["killer_1"], "difficulty": 4 },
+      { "id": "enc_slasher", "name": "Slasher 现身", "type": "COMBAT", "description": "经典面具杀手堵住了藏匿点出口。", "participants": ["slasher"], "difficulty": 4 },
+      { "id": "enc_nosferatu", "name": "Nosferatu 伏击", "type": "COMBAT", "description": "Phosphorus 的代理人现身，尖牙在黑暗中闪烁。", "participants": ["nosferatu"], "difficulty": 5 }
     ],
-    "events": [{ "id": "evt_hunt_begin", "name": "狩猎开始", "description": "远处传来脚步声。" }]
+    "events": [
+      { "id": "evt_spectre_watch", "name": "幽灵注视", "description": "天空变成噩梦般的红黑色，Spectre 在注视你们。" },
+      { "id": "evt_objective", "name": "目标达成", "description": "你们发现了一个可以削减时间的目标装置。" }
+    ]
   },
   "rewards": [
     { "type": "currency", "name": "金币", "amount": 150 },
     { "type": "item", "name": "治疗药水" }
   ],
-  "random_events": ["POWER_OUTAGE", "WEATHER_CHANGE"]
+  "random_events": ["SPECTRE_ATTACK", "OBJECTIVE_DONE", "MAP_HAZARD"],
+  "mode": "LORE_SIMULATION",
+  "mode_note": "Lore Simulation：不是游戏玩法复刻。不实现对局计时 / 目标系统 UI / 胜负条件 / 角色升级 / 竞技模式。目标：让 AI GM 模拟 Spectre 领域中幸存者与杀手的事件与互动。",
+  "world_setting": {
+    "experience": "Forsaken",
+    "world": "The Spectre's Realm",
+    "era": "被 Spectre 绑架后的无限循环",
+    "player_role": "被困在 Spectre 领域中的普通幸存者（不是英雄）",
+    "lore_source": "CANON"
+  },
+  "world_lore": {
+    "table": "experience_world_profiles",
+    "name": "Forsaken Realm",
+    "description": "The Spectre 创造的黑暗领域：被绑架的罗布乐克人与地点被拉入其中，进行扭曲而残酷的猎杀游戏。",
+    "setting": "Spectre's Realm（由无实体的存在创建，赤红色噩梦天幕下的猎杀领域）",
+    "era": "无限循环的猎杀游戏（每局随机地图，完成目标削弱时间）",
+    "civilian_life": {
+      "大厅": "被森林环绕的小岛，有木屋，幸存者与 NPC 在此生活",
+      "对局": "幸存者被拖入随机地图，完成目标并躲避杀手",
+      "杀手": "进入对局前处于 Limbo 状态，重温生命中的关键时刻",
+      "note": "Survivor 不是英雄——只是被困在领域中、拥有不同人生经验的平民。"
+    },
+    "threat_concept": "Killer 当前作为领域威胁（幸存者需要逃离/隐藏/合作/利用自身能力生存）；Killer 的具体能力为 CANON 内容（可作遭遇参考），不实现对局系统。",
+    "government_interface": {
+      "name": "The Spectre",
+      "description": "领域的创造者与主宰，无实体的存在",
+      "public_information": "用超自然力量将罗布乐克人和地点拉入领域；操控幸存者与杀手的能力（nerf/buff）；以他人的痛苦为食；起源于 Roblox HQ 服务器中的一段腐败代码",
+      "secret_information": "reserved（本阶段只创建 Lore 接口，不实现具体剧情）"
+    },
+    "world_rules": [
+      "Survivor 能力来自自身经历。",
+      "普通幸存者不是英雄。",
+      "生存优先于战斗。",
+      "能力不能违反世界逻辑。",
+      "AI 生成剧情必须符合普通人的视角。"
+    ],
+    "lore_source": "CANON"
+  },
+  "synergy_lore": {
+    "table": "ability_synergies",
+    "definition": "Forsaken 无官方 Synergy 系统：角色能力是固定的角色设定（每个 Survivor/Killer 的 Ability 属于其个人经历），不适用能力组合产生特殊状态的概念。",
+    "rule": "不创造 Forsaken Synergy；AI GM 描述角色能力时按其 CANON 设定解释（个人经历/设定），禁止用 DoD 式 Synergy 组合说法。",
+    "entries": [],
+    "lore_source": "CANON"
+  },
+  "civilian": {
+    "definition": "被 Spectre 绑架到领域中的罗布乐克平民；Survivor 代表一类幸存者，Killer 代表猎杀者；角色能力为 CANON（固定角色设定，不是模板生成）。",
+    "backgrounds": [
+      "Lobby Resident",
+      "Admin Associate",
+      "Ex-Hacker",
+      "Former Spawn Cultist",
+      "Survivalist",
+      "Explorer"
+    ],
+    "background_note": "Background 用于解释为什么拥有某种能力（人生经历，不是职业系统）；Forsaken 角色为 CANON 固定设定。",
+    "traits": [
+      "Food Survival",
+      "Speed Training",
+      "Stealth Skill",
+      "Magic Familiarity",
+      "Tech Knowledge",
+      "Cult Lore",
+      "Administrative Access",
+      "Navigation",
+      "Fear Resistance"
+    ],
+    "trait_note": "Trait 代表个人特点，决定 Ability 出现可能性。",
+    "ability_note": "Ability 不是魔法/超能力/技能树，代表角色利用自身经历生存（CANON 角色能力可查官方 Wiki）。",
+    "ability_lore": {
+      "table": "forsaken_abilities_lore",
+      "source": "FORSAKEN",
+      "explanation_rule": "Ability 不是魔法，代表角色过去的人生经历：解释为什么拥有该能力（如食物生存/速度训练/隐身技巧），而不是描述技能效果或数值。",
+      "lore_fields": [
+        "id",
+        "name",
+        "source",
+        "category",
+        "core_trait",
+        "possible_background",
+        "lore_description",
+        "personality_connection",
+        "synergy_candidates"
+      ],
+      "background_weights": {
+        "Survivalist": ["Bloxy Cola", "Slateskin Potion"],
+        "Explorer": ["Ghost Burger", "Bloxy Cola"],
+        "Ex-Hacker": ["Corrupt Nature", "Walkspeed Override"],
+        "Admin Associate": ["Sentry", "Dispenser"],
+        "Former Spawn Cultist": ["Respawn", "Force Field"],
+        "Magic Familiarity": ["Force Field"]
+      },
+      "background_weight_note": "只是概率提高（权重 3，其余 1），不是固定绑定；任何幸存者都可能获得任何能力（无职业锁定）。",
+      "possible_synergy": {},
+      "synergy_note": "Forsaken 无 Synergy 系统，预留为空。",
+      "relations_note": "幸存者间关系保存在 personality_connection：如 Noob 与 Guest 666 有联系（ARG 揭示）、c00lkidd 是 007n7 的养子、Dusekkar 魔法被剥夺、Two Time 与 Azure 曾追随 Spawn Cult——供 GM 叙事邻里关系使用。"
+    },
+    "npc_rule": "NPC 也使用幸存者规则；不创建固定英雄，除非 Lore 明确存在（如 Builderman 是真实管理员角色、Jane Doe 是大厅传说）。"
+  },
+  "future_hooks": {
+    "Spectre": "reserved",
+    "Lobby": "reserved",
+    "Killers": "reserved",
+    "ARG": "reserved",
+    "SpawnCult": "reserved",
+    "Hackers": "reserved"
+  },
+  "future_note": "未来扩展接口：当前阶段不实现。"
 }

@@ -301,10 +301,20 @@ function importPreset(io, preset) {
     try {
       require('./dodSynergy').ensureSynergySeeded();
     } catch (e) { console.error('[seeder] synergy 播种失败:', e.message); }
+    // 阶段24：Fate 能力池播种（所有 Ability 经 Fate 池播种，补 dod_fate_ability 标记）
+    try {
+      require('./dodFate').ensureFateSeeded();
+    } catch (e) { console.error('[seeder] fate 播种失败:', e.message); }
     // 阶段25：官方 威胁互动（能力×杀手对策）随导入播种（幂等）
     try {
       require('./dodThreatInteractions').ensureInteractionSeeded();
     } catch (e) { console.error('[seeder] interactions 播种失败:', e.message); }
+  }
+  // Forsaken：世界档案随导入播种（幂等；只读 Lore 数据，镜像 dodWorldLore）
+  if (preset.key === 'forsaken') {
+    try {
+      require('./forsakenWorldLore').ensureWorldProfileSeeded();
+    } catch { /* 播种失败不阻塞导入 */ }
   }
   const npcs = ensureNpcs(preset, dungeon.id);
   const quest = ensureQuest(preset, dungeon.id);

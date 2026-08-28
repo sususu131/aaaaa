@@ -58,6 +58,27 @@ const migrations = [
     },
   },
   {
+    name: '022_stage24_forsaken_ability_lore',
+    up(db) {
+      // ── 阶段24：Forsaken Ability Lore（镜像 dod_abilities_lore 结构）──
+      // Lore 数据库：解释 Forsaken 角色/幸存者为什么拥有这些 Ability（人生经历，不是魔法/技能系统）。
+      // 红线：不存 Cooldown/Damage/HP/SP 等战斗数值；仅设定解释字段。
+      db.exec(`CREATE TABLE IF NOT EXISTS forsaken_abilities_lore (
+        id                    TEXT PRIMARY KEY,             -- 语义 id（noob_bloxy_cola/...）
+        name                  TEXT NOT NULL UNIQUE,         -- Ability 名（Bloxy Cola/Coin Flip/...）
+        source                TEXT NOT NULL DEFAULT 'FORSAKEN',
+        owner                 TEXT NOT NULL,                -- 关联角色（Noob/Chance/Elliot/...）
+        category              TEXT NOT NULL,                -- survival/stealth/support/offensive/...
+        core_trait            TEXT NOT NULL,                -- 核心 Trait（能力来源的主特点）
+        explaining_traits     TEXT NOT NULL DEFAULT '[]',   -- JSON：解释该 Ability 的 Trait 列表
+        possible_background   TEXT NOT NULL DEFAULT '[]',   -- JSON：关联 Background（只提高概率，不锁定）
+        lore_description      TEXT NOT NULL,                -- 过去的人生经历解释（禁止魔法描述）
+        personality_connection TEXT NOT NULL,               -- 性格关联（该经历如何塑造性格）
+        created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+      )`);
+    },
+  },
+  {
     name: '024_stage24_dod_fate_system',
     up(db) {
       // ── 阶段24：Civilian Fate Selection System（Deck of Death Lore）──
