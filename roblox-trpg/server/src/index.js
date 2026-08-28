@@ -10,6 +10,7 @@ const { PORT } = require('./config');
 const registerSocketHandlers = require('./sockets/handlers');
 const apiRoutes = require('./routes/apiRoutes');
 const visionRoutes = require('./routes/visionRoutes');
+const adminAiTestRoutes = require('./routes/adminAiTestRoutes');
 const dungeonRoutes = require('./routes/dungeonRoutes');
 const runtimeRoutes = require('./routes/runtimeRoutes');
 const characterRoutes = require('./routes/characterRoutes');
@@ -20,7 +21,6 @@ const partyDecisionRoutes = require('./routes/partyDecisionRoutes');
 const inventoryRoutes = require('./routes/inventoryRoutes');
 const presetRoutes = require('./routes/presetRoutes');
 
-// 启动即建表（幂等）
 initDb();
 
 const app = express();
@@ -29,33 +29,28 @@ const io = new Server(server, {
   cors: { origin: '*' },
 });
 
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '8mb' }));
 app.get('/health', (_req, res) => res.json({ ok: true, name: 'roblox-trpg-server', stage: 16 }));
 app.use('/api', apiRoutes);
-app.use(require('./routes/adminRoutes')); // 阶段25：/admin 管理页 + /api/admin/*
-app.use(visionRoutes); // /api/vision/avatar/analyze、/vision-test 等
-app.use(dungeonRoutes); // 阶段4：Dungeon Design Pipeline
-app.use(runtimeRoutes); // 阶段5：Dungeon Runtime
-app.use(characterRoutes); // 阶段6：Persistent Character
-app.use(questRoutes); // 阶段8：Quest System
-app.use(npcRoutes); // 阶段9：NPC & Living World
-app.use(worldRoutes); // 阶段12：World Simulation & Dynamic Events
-app.use(partyDecisionRoutes); // 阶段13：Party & Narrative Decision
-app.use(inventoryRoutes); // 阶段14：Persistent Inventory
-app.use(presetRoutes); // 阶段16：Preset Experience Dungeon Library
+app.use(require('./routes/adminRoutes'));
+app.use(adminAiTestRoutes);
+app.use(visionRoutes);
+app.use(dungeonRoutes);
+app.use(runtimeRoutes);
+app.use(characterRoutes);
+app.use(questRoutes);
+app.use(npcRoutes);
+app.use(worldRoutes);
+app.use(partyDecisionRoutes);
+app.use(inventoryRoutes);
+app.use(presetRoutes);
 
 registerSocketHandlers(io);
-
-// 阶段9：NPC Listener（Game Event Bus → NPC 反应，服务器规则决定）
 require('./services/npcs/npcListener').registerNpcListener();
-// 阶段11：表现追踪监听器（死亡/战斗/探索/任务 → 完成度评分）
 require('./services/legends/performanceListener').registerPerformanceListener();
-// 阶段13：玩家关系监听器（类型化事件 → 固定增量；AI 无直接修改途径）
 require('./services/party/playerRelations').registerPlayerRelationsListener();
 
-// 作为入口运行时才监听端口（测试可直接 require 后自管端口）
 if (require.main === module) {
-  // 阶段16：官方体验预设导入（幂等；测试环境不自动执行）
   try {
     const results = require('./services/presets/presetSeeder').runPresetSeeder();
     console.log(`[server] 预设副本导入完成：${results.map((r) => r.key || `${r.error}`).join(', ')}`);
@@ -64,7 +59,6 @@ if (require.main === module) {
   }
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`[server] roblox-trpg 服务器已启动（阶段16：预设副本库）: http://localhost:${PORT}`);
-    // 阶段12：World Tick 调度器（周期驱动世界演化；可经 /api/world/pause 暂停）
     if (process.env.WORLD_TICK_ENABLED !== 'off') {
       const worldSim = require('./services/world/worldSim');
       const { WORLD_TICK_INTERVAL_MS } = require('./config');
