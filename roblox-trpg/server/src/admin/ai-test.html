@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Roblox TRPG · AI 测试</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0f1216;color:#e6e9ee;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}.wrap{max-width:980px;margin:auto;padding:24px 16px 64px}h1{font-size:20px}h2{font-size:15px;color:#9fc3ff;margin:24px 0 10px}.card{background:#171c23;border:1px solid #262e39;border-radius:10px;padding:16px;margin-top:8px}textarea,input,button{font:inherit}textarea,input{width:100%;padding:9px 10px;background:#0f1216;color:#e6e9ee;border:1px solid #2c3644;border-radius:8px}textarea{min-height:130px;resize:vertical}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}button{padding:8px 14px;border-radius:8px;border:1px solid #2c3644;background:#202836;color:#e6e9ee;cursor:pointer}button.primary{background:#2f6fed;border-color:#2f6fed}.hint{font-size:12px;color:#77828f;margin-top:6px}pre{background:#0b0e12;border:1px solid #262e39;border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-word;max-height:520px;overflow:auto}.preview{max-width:320px;max-height:320px;display:none;border-radius:8px;border:1px solid #2c3644;margin-top:10px}.ok{color:#7fe0a2}.err{color:#ff9aa8}.meta{display:flex;gap:6px;flex-wrap:wrap}.chip{background:#10202f;color:#9fc3ff;border-radius:999px;padding:3px 10px;font-size:11px}
+</style>
+</head>
+<body><div class="wrap">
+<h1>Roblox TRPG · AI 测试中心</h1>
+<div class="hint">这里直接调用服务器当前配置的外部 API。不会把 API Key 返回到浏览器。文本测试用于普通 AI，图片测试用于 Vision API。</div>
+
+<h2>当前配置</h2><div class="card"><div id="config" class="meta">读取中…</div></div>
+
+<h2>文本响应测试</h2><div class="card">
+<textarea id="text" placeholder="例如：用一句话介绍一个 Roblox TRPG 的地下城。">你好，请用一句话回复：Vision/AI API 测试成功。</textarea>
+<div class="btns"><button class="primary" onclick="testText()">发送文本测试</button></div><div id="textStatus" class="hint"></div><pre id="textOut">等待测试…</pre>
+</div>
+
+<h2>图片响应测试（Vision）</h2><div class="card">
+<div class="hint">支持本地图片或图片 URL。上传图片会在浏览器转换成 data URL，再由服务器转发给外部 Vision API。</div>
+<input id="imageUrl" placeholder="可选：https://.../image.png" />
+<input id="imageFile" type="file" accept="image/*" style="margin-top:8px" />
+<img id="preview" class="preview" alt="preview">
+<textarea id="visionPrompt" style="margin-top:10px;min-height:110px">请分析这张 Roblox Avatar。只观察角色本体，忽略背景。请特别确认角色手持的武器/物品是什么；如果是剑，请明确写“手持剑”。列出客观可见的服装、头部、武器、装备和视觉特征。不要因为背景中的巨石、山坡、矿洞等元素联想到西西弗斯或其他角色，不要猜测无法从图片确认的信息。</textarea>
+<div class="btns"><button class="primary" onclick="testVision()">发送图片测试</button></div><div id="visionStatus" class="hint"></div><pre id="visionOut">等待测试…</pre>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);let imageData='';
+function esc(s){return String(s??'')}
+async function loadConfig(){try{const r=await fetch('/api/admin/ai-test/config');const d=await r.json();if(!r.ok)throw Error(d.error||'读取配置失败');$('config').innerHTML=`<span class="chip">AI: ${esc(d.ai.model)}</span><span class="chip">AI格式: ${esc(d.ai.format)}</span><span class="chip">Vision: ${esc(d.vision.model)}</span><span class="chip">Vision Key: ${d.vision.hasApiKey?'已配置':'未配置'}</span>`}catch(e){$('config').textContent='读取失败：'+e.message}}
+$('imageFile').addEventListener('change',()=>{const f=$('imageFile').files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{imageData=rd.result;$('preview').src=imageData;$('preview').style.display='block'};rd.readAsDataURL(f)});
+async function testText(){const text=$('text').value.trim();if(!text)return;$('textStatus').textContent='测试中…';$('textOut').textContent='';try{const r=await fetch('/api/admin/ai-test/text',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});const d=await r.json();$('textStatus').className='hint '+(r.ok?'ok':'err');$('textStatus').textContent=r.ok?'成功':'失败：'+(d.error||'未知错误');$('textOut').textContent=JSON.stringify(d,null,2)}catch(e){$('textStatus').className='hint err';$('textStatus').textContent='请求失败';$('textOut').textContent=e.stack||e.message}}
+async function testVision(){let imageUrl=$('imageUrl').value.trim()||imageData;if(!imageUrl){$('visionStatus').textContent='请选择图片或输入图片 URL';return}$('visionStatus').textContent='测试中…';$('visionOut').textContent='';try{const r=await fetch('/api/admin/ai-test/vision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({imageUrl,prompt:$('visionPrompt').value})});const d=await r.json();$('visionStatus').className='hint '+(r.ok?'ok':'err');$('visionStatus').textContent=r.ok?'成功':'失败：'+(d.error||'未知错误');$('visionOut').textContent=JSON.stringify(d,null,2)}catch(e){$('visionStatus').className='hint err';$('visionStatus').textContent='请求失败';$('visionOut').textContent=e.stack||e.message}}
+loadConfig();
+</script></div></body></html>
