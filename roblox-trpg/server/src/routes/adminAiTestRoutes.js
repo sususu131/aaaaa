@@ -9,16 +9,8 @@ const { getDb } = require('@roblox-trpg/database');
 
 const router = express.Router();
 
-function authorized(req) {
-  const token = process.env.ADMIN_TOKEN;
-  if (!token) return true;
-  return (req.get('X-Admin-Token') || req.query.admin_token || '') === token;
-}
-function guard(req, res) {
-  if (!authorized(req)) {
-    res.status(401).json({ error: '需要管理员令牌', code: 'ADMIN_UNAUTHORIZED' });
-    return false;
-  }
+// 本地/个人测试项目：Admin AI 测试接口不启用鉴权。
+function guard(_req, _res) {
   return true;
 }
 
