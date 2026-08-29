@@ -9,6 +9,8 @@ const partyService = require('../services/party/partyService');
 const playerRelations = require('../services/party/playerRelations');
 const decisionEngine = require('../services/party/decisionEngine');
 const { getDb } = require('@roblox-trpg/database');
+const aiAgent = require('../services/ai/aiAgent');
+const roomManager = require('../rooms/roomManager');
 
 const router = express.Router();
 
@@ -148,6 +150,54 @@ router.post('/api/decisions/:uid/select', (req, res) => {
     const { io } = require('../index.js');
     const optionKey = String((req.body && req.body.optionKey) || '');
     const r = decisionEngine.selectDecision(io, req.params.uid, auth.player.id, optionKey);
+    // 阶段34：PARTY 决策投票达标/全员后结算 → 服务器侧直接触发 GM 推进剧情（避免每个玩家前端各自发 @AI 造成重复）
+    if (r.settled) {
+      const view = decisionEngine.decisionView(req.params.uid);
+      const option = (view.options || []).find((o) => o.key === r.optionKey);
+      const room = roomManager.getRoom(auth.player.room_id);
+      if (room) {
+        const text = `队伍投票已结算，全队选择了「${option ? option.text : r.optionKey}」。请根据这个决定继续推进剧情，不要重复要求投票，也不要再输出新的抉择选项。`;
+        if (!room.gmBusy) {
+          room.gmBusy = true;
+          const ctx = {
+            io,
+            room,
+            socket: null,
+            playerUid: 'system_gm',
+            actingPlayerName: '系统',
+            broadcast: (event, payload) => io.to(room.id).emit(event, payload),
+          };
+          aiAgent
+            .runAgentTurn(ctx, text)
+            .then(async (parsed) => {
+              const msgId = aiAgent.persistGmOutcome(room, parsed);
+              io.to(room.id).emit('gm:response', {
+                id: msgId,
+                type: 'gm_response',
+                askerName: '系统（投票结算）',
+                narrative: parsed.narrative,
+                options: parsed.options,
+                sourceReferences: parsed.source_references,
+                at: new Date().toISOString(),
+              });
+            })
+            .catch((err) => {
+              roomManager.saveMessage(room.id, null, 'system', `GM 无法回应投票结果：${err.message || '未知错误'}`);
+              io.to(room.id).emit('chat:message', {
+                id: roomManager.saveMessage(room.id, null, 'system', `GM 无法回应投票结果：${err.message || '未知错误'}`),
+                type: 'system',
+                playerName: null,
+                text: `GM 无法回应投票结果：${err.message || '未知错误'}`,
+                at: new Date().toISOString(),
+              });
+            })
+            .finally(() => {
+              room.gmBusy = false;
+              io.to(room.id).emit('gm:status', { status: null });
+            });
+        }
+      }
+    }
     res.json({ ok: true, ...r, decision: decisionEngine.decisionView(req.params.uid) });
   } catch (err) {
     fail(res, err);

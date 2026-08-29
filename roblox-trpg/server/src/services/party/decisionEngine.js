@@ -153,13 +153,23 @@ function createDecision(io, roomId, spec) {
     expiresAt = iso(Date.now() + timeoutMs);
   }
 
-  // PARTY：必须有队伍；票数钳制
+  // PARTY：必须有队伍；无队伍时自动创建（首位玩家为队长、其余房间玩家加入），票数钳制
   let requiredVotes = null;
   let resultRule = 'FIRST_VOTE';
   if (spec.type === 'PARTY') {
     const partyService = require('./partyService');
-    const party = partyService.getActiveParty(roomId);
-    if (!party) throw new DecisionError('NO_PARTY', '团队决策需要房间先有队伍', 409);
+    let party = partyService.getActiveParty(roomId);
+    if (!party) {
+      // 修复：GM 调用 request_party_vote 时房间可能尚未手动建队——自动创建并全员加入，
+      // 避免 NO_PARTY 导致投票无法发起（此前会回退成普通选项，用户看不到投票 UI）。
+      if (players.length === 0) throw new DecisionError('NO_PLAYERS', '房间内没有玩家，无法发起团队投票', 409);
+      party = partyService.createParty(io, roomId, players[0].id);
+      for (const p of players) {
+        if (p.id !== players[0].id) {
+          try { partyService.joinParty(io, party.id, p.id); } catch { /* 已加入或异常则忽略 */ }
+        }
+      }
+    }
     const memberCount = partyService.membersOf(party.id).length;
     requiredVotes = Math.max(1, Math.min(memberCount, Math.round(Number(spec.requiredVotes) || memberCount)));
     resultRule = spec.resultRule === 'FIRST_VOTE' ? 'FIRST_VOTE' : 'MAJORITY';

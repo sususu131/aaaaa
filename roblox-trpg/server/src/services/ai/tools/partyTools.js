@@ -43,6 +43,8 @@ register({
   name: 'create_decision',
   description:
     '创建一个普通剧情选择（NORMAL，无时限），由玩家选择后服务器结算。' +
+    '仅用于单个玩家的个人行动选择（如"你要先调查书架还是柜子？"）。' +
+    '若是决定团队整体走向（前往哪里/走哪条路/全体共同行动），必须改用 request_party_vote 团队投票，不得用本工具让每个玩家各自选择。' +
     '选项 2~4 个；效果白名单：npc/quest/world_event/player_relationship/damage/heal/flag（全部由服务器验证与执行）。' +
     'AI 不能直接宣布结果 —— 必须等待玩家选择。',
   permission: 'GAME_ACTION',
@@ -122,8 +124,9 @@ register({
 register({
   name: 'request_party_vote',
   description:
-    '创建团队决策（PARTY）：仅用于真正需要全队决定的场合（如副本路线）。队伍成员投票，' +
-    '达到 required_votes 或全员投票后按多数结算（平票执行默认选项）；超时执行默认选项。',
+    '创建团队决策（PARTY）：用于需要全队共同决定的场合——决定团队整体走向（前往哪张地图/哪个区域/走哪条路/全体共同行动）必须用本工具，由全队成员投票、' +
+    '达到 required_votes 或全员投票后按多数结算（平票执行默认选项）；超时执行默认选项。' +
+    '团队走向类选择绝不能用 create_decision / create_timed_decision 让每个玩家各自单独选择。',
   permission: 'GAME_ACTION',
   inputSchema: {
     type: 'object',

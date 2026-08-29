@@ -207,9 +207,6 @@ export default function RoomScreen({
           <button className={`btn tiny ${modal === 'party' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'party' ? null : 'party')}>
             🤝 队伍
           </button>
-          <button className={`btn tiny ${modal === 'decision' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'decision' ? null : 'decision')}>
-            🎭 抉择
-          </button>
           <button className={`btn tiny ${modal === 'inventory' ? 'active' : ''}`} onClick={() => onOpenModal(modal === 'inventory' ? null : 'inventory')}>
             🎒 背包
           </button>

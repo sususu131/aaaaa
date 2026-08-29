@@ -240,6 +240,34 @@ module.exports = function registerSocketHandlers(io) {
       maybeBaconInit(io, room, socket); // 阶段3b：无 Roblox 账号 → 默认属性，不调用 Vision
     });
 
+    /** 单人游玩：一键创建单人房间并自动触发 AI GM 开场（不依赖房间码/其他玩家）。 */
+    socket.on('room:solo', ({ playerName } = {}, ack) => {
+      const { name, error } = validateName(playerName);
+      if (error) return socket.emit('error', { message: error });
+
+      leaveCurrentRoom(io, socket, true);
+
+      const room = roomManager.createRoom(socket.id);
+      roomManager.joinRoom(room.id, { socketId: socket.id, name });
+      socket.join(room.id);
+
+      const row = roomManager.getPlayerRow(socket.id);
+      const session = attachSession(socket, row.id);
+      require('../services/character/characterService').ensureCharacter(row.id);
+      const payload = roomPayload(room, session);
+      if (typeof ack === 'function') ack({ ok: true, ...payload });
+      socket.emit('room:joined', payload);
+      maybeBaconInit(io, room, socket);
+
+      // 自动开场：触发 AI GM 生成一段单人开场叙事（随机选择体验/世界）
+      setTimeout(() => {
+        const p = room.players.find((pl) => pl.socketId === socket.id);
+        if (p) {
+          triggerGm(io, socket, room, p, '@AI 我是单人游玩。请为我生成一段开场叙事，设定当前所处的 Roblox 灾变世界场景，并给出接下来的行动选项。').catch(() => {});
+        }
+      }, 600);
+    });
+
     /** 加入房间。 */
     socket.on('room:join', ({ playerName, roomId } = {}, ack) => {
       const { name, error } = validateName(playerName);
@@ -266,6 +294,9 @@ module.exports = function registerSocketHandlers(io) {
       const payload = roomPayload(room, session);
       if (typeof ack === 'function') ack({ ok: true, ...payload });
       socket.emit('room:joined', payload);
+      // 修复加入后自己不显示：room:joined 里的 players 是加入前的快照，且 socket.to(...) 排除本人；
+      // 主动向本人再推一次 players:update，确保自己出现在玩家列表（含 Roblox 绑定/培根头标记）。
+      socket.emit('players:update', { players: roomManager.publicPlayers(room) });
 
       socket.to(room.id).emit('player:joined', { playerName: name, players: payload.players });
       broadcastSystem(io, room, `${name} 加入了房间`);

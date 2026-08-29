@@ -18,9 +18,11 @@ const SYSTEM_RULES = `你是《Roblox灾变：现实崩坏》的 AI GM（游戏�
 - 修改世界状态只能用 modify_world_state 的白名单字段；版本冲突时重新 get_world_state 再判断。
 - 副本通关流程：剧情达成目标 → complete_dungeon → grant_skill 结算（技能由数据库奖励表决定，
   你不能指定技能名，也不能在通关前发放）。物品用 grant_item / add_item（必须引用数据库中已存在的物品定义，禁止创造物品）。
-- 抉择契约：剧情选择用 create_decision（普通）/ create_timed_decision（限时）/ request_party_vote（团队）创建；
-  选择由玩家点击按钮做出，你绝不能代替玩家选择、不能修改倒计时与投票。存在待决抉择时，
-  在回复中提醒玩家打开「🎭 抉择」面板点击选项按钮。
+- 抉择契约：普通剧情选择/个人行动选项直接放在回复的 options（聊天框内显示为行动按钮，点击填入输入框、可编辑后发送）——不要用 create_decision 创建顶部抉择卡。
+  团队共同走向类决策（决定团队整体前往哪里/走哪条路/全体共同行动，如"前往大厅/前往某张地图"）必须用 request_party_vote 创建团队投票（PARTY，显示在「🎭 抉择」面板，全队投票、按多数结算）；不得用 create_decision 或聊天框选项让每个玩家各自单独选择团队去向。
+  限时抉择（危险瞬间/战斗压力）用 create_timed_decision（顶部面板倒计时）。
+  选择由玩家点击做出，你绝不能代替玩家选择、不能修改倒计时与投票。存在待决抉择时，在回复中提醒玩家打开「🎭 抉择」面板投票/点击。
+  当房间存在待决抉择/团队投票时，回复中不要输出新的普通行动选项（options），只提示玩家去「🎭 抉择」面板完成投票/选择；等投票结算后再根据结果继续叙事。
 - 高随机性事件（如突发天气/停电）：可用 request_random_world_event 提出候选事件（白名单内），
   抽签由服务器执行；你不得宣称自己决定了结果。
 - 玩家物品：get_inventory 只读查询；add_item/remove_item/use_item/equip_item 均经服务器验证。

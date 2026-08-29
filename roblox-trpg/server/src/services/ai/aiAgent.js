@@ -91,6 +91,27 @@ async function runAgentTurn(ctx, playerText) {
     broadcastStatus(io, room, round === 0 ? 'GM 思考中…' : 'GM 继续推演…');
     const res = await provider.chat(session, toolDefs);
 
+    // ── 阶段34 诊断日志：打印 AI 原始输出与工具调用，便于定位 GM 决策行为（如是否用了团队投票）──
+    try {
+      console.log(`[aiAgent] ── AI 原始输出（第 ${round + 1} 轮）──`);
+      console.log('[aiAgent] 最终回复原文:', String(res.content || '').slice(0, 1500));
+      console.log(
+        '[aiAgent] 工具调用:',
+        (res.toolCalls || []).map((c) => {
+          const args = c.args || {};
+          const info = { name: c.name };
+          // 决策类工具额外打印关键参数（类型/选项/是否团队投票）
+          if (['create_decision', 'create_timed_decision', 'request_party_vote'].includes(c.name)) {
+            info.prompt = String(args.prompt || '').slice(0, 120);
+            info.options = String(args.options || '').slice(0, 400);
+            info.default_option = args.default_option || null;
+            info.required_votes = args.required_votes ?? null;
+          }
+          return info;
+        }) || []
+      );
+    } catch (logErr) { /* 日志失败不阻塞 */ }
+
     if (!res.toolCalls.length) {
       const parsed = parseGmResponse(res.content);
       if (!parsed) throw new AiError('bad_format', 'GM回复格式异常，请重试');
@@ -98,6 +119,7 @@ async function runAgentTurn(ctx, playerText) {
       if (ctx.pendingOptions.length) {
         parsed.options = [...parsed.options, ...ctx.pendingOptions].slice(0, 6);
       }
+      console.log(`[aiAgent] 最终 GM options（第 ${round + 1} 轮）:`, JSON.stringify((parsed.options || []).map((o) => o.label)));
       io.to(room.id).emit('agent:event', { type: 'AI_COMPLETE', scope: 'room', rounds: round + 1 });
       return parsed;
     }

@@ -1,13 +1,18 @@
 import { useState } from 'react';
 
 /**
- * 入口页：输入名字 → 创建房间 / 输入房间ID加入（F2–F5）。
+ * 入口页：输入名字 → 单人游玩 / 创建房间 / 输入房间ID加入。
  */
-export default function LobbyScreen({ initialName, onCreate, onJoin, connected }) {
+export default function LobbyScreen({ initialName, onCreate, onSolo, onJoin, connected }) {
   const [name, setName] = useState(initialName);
   const [joinCode, setJoinCode] = useState('');
 
   const nameValid = name.trim().length > 0;
+
+  const handleSolo = () => {
+    if (!nameValid) return;
+    onSolo(name.trim());
+  };
 
   const handleCreate = () => {
     if (!nameValid) return;
@@ -33,11 +38,17 @@ export default function LobbyScreen({ initialName, onCreate, onJoin, connected }
             maxLength={16}
             placeholder="输入名字（1-16字符）"
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+            onKeyDown={(e) => e.key === 'Enter' && handleSolo()}
           />
         </label>
 
-        <button className="btn primary" disabled={!nameValid || !connected} onClick={handleCreate}>
+        <button className="btn primary" disabled={!nameValid || !connected} onClick={handleSolo}>
+          🎮 单人游玩
+        </button>
+
+        <div className="divider">或与好友一起</div>
+
+        <button className="btn" disabled={!nameValid || !connected} onClick={handleCreate}>
           创建房间
         </button>
 

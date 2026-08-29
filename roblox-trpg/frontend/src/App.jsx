@@ -113,6 +113,11 @@ export default function App() {
     const onDungeonSet = ({ experience, dungeon }) =>
       setRoom((prev) => (prev ? { ...prev, experience, dungeon } : prev));
     const onGmStatus = ({ status }) => setGmStatus(status || '');
+    const onDecisionNew = () => {
+      // 阶段34：收到新决策（NORMAL/TIMED/PARTY）时自动弹出抉择面板
+      // 仅在房间内时弹出；DecisionPanel 已按类型区分显示（NORMAL=剧情选择/TIMED=限时选择/PARTY=团队投票）
+      if (roomRef.current) setModal('decision');
+    };
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
@@ -124,6 +129,7 @@ export default function App() {
     socket.on('chat:message', onChatMessage);
     socket.on('gm:response', onGmResponse);
     socket.on('gm:status', onGmStatus);
+    socket.on('decision:new', onDecisionNew);
     socket.on('dungeon:set', onDungeonSet);
 
     return () => {
@@ -137,6 +143,7 @@ export default function App() {
       socket.off('chat:message', onChatMessage);
       socket.off('gm:response', onGmResponse);
       socket.off('gm:status', onGmStatus);
+      socket.off('decision:new', onDecisionNew);
       socket.off('dungeon:set', onDungeonSet);
       socket.disconnect();
     };
@@ -147,6 +154,13 @@ export default function App() {
     localStorage.setItem('rtp_name', name);
     myNameRef.current = name; // 阶段32：重连回房用
     socket.emit('room:create', { playerName: name });
+  };
+
+  const soloPlay = (name) => {
+    setError('');
+    localStorage.setItem('rtp_name', name);
+    myNameRef.current = name;
+    socket.emit('room:solo', { playerName: name });
   };
 
   const joinRoom = (name, roomId) => {
@@ -224,7 +238,7 @@ export default function App() {
       )}
 
       {screen === 'lobby' ? (
-        <LobbyScreen initialName={playerName} onCreate={createRoom} onJoin={joinRoom} connected={connected} />
+        <LobbyScreen initialName={playerName} onCreate={createRoom} onSolo={soloPlay} onJoin={joinRoom} connected={connected} />
       ) : (
         <RoomScreen
           room={room}
